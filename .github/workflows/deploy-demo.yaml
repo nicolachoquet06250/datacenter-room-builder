@@ -1,0 +1,44 @@
+name: Build & Deploy Demo (to datacenter-room-builder-demo)
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Si ton build sort dans "build", remplace dist -> build ici
+      - name: Push dist to demo repo (gh-pages)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.DEMO_REPO_TOKEN }}
+          external_repository: nicolachoquet06250/datacenter-room-builder-demo
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          destination_dir: .
+          force_orphan: true
+          commit_message: "chore: deploy demo from source repo (${{ github.sha }})"
