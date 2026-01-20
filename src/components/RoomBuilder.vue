@@ -19,6 +19,14 @@ export interface Point {
   y: number;
 }
 
+export interface Layer {
+  id: number;
+  name: string;
+  racks: Rack[];
+  pods: Pod[];
+  walls: Point[];
+}
+
 const rack_width = 50;
 const rack_height = 50;
 </script>
@@ -36,17 +44,48 @@ const props = withDefaults(
       racks: Rack[];
       pods: Pod[];
       walls: Point[];
+      layers?: Layer[];
     }>(),
     {
       racks: () => [],
       pods: () => [],
-      walls: () => []
+      walls: () => [],
+      layers: () => []
     }
 );
 
-const racks = ref<Rack[]>([]);
-const pods = ref<Pod[]>([]);
-const walls = ref<Point[]>([]);
+const layers = ref<Layer[]>([]);
+const currentLayerIndex = ref(0);
+
+const racks = computed({
+  get: () => layers.value[currentLayerIndex.value]?.racks || [],
+  set: (val) => {
+    if (layers.value[currentLayerIndex.value]) {
+      layers.value[currentLayerIndex.value]!.racks = val;
+    }
+  }
+});
+
+const pods = computed({
+  get: () => layers.value[currentLayerIndex.value]?.pods || [],
+  set: (val) => {
+    if (layers.value[currentLayerIndex.value]) {
+      layers.value[currentLayerIndex.value]!.pods = val;
+    }
+  }
+});
+
+const wallsRef = ref<Point[]>([]);
+const walls = computed({
+  get: () => layers.value.length > 0 ? (layers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value,
+  set: (val) => {
+    if (layers.value.length > 0 && layers.value[currentLayerIndex.value]) {
+      layers.value[currentLayerIndex.value]!.walls = val;
+    } else {
+      wallsRef.value = val;
+    }
+  }
+});
 const roomName = ref(props.roomName);
 
 const isDrawingWalls = ref(false);
@@ -71,17 +110,17 @@ const triggerClearWalls = () => {
 const confirmClearWalls = () => {
   takeSnapshot();
   walls.value = [];
-  racks.value = [];
-  pods.value = [];
+  layers.value = [];
+  currentLayerIndex.value = 0;
   isWallSelected.value = false;
   selectedRackIndices.value = [];
   isDrawingWalls.value = false;
   wallPreviewPoint.value = null;
 };
 
-const podBoundaries = computed(() => {
-  return pods.value.map(pod => {
-    const podRacks = racks.value.filter(r => r.podId === pod.id);
+const getPodBoundaries = (layerRacks: Rack[], layerPods: Pod[]) => {
+  return layerPods.map(pod => {
+    const podRacks = layerRacks.filter(r => r.podId === pod.id);
     if (podRacks.length === 0) return null;
 
     let minX = Infinity;
@@ -90,12 +129,6 @@ const podBoundaries = computed(() => {
     let maxY = -Infinity;
 
     podRacks.forEach(rack => {
-      // Pour calculer la bounding box réelle, il faudrait prendre en compte la rotation.
-      // Mais ici, on semble vouloir une boîte englobante simple ou alignée sur les axes.
-      // Vu que les racks font 50x50, on prend les coins.
-      // Pour simplifier on va prendre le rectangle non tourné pour l'instant, 
-      // ou calculer les 4 coins si tourné.
-      
       const corners = [
         { x: rack.x, y: rack.y },
         { x: rack.x + rack_width, y: rack.y },
@@ -126,7 +159,7 @@ const podBoundaries = computed(() => {
       }
     });
 
-    const padding = 10; // demi unité de grille (20 / 2)
+    const padding = 10;
     return {
       id: pod.id,
       x: minX - padding,
@@ -135,20 +168,27 @@ const podBoundaries = computed(() => {
       height: (maxY - minY) + 2 * padding
     };
   }).filter(Boolean);
-});
+};
+
+const podBoundaries = computed(() => getPodBoundaries(racks.value, pods.value));
 
 const zoomLevel = ref(1);
 const panOffset = ref({ x: 0, y: 0 });
 
-const wallBoundingBox = computed(() => {
-  if (walls.value.length < 3 || isDrawingWalls.value) return null;
+const getWallBoundingBox = (walls: Point[]) => {
+  if (walls.length < 3) return null;
   
-  let minX = Math.min(...walls.value.map(p => p.x));
-  let minY = Math.min(...walls.value.map(p => p.y));
-  let maxX = Math.max(...walls.value.map(p => p.x));
-  let maxY = Math.max(...walls.value.map(p => p.y));
+  let minX = Math.min(...walls.map(p => p.x));
+  let minY = Math.min(...walls.map(p => p.y));
+  let maxX = Math.max(...walls.map(p => p.x));
+  let maxY = Math.max(...walls.map(p => p.y));
   
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+};
+
+const wallBoundingBox = computed(() => {
+  if (isDrawingWalls.value) return null;
+  return getWallBoundingBox(walls.value);
 });
 
 const horizontalCoords = computed(() => {
@@ -191,7 +231,7 @@ const undoStack = ref<string[]>([]);
 const redoStack = ref<string[]>([]);
 
 const takeSnapshot = () => {
-  undoStack.value.push(JSON.stringify({ racks: racks.value, walls: walls.value, pods: pods.value }));
+  undoStack.value.push(JSON.stringify({ layers: layers.value, walls: walls.value, currentLayerIndex: currentLayerIndex.value }));
   redoStack.value = []; // Clear redo stack on new action
   if (undoStack.value.length > 50) { // Limit history size
     undoStack.value.shift();
@@ -200,26 +240,26 @@ const takeSnapshot = () => {
 
 const undo = () => {
   if (undoStack.value.length > 0) {
-    redoStack.value.push(JSON.stringify({ racks: racks.value, walls: walls.value, pods: pods.value }));
+    redoStack.value.push(JSON.stringify({ layers: layers.value, walls: walls.value, currentLayerIndex: currentLayerIndex.value }));
     const previousState = undoStack.value.pop();
     if (previousState) {
       const state = JSON.parse(previousState);
-      racks.value = state.racks;
-      walls.value = state.walls || [];
-      pods.value = state.pods || [];
+      if (state.layers) layers.value = state.layers;
+      if (state.walls && !state.layers) walls.value = state.walls;
+      if (state.currentLayerIndex !== undefined) currentLayerIndex.value = state.currentLayerIndex;
     }
   }
 };
 
 const redo = () => {
   if (redoStack.value.length > 0) {
-    undoStack.value.push(JSON.stringify({ racks: racks.value, walls: walls.value, pods: pods.value }));
+    undoStack.value.push(JSON.stringify({ layers: layers.value, walls: walls.value, currentLayerIndex: currentLayerIndex.value }));
     const nextState = redoStack.value.pop();
     if (nextState) {
       const state = JSON.parse(nextState);
-      racks.value = state.racks;
-      walls.value = state.walls || [];
-      pods.value = state.pods || [];
+      if (state.layers) layers.value = state.layers;
+      if (state.walls && !state.layers) walls.value = state.walls;
+      if (state.currentLayerIndex !== undefined) currentLayerIndex.value = state.currentLayerIndex;
     }
   }
 };
@@ -497,8 +537,21 @@ const deselect = (event: MouseEvent) => {
       const firstPoint = walls.value[0];
       const dist = Math.sqrt(Math.pow(snapX - (firstPoint?.x ?? 0), 2) + Math.pow(snapY - (firstPoint?.y ?? 0), 2));
       if (dist < 10) {
+        const finalWalls = [...walls.value];
         isDrawingWalls.value = false;
         wallPreviewPoint.value = null;
+
+        // Génération des 3 layers
+        const layerNames = ['Circuits électriques', 'Surfaces au sol', 'Baies'];
+        layers.value = layerNames.map((name, index) => ({
+          id: index + 1,
+          name: name,
+          racks: [],
+          pods: [],
+          walls: JSON.parse(JSON.stringify(finalWalls))
+        }));
+        currentLayerIndex.value = 0;
+        
         return;
       }
     }
@@ -515,7 +568,7 @@ const deselect = (event: MouseEvent) => {
 };
 
 const emit = defineEmits<{
-  (e: 'saved', payload: {racks: Rack[], pods: Pod[], walls: Point[]}): void;
+  (e: 'saved', payload: {racks: Rack[], pods: Pod[], walls: Point[], layers: Layer[]}): void;
 }>();
 
 const handleKeyDown = (event: KeyboardEvent) => {
@@ -639,7 +692,12 @@ const pasteFromClipboard = async () => {
 
 const save = async () => {
   try {
-    emit('saved', {racks: racks.value, pods: pods.value, walls: walls.value});
+    emit('saved', {
+      racks: racks.value, 
+      pods: pods.value, 
+      walls: walls.value,
+      layers: layers.value
+    });
   } catch (e) {
     console.error(e);
     // @ts-ignore
@@ -834,14 +892,29 @@ const clearWalls = () => {
 };
 
 onMounted(async () => {
-  if (props.racks) {
-    racks.value = typeof props.racks === 'string' ? JSON.parse(props.racks) : props.racks;
-  }
-  if (props.pods) {
-    pods.value = typeof props.pods === 'string' ? JSON.parse(props.pods) : props.pods;
-  }
-  if (props.walls) {
-    walls.value = typeof props.walls === 'string' ? JSON.parse(props.walls) : props.walls;
+  if (props.layers && props.layers.length > 0) {
+    layers.value = typeof props.layers === 'string' ? JSON.parse(props.layers) : props.layers;
+    currentLayerIndex.value = 0;
+  } else {
+    // Fallback aux anciennes props si pas de layers
+    if (props.walls && props.walls.length > 0) {
+      const initialWalls = typeof props.walls === 'string' ? JSON.parse(props.walls) : props.walls;
+      // Si on a des murs mais pas de layers, on peut soit les mettre dans wallsRef soit générer les layers
+      walls.value = initialWalls;
+      
+      const initialRacks = typeof props.racks === 'string' ? JSON.parse(props.racks) : props.racks;
+      const initialPods = typeof props.pods === 'string' ? JSON.parse(props.pods) : props.pods;
+
+      // Si on a déjà des murs, on génère les 3 layers avec le contenu existant sur le premier layer
+      const layerNames = ['Circuits électriques', 'Surfaces au sol', 'Baies'];
+      layers.value = layerNames.map((name, index) => ({
+        id: index + 1,
+        name: name,
+        racks: index === 0 ? initialRacks : [],
+        pods: index === 0 ? initialPods : [],
+        walls: JSON.parse(JSON.stringify(initialWalls))
+      }));
+    }
   }
   window.addEventListener('keydown', handleKeyDown);
 });
@@ -866,6 +939,7 @@ onUnmounted(() => {
         {{ isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs' }}
       </button>
       <button v-if="walls.length > 0" class="btn btn-danger" @click="clearWalls">Supprimer la pièce</button>
+
       <div class="zoom-controls">
         <button class="btn btn-sm btn-secondary" @click="zoomOut" :disabled="zoomLevel <= 0.2">-</button>
         <span class="zoom-text">{{ Math.round(zoomLevel * 100) }}%</span>
@@ -892,26 +966,83 @@ onUnmounted(() => {
         <rect width="100%" height="100%" fill="url(#grid)" class="canvas-background" :transform="`translate(${(panOffset.x * zoomLevel) % (20 * zoomLevel)}, ${(panOffset.y * zoomLevel) % (20 * zoomLevel)})`" />
 
         <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`">
-          <!-- Walls -->
-          <polyline
-              v-if="walls.length > 0"
-              :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
-              fill="none"
-              stroke="#333"
-              stroke-width="4"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-          />
-          <polygon
-              v-if="!isDrawingWalls && walls.length > 2"
-              :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
-              class="room-surface"
-              :class="{ selected: isWallSelected }"
-              @mousedown.stop="isWallSelected = true; selectedRackIndices = []"
-              stroke="#333"
-              stroke-width="4"
-              stroke-linejoin="round"
-          />
+          <!-- Non-active layers (background) -->
+          <g v-for="(layer, lIdx) in layers" :key="'layer-' + layer.id" 
+             v-show="lIdx !== currentLayerIndex"
+             class="layer-inactive"
+          >
+            <!-- Walls -->
+            <polyline
+                v-if="layer.walls.length > 0"
+                :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
+                fill="none"
+                stroke="#333"
+                stroke-width="4"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+            />
+            <polygon
+                v-if="layer.walls.length > 2"
+                :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
+                class="room-surface"
+                stroke="#333"
+                stroke-width="4"
+                stroke-linejoin="round"
+            />
+
+            <!-- Pods boundaries -->
+            <rect
+                v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
+                :key="pod!.id"
+                :x="pod!.x"
+                :y="pod!.y"
+                :width="pod!.width"
+                :height="pod!.height"
+                class="pod-rect"
+            />
+
+            <!-- Racks -->
+            <g v-for="(table, tIdx) in layer.racks" :key="'rack-' + tIdx">
+              <g :transform="`rotate(${table?.rotation || 0}, ${table.x + rack_width / 2}, ${table.y + rack_height / 2})`">
+                <rect
+                    :x="table.x" :y="table.y"
+                    :width="rack_width" :height="rack_height"
+                    class="table-rect"
+                    :class="{ grouped: table.podId }"
+                />
+                <text
+                    :x="table.x + rack_width / 2"
+                    :y="table.y + rack_height / 2"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    class="table-label"
+                >{{ table.name }}</text>
+              </g>
+            </g>
+          </g>
+
+          <!-- Active Layer -->
+          <g class="layer-active">
+            <!-- Walls -->
+            <polyline
+                v-if="walls.length > 0"
+                :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
+                fill="none"
+                stroke="#333"
+                stroke-width="4"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+            />
+            <polygon
+                v-if="!isDrawingWalls && walls.length > 2"
+                :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
+                class="room-surface"
+                :class="{ selected: isWallSelected }"
+                @mousedown.stop="isWallSelected = true; selectedRackIndices = []"
+                stroke="#333"
+                stroke-width="4"
+                stroke-linejoin="round"
+            />
           <!-- Preview line when drawing -->
           <circle
               v-if="isDrawingWalls && wallPreviewPoint"
@@ -1025,7 +1156,8 @@ onUnmounted(() => {
             </g>
           </g>
         </g>
-      </svg>
+      </g>
+    </svg>
 
       <div v-if="contextMenu.show" class="context-menu" :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }">
         <ul>
@@ -1066,6 +1198,56 @@ onUnmounted(() => {
              <button v-if="contextMenuOptions.type === 'delete_pod'" @click="deletePod(contextMenuOptions.podId!)" class="btn btn-danger">Supprimer le pod</button>
              <button @click="selectedRackIndices = []" class="btn btn-outline-secondary">Désélectionner tout</button>
           </div>
+        </div>
+      </div>
+      <div v-if="layers.length > 0" class="layer-previews">
+        <div 
+          v-for="(layer, index) in layers" 
+          :key="'preview-' + layer.id"
+          class="layer-preview-card"
+          :class="{ active: currentLayerIndex === index }"
+          @click="currentLayerIndex = index"
+        >
+          <div class="preview-title">{{ layer.name }}</div>
+          <svg
+            :viewBox="getWallBoundingBox(layer.walls) ? `${getWallBoundingBox(layer.walls)!.minX - 20} ${getWallBoundingBox(layer.walls)!.minY - 20} ${getWallBoundingBox(layer.walls)!.width + 40} ${getWallBoundingBox(layer.walls)!.height + 40}` : '0 0 100 100'"
+            class="mini-map"
+          >
+            <!-- Walls -->
+            <polygon
+                v-if="layer.walls.length > 2"
+                :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
+                fill="rgba(0,0,0,0.05)"
+                stroke="#333"
+                stroke-width="2"
+            />
+            
+            <!-- Racks -->
+            <g v-for="(table, tIdx) in layer.racks" :key="'preview-rack-' + tIdx">
+              <rect
+                  :x="table.x" :y="table.y"
+                  :width="rack_width" :height="rack_height"
+                  fill="#d2b48c"
+                  stroke="#8b4513"
+                  stroke-width="1"
+                  :transform="`rotate(${table?.rotation || 0}, ${table.x + rack_width / 2}, ${table.y + rack_height / 2})`"
+              />
+            </g>
+
+            <!-- Pods -->
+            <rect
+                v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
+                :key="'preview-pod-' + pod!.id"
+                :x="pod!.x"
+                :y="pod!.y"
+                :width="pod!.width"
+                :height="pod!.height"
+                fill="none"
+                stroke="red"
+                stroke-width="1"
+                stroke-dasharray="2, 2"
+            />
+          </svg>
         </div>
       </div>
     </div>
@@ -1267,6 +1449,25 @@ onUnmounted(() => {
   border-top: 1px solid #f3f4f6;
   padding-top: 1rem;
 }
+.layer-selector {
+  display: flex;
+  gap: 5px;
+  margin: 0 10px;
+  padding: 5px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.layer-selector .btn {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.layer-inactive {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
 .zoom-controls {
   display: flex;
   align-items: center;
@@ -1291,5 +1492,55 @@ onUnmounted(() => {
 }
 .canvas-svg.drawing-walls {
   cursor: crosshair !important;
+}
+
+.layer-previews {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.layer-preview-card {
+  width: 150px;
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 5px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.2s;
+}
+
+.layer-preview-card:hover {
+  border-color: #2563eb;
+  transform: scale(1.05);
+}
+
+.layer-preview-card.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.preview-title {
+  font-size: 0.7rem;
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-map {
+  width: 100%;
+  height: 100px;
+  background: #f9fafb;
+  border-radius: 4px;
 }
 </style>
