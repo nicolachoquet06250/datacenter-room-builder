@@ -13,4 +13,5 @@ export default defineConfig({
       customElement: true
     })
   ],
+  base: './'
 })
