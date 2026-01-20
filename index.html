@@ -18,7 +18,107 @@
     </style>
   </head>
   <body>
-    <room-builder room-id="1" room-name="Salle principale"></room-builder>
+    <room-builder room-id="1" room-name="Salle principale" layers='[
+            {
+                "id": 1,
+                "name": "Circuits électriques",
+                "racks": [
+                    {
+                        "id": 1,
+                        "roomId": 1,
+                        "name": "Rack 1",
+                        "x": 460,
+                        "y": 160,
+                        "rotation": 0
+                    }
+                ],
+                "pods": [],
+                "walls": [
+                    {
+                        "x": 220,
+                        "y": 40
+                    },
+                    {
+                        "x": 220,
+                        "y": 340
+                    },
+                    {
+                        "x": 760,
+                        "y": 340
+                    },
+                    {
+                        "x": 760,
+                        "y": 40
+                    }
+                ]
+            },
+            {
+                "id": 2,
+                "name": "Surfaces au sol",
+                "racks": [
+                    {
+                        "id": 1,
+                        "roomId": 1,
+                        "name": "Rack 1",
+                        "x": 300,
+                        "y": 80,
+                        "rotation": 0
+                    }
+                ],
+                "pods": [],
+                "walls": [
+                    {
+                        "x": 220,
+                        "y": 40
+                    },
+                    {
+                        "x": 220,
+                        "y": 340
+                    },
+                    {
+                        "x": 760,
+                        "y": 340
+                    },
+                    {
+                        "x": 760,
+                        "y": 40
+                    }
+                ]
+            },
+            {
+                "id": 3,
+                "name": "Baies",
+                "racks": [
+                    {
+                        "id": 1,
+                        "roomId": 1,
+                        "name": "Rack 1",
+                        "x": 660,
+                        "y": 100,
+                        "rotation": 0
+                    }
+                ],
+                "pods": [],
+                "walls": [
+                    {
+                        "x": 220,
+                        "y": 40
+                    },
+                    {
+                        "x": 220,
+                        "y": 340
+                    },
+                    {
+                        "x": 760,
+                        "y": 340
+                    },
+                    {
+                        "x": 760,
+                        "y": 40
+                    }
+                ]
+            }
+        ]'></room-builder>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -41,27 +41,40 @@ const props = withDefaults(
     defineProps<{
       roomId: number;
       roomName: string;
-      racks: Rack[];
-      pods: Pod[];
-      walls: Point[];
-      layers?: Layer[];
+      layers?: Layer[] | string;
     }>(),
     {
-      racks: () => [],
-      pods: () => [],
-      walls: () => [],
       layers: () => []
     }
 );
 
 const layers = ref<Layer[]>([]);
 const currentLayerIndex = ref(0);
+const canvasSvg = ref<SVGSVGElement | null>(null);
+const canvasWidth = ref(800); // Valeur par défaut
+const canvasHeight = ref(600);
+
+const updateCanvasSize = () => {
+  if (canvasSvg.value) {
+    canvasWidth.value = canvasSvg.value.clientWidth;
+    canvasHeight.value = canvasSvg.value.clientHeight;
+  }
+};
+
+const viewportRect = computed(() => {
+  return {
+    x: -panOffset.value.x,
+    y: -panOffset.value.y,
+    width: canvasWidth.value / zoomLevel.value,
+    height: canvasHeight.value / zoomLevel.value
+  };
+});
 
 const racks = computed({
-  get: () => layers.value[currentLayerIndex.value]?.racks || [],
+  get: () => (layers.value[currentLayerIndex.value]?.racks || []) as Rack[]|string,
   set: (val) => {
     if (layers.value[currentLayerIndex.value]) {
-      layers.value[currentLayerIndex.value]!.racks = val;
+      layers.value[currentLayerIndex.value]!.racks = val as Rack[];
     }
   }
 });
@@ -109,8 +122,8 @@ const triggerClearWalls = () => {
 
 const confirmClearWalls = () => {
   takeSnapshot();
-  walls.value = [];
   layers.value = [];
+  wallsRef.value = [];
   currentLayerIndex.value = 0;
   isWallSelected.value = false;
   selectedRackIndices.value = [];
@@ -170,7 +183,7 @@ const getPodBoundaries = (layerRacks: Rack[], layerPods: Pod[]) => {
   }).filter(Boolean);
 };
 
-const podBoundaries = computed(() => getPodBoundaries(racks.value, pods.value));
+const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
 
 const zoomLevel = ref(1);
 const panOffset = ref({ x: 0, y: 0 });
@@ -319,6 +332,8 @@ const addRack = () => {
     }
   }
 
+  if (typeof racks.value === 'string') return;
+
   racks.value.push({
     id: racks.value.length + 1,
     roomId: props.roomId,
@@ -332,6 +347,7 @@ const addRack = () => {
 
 const removeRack = async (index: number) => {
   takeSnapshot();
+  if (typeof racks.value === 'string') return;
   racks.value.splice(index, 1);
   selectedRackIndices.value = [];
 };
@@ -372,6 +388,8 @@ const startDragRack = (event: MouseEvent, index: number) => {
     }
   }
 
+  if (typeof racks.value === 'string') return;
+
   // Store initial positions of all racks (to keep track of "real" non-snapped positions during drag)
   rackPositionsBeforeDrag.value = racks.value.map(r => ({ x: r.x, y: r.y }));
   
@@ -386,13 +404,15 @@ const startRotateRack = (event: MouseEvent, index: number) => {
   event.stopPropagation();
   rotatingRack.value = index;
   selectedRackIndices.value = [index];
+
+  if (typeof racks.value === 'string') return;
   
-  const table = racks.value[index];
-  const centerX = (table?.x ?? 0) + rack_width / 2 + panOffset.value.x;
-  const centerY = (table?.y ?? 0) + rack_height / 2 + panOffset.value.y;
+  const rack = racks.value[index];
+  const centerX = (rack?.x ?? 0) + rack_width / 2 + panOffset.value.x;
+  const centerY = (rack?.y ?? 0) + rack_height / 2 + panOffset.value.y;
 
   startRotationAngle.value = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
-  initialRackRotation.value = table?.rotation || 0;
+  initialRackRotation.value = rack?.rotation || 0;
 };
 
 const getConstrainedPoint = (currentX: number, currentY: number, lastPoint: Point | null): Point => {
@@ -461,6 +481,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
 
 const onMouseMove = (event: MouseEvent) => {
   if (isDrawingWalls.value) return;
+  if (typeof racks.value === 'string') return;
   if (isPanning.value) {
     panOffset.value.x += event.movementX / zoomLevel.value;
     panOffset.value.y += event.movementY / zoomLevel.value;
@@ -471,9 +492,9 @@ const onMouseMove = (event: MouseEvent) => {
     const deltaY = (event.clientY - lastMousePos.y) / zoomLevel.value;
 
     selectedRackIndices.value.forEach(index => {
-      const table = racks.value[index];
+      const rack = racks.value[index] as Rack;
       const initialPos = rackPositionsBeforeDrag.value[index];
-      if (!table || !initialPos) return;
+      if (!rack || !initialPos) return;
       
       const rawX = initialPos.x + deltaX;
       const rawY = initialPos.y + deltaY;
@@ -485,25 +506,25 @@ const onMouseMove = (event: MouseEvent) => {
       // Vérifier si la nouvelle position (centre du rack) est à l'intérieur des murs
       if (walls.value.length > 2) {
         if (isPointInPolygon(snapX + rack_width / 2, snapY + rack_height / 2, walls.value)) {
-          table.x = snapX;
-          table.y = snapY;
+          rack.x = snapX;
+          rack.y = snapY;
         }
       } else {
-        table.x = snapX;
-        table.y = snapY;
+        rack.x = snapX;
+        rack.y = snapY;
       }
     });
   } else if (rotatingRack.value !== null) {
-    const table = racks.value[rotatingRack.value];
-    const centerX = (table?.x ?? 0) + (rack_width ?? 0) / 2 + panOffset.value.x;
-    const centerY = (table?.y ?? 0) + (rack_height ?? 0) / 2 + panOffset.value.y;
+    const rack = racks.value[rotatingRack.value];
+    const centerX = (rack?.x ?? 0) + (rack_width ?? 0) / 2 + panOffset.value.x;
+    const centerY = (rack?.y ?? 0) + (rack_height ?? 0) / 2 + panOffset.value.y;
     
     const currentAngle = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
     const deltaAngle = (currentAngle - startRotationAngle.value) * (180 / Math.PI);
     
     const rawRotation = (initialRackRotation.value + deltaAngle) % 360;
     // Snap to 45° increments
-    table!.rotation = Math.round(rawRotation / 45) * 45;
+    rack!.rotation = Math.round(rawRotation / 45) * 45;
   }
 };
 
@@ -592,7 +613,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
   // Suppression
   if (event.key === 'Delete' || event.key === 'Backspace') {
-    // Si on est dans un input, on ne supprime pas la table/chaise
+    // Si on est dans un input, on ne supprime pas la rack/chaise
     if (event.composedPath().some((el) => {
       if (!(el instanceof HTMLElement)) return false;
       return (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
@@ -606,6 +627,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
       // On trie par index décroissant pour ne pas décaler les index lors de la suppression
       const sortedIndices = [...selectedRackIndices.value].sort((a, b) => b - a);
       sortedIndices.forEach(index => {
+        if (typeof racks.value === 'string') return;
         racks.value.splice(index, 1);
       });
       selectedRackIndices.value = [];
@@ -644,10 +666,11 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
 const duplicateRack = (index: number) => {
   takeSnapshot();
-  const table = racks.value[index];
-  const newRack = JSON.parse(JSON.stringify(table));
+  if (typeof racks.value === 'string') return;
+  const rack = racks.value[index];
+  const newRack = JSON.parse(JSON.stringify(rack));
   delete newRack.id;
-  newRack.name = `${table?.name} (copie)`;
+  newRack.name = `${rack?.name} (copie)`;
   newRack.x += 20;
   newRack.y += 20;
   
@@ -656,15 +679,15 @@ const duplicateRack = (index: number) => {
 };
 
 const copyRack = (index: number) => {
-  const table = racks.value[index];
-  const copyData = JSON.parse(JSON.stringify(table));
+  const rack = racks.value[index];
+  const copyData = JSON.parse(JSON.stringify(rack));
   delete copyData.id;
-  copyData._type = 'rack'; // Tag to identify it as a table
+  copyData._type = 'rack'; // Tag to identify it as a rack
   
   // Copy to system clipboard as JSON string
   navigator.clipboard.writeText(JSON.stringify(copyData))
     .then(() => console.log('Rack copied to clipboard'))
-    .catch(err => console.error('Failed to copy table: ', err));
+    .catch(err => console.error('Failed to copy rack: ', err));
 };
 
 const pasteFromClipboard = async () => {
@@ -674,9 +697,11 @@ const pasteFromClipboard = async () => {
     
     if (!data || typeof data !== 'object') return;
 
-    // Handle pasting a table
+    // Handle pasting a rack
     if (data._type === 'rack') {
       takeSnapshot();
+      if (typeof racks.value === 'string') return;
+
       const newRack = data;
       delete newRack._type;
       newRack.x += 20;
@@ -692,6 +717,8 @@ const pasteFromClipboard = async () => {
 
 const save = async () => {
   try {
+    if (typeof racks.value === 'string') return;
+
     emit('saved', {
       racks: racks.value, 
       pods: pods.value, 
@@ -728,27 +755,29 @@ const onWheel = (event: WheelEvent) => {
 
 const contextMenu = ref<{ x: number, y: number, show: boolean }>({ x: 0, y: 0, show: false });
 
-const contextMenuOptions = computed(() => {
-  if (selectedRackIndices.value.length === 0) return { type: 'none' };
+const contextMenuOptions = computed<{type: string, podId: string}>(() => {
+  if (selectedRackIndices.value.length === 0) return { type: 'none' } as {type: string, podId: string};
 
-  const selectedRacks = selectedRackIndices.value.map(idx => racks.value[idx]!);
+  if (typeof racks.value === 'string') return { type: 'none' } as {type: string, podId: string};
+
+  const selectedRacks = selectedRackIndices.value.map(idx => racks.value[idx]!) as Rack[];
   const podsInSelection = [...new Set(selectedRacks.map(r => r.podId).filter(Boolean))];
 
   if (podsInSelection.length === 0) {
-    return { type: 'create_pod' };
+    return { type: 'create_pod' } as {type: string, podId: string};
   }
 
   if (podsInSelection.length === 1) {
     const podId = podsInSelection[0]!;
     const racksInPod = racks.value.filter(r => r.podId === podId);
     const allRacksOfPodSelected = racksInPod.every(r => 
-      selectedRackIndices.value.includes(racks.value.indexOf(r))
+      selectedRackIndices.value.includes(racks.value.indexOf(r as Rack & string))
     );
 
     if (allRacksOfPodSelected) {
-      return { type: 'delete_pod', podId };
+      return { type: 'delete_pod', podId } as {type: string, podId: string};
     } else {
-      return { type: 'leave_pod', podId };
+      return { type: 'leave_pod', podId } as {type: string, podId: string};
     }
   }
 
@@ -793,6 +822,8 @@ const createPod = () => {
   pods.value.push({ id: podId, name: podName });
   
   selectedRackIndices.value.forEach(index => {
+    if (typeof racks.value === 'string') return;
+
     racks.value[index]!.podId = podId;
   });
   
@@ -816,6 +847,8 @@ const leavePod = () => {
   takeSnapshot();
   
   selectedRackIndices.value.forEach(index => {
+    if (typeof racks.value === 'string') return;
+
     racks.value[index]!.podId = null;
   });
   
@@ -839,6 +872,8 @@ const deletePod = (podId: string) => {
   
   // Sortir tous les racks de ce pod (au cas où certains n'étaient pas sélectionnés, 
   // même si la logique actuelle dit qu'on ne propose l'option que si tout est sélectionné)
+  if (typeof racks.value === 'string') return;
+
   racks.value.forEach(r => {
     if (r.podId === podId) {
       r.podId = null;
@@ -874,6 +909,8 @@ const selectPod = (event: MouseEvent, podId: string) => {
   isWallSelected.value = false;
   
   const podRacksIndices: number[] = [];
+  if (typeof racks.value === 'string') return;
+
   racks.value.forEach((rack, index) => {
     if (rack.podId === podId) {
       podRacksIndices.push(index);
@@ -892,34 +929,17 @@ const clearWalls = () => {
 };
 
 onMounted(async () => {
+  updateCanvasSize();
+  window.addEventListener('resize', updateCanvasSize);
   if (props.layers && props.layers.length > 0) {
     layers.value = typeof props.layers === 'string' ? JSON.parse(props.layers) : props.layers;
     currentLayerIndex.value = 0;
-  } else {
-    // Fallback aux anciennes props si pas de layers
-    if (props.walls && props.walls.length > 0) {
-      const initialWalls = typeof props.walls === 'string' ? JSON.parse(props.walls) : props.walls;
-      // Si on a des murs mais pas de layers, on peut soit les mettre dans wallsRef soit générer les layers
-      walls.value = initialWalls;
-      
-      const initialRacks = typeof props.racks === 'string' ? JSON.parse(props.racks) : props.racks;
-      const initialPods = typeof props.pods === 'string' ? JSON.parse(props.pods) : props.pods;
-
-      // Si on a déjà des murs, on génère les 3 layers avec le contenu existant sur le premier layer
-      const layerNames = ['Circuits électriques', 'Surfaces au sol', 'Baies'];
-      layers.value = layerNames.map((name, index) => ({
-        id: index + 1,
-        name: name,
-        racks: index === 0 ? initialRacks : [],
-        pods: index === 0 ? initialPods : [],
-        walls: JSON.parse(JSON.stringify(initialWalls))
-      }));
-    }
   }
   window.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateCanvasSize);
   window.removeEventListener('keydown', handleKeyDown);
 });
 </script>
@@ -951,6 +971,7 @@ onUnmounted(() => {
 
     <div class="canvas-area">
       <svg
+          ref="canvasSvg"
           width="100%"
           height="600"
           class="canvas-svg"
@@ -967,7 +988,7 @@ onUnmounted(() => {
 
         <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`">
           <!-- Non-active layers (background) -->
-          <g v-for="(layer, lIdx) in layers" :key="'layer-' + layer.id" 
+          <g v-for="(layer, lIdx) in (layers as Layer[])" :key="'layer-' + layer.id"
              v-show="lIdx !== currentLayerIndex"
              class="layer-inactive"
           >
@@ -1002,21 +1023,21 @@ onUnmounted(() => {
             />
 
             <!-- Racks -->
-            <g v-for="(table, tIdx) in layer.racks" :key="'rack-' + tIdx">
-              <g :transform="`rotate(${table?.rotation || 0}, ${table.x + rack_width / 2}, ${table.y + rack_height / 2})`">
+            <g v-for="(rack, tIdx) in layer.racks" :key="'rack-' + tIdx">
+              <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`">
                 <rect
-                    :x="table.x" :y="table.y"
+                    :x="rack.x" :y="rack.y"
                     :width="rack_width" :height="rack_height"
-                    class="table-rect"
-                    :class="{ grouped: table.podId }"
+                    class="rack-rect"
+                    :class="{ grouped: rack.podId }"
                 />
                 <text
-                    :x="table.x + rack_width / 2"
-                    :y="table.y + rack_height / 2"
+                    :x="rack.x + rack_width / 2"
+                    :y="rack.y + rack_height / 2"
                     text-anchor="middle"
                     dominant-baseline="middle"
-                    class="table-label"
-                >{{ table.name }}</text>
+                    class="rack-label"
+                >{{ rack.name }}</text>
               </g>
             </g>
           </g>
@@ -1083,7 +1104,7 @@ onUnmounted(() => {
               :width="pod!.width"
               :height="pod!.height"
               class="pod-rect"
-              :class="{ selected: selectedRackIndices.length > 0 && racks[selectedRackIndices[0]!]?.podId === pod!.id }"
+              :class="{ selected: selectedRackIndices.length > 0 && (racks as Rack[])[selectedRackIndices[0]!]?.podId === pod!.id }"
               @mousedown="selectPod($event, pod!.id)"
           />
 
@@ -1108,52 +1129,54 @@ onUnmounted(() => {
             >{{ coord.label }}</text>
           </g>
 
-          <g v-for="(table, tIdx) in racks" :key="tIdx">
-            <g :transform="`rotate(${table?.rotation || 0}, ${table.x + rack_width / 2}, ${table.y + rack_height / 2})`">
-              <!-- Rack -->
-              <rect
-                  :x="table.x" :y="table.y"
-                  :width="rack_width" :height="rack_height"
-                  class="table-rect"
-                  :class="{ selected: selectedRackIndices.includes(tIdx), grouped: table.podId }"
-                  @mousedown="startDragRack($event, tIdx)"
-                  @contextmenu="openContextMenu($event, tIdx)"
-              />
-
-              <!-- Indicateur de l'avant du rack (en bas du carré par défaut) -->
-              <line
-                  :x1="table.x + 1" :y1="table.y + (rack_height / 10) * 9"
-                  :x2="table.x + (rack_width - 1)" :y2="table.y + (rack_height / 10) * 9"
-                  class="rack-front-line"
-              />
-
-              <text
-                  :x="table.x + rack_width / 2"
-                  :y="table.y + rack_height / 2"
-                  text-anchor="middle"
-                  dominant-baseline="middle"
-                  class="table-label"
-                  :transform="`rotate(${- (table?.rotation || 0)}, ${table.x + rack_width / 2}, ${table.y + rack_height / 2})`"
-              >
-                {{ table.name }}
-              </text>
-
-              <!-- Poignées de rotation sur les coins (visibles seulement si sélectionnée seule) -->
-              <template v-if="selectedRackIndices.length === 1 && selectedRackIndices[0] === tIdx">
-                <circle
-                    v-for="(pos, pIdx) in [
-                    {x: table.x, y: table.y},
-                    {x: table.x + rack_width, y: table.y},
-                    {x: table.x, y: table.y + rack_height},
-                    {x: table.x + rack_width, y: table.y + rack_height}
-                  ]"
-                    :key="pIdx"
-                    :cx="pos.x" :cy="pos.y" r="6"
-                    class="rotation-handle"
-                    @mousedown="startRotateRack($event, tIdx)"
+          <g v-for="(rack, tIdx) in racks" :key="tIdx">
+            <template v-if="typeof rack !== 'string'">
+              <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`">
+                <!-- Rack -->
+                <rect
+                    :x="rack.x" :y="rack.y"
+                    :width="rack_width" :height="rack_height"
+                    class="rack-rect"
+                    :class="{ selected: selectedRackIndices.includes(tIdx), grouped: rack.podId }"
+                    @mousedown="startDragRack($event, tIdx)"
+                    @contextmenu="openContextMenu($event, tIdx)"
                 />
-              </template>
-            </g>
+
+                <!-- Indicateur de l'avant du rack (en bas du carré par défaut) -->
+                <line
+                    :x1="rack.x + 1" :y1="rack.y + (rack_height / 10) * 9"
+                    :x2="rack.x + (rack_width - 1)" :y2="rack.y + (rack_height / 10) * 9"
+                    class="rack-front-line"
+                />
+
+                <text
+                    :x="rack.x + rack_width / 2"
+                    :y="rack.y + rack_height / 2"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    class="rack-label"
+                    :transform="`rotate(${- (rack?.rotation || 0)}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`"
+                >
+                  {{ rack.name }}
+                </text>
+
+                <!-- Poignées de rotation sur les coins (visibles seulement si sélectionnée seule) -->
+                <template v-if="selectedRackIndices.length === 1 && selectedRackIndices[0] === tIdx">
+                  <circle
+                      v-for="(pos, pIdx) in [
+                      {x: rack.x, y: rack.y},
+                      {x: rack.x + rack_width, y: rack.y},
+                      {x: rack.x, y: rack.y + rack_height},
+                      {x: rack.x + rack_width, y: rack.y + rack_height}
+                    ]"
+                      :key="pIdx"
+                      :cx="pos.x" :cy="pos.y" r="6"
+                      class="rotation-handle"
+                      @mousedown="startRotateRack($event, tIdx)"
+                  />
+                </template>
+              </g>
+            </template>
           </g>
         </g>
       </g>
@@ -1179,9 +1202,9 @@ onUnmounted(() => {
       <div v-if="selectedRackIndices.length === 1 && !isWallSelected" class="properties-panel">
         <div v-if="racks[selectedRackIndices[0]!]">
           <h3>Rack</h3>
-          <label>Nom: <input v-model="racks[selectedRackIndices[0]!]!.name" @keyup.delete.stop.prevent="() => {}" /></label>
-          <label>Rotation (°): <input type="number" v-model.number="racks[selectedRackIndices[0]!]!.rotation" step="45" @change="racks[selectedRackIndices[0]!]!.rotation = Math.round((racks[selectedRackIndices[0]!]?.rotation ?? 0) / 45) * 45" /></label>
-          <label v-if="racks[selectedRackIndices[0]!]?.podId">Pod ID: <span>{{ racks[selectedRackIndices[0]!]?.podId }}</span></label>
+          <label>Nom: <input v-model="(racks as Rack[])[selectedRackIndices[0]!]!.name" @keyup.delete.stop.prevent="() => {}" /></label>
+          <label>Rotation (°): <input type="number" v-model.number="(racks as Rack[])[selectedRackIndices[0]!]!.rotation" step="45" @change="(racks as Rack[])[selectedRackIndices[0]!]!.rotation = Math.round(((racks as Rack[])[selectedRackIndices[0]!]?.rotation ?? 0) / 45) * 45" /></label>
+          <label v-if="(racks as Rack[])[selectedRackIndices[0]!]?.podId">Pod ID: <span>{{ (racks as Rack[])[selectedRackIndices[0]!]?.podId }}</span></label>
 
           <div class="actions">
             <button @click="removeRack(selectedRackIndices[0]!)" class="btn btn-danger">Supprimer le rack</button>
@@ -1202,7 +1225,7 @@ onUnmounted(() => {
       </div>
       <div v-if="layers.length > 0" class="layer-previews">
         <div 
-          v-for="(layer, index) in layers" 
+          v-for="(layer, index) in (layers as Layer[])"
           :key="'preview-' + layer.id"
           class="layer-preview-card"
           :class="{ active: currentLayerIndex === index }"
@@ -1223,14 +1246,14 @@ onUnmounted(() => {
             />
             
             <!-- Racks -->
-            <g v-for="(table, tIdx) in layer.racks" :key="'preview-rack-' + tIdx">
+            <g v-for="(rack, tIdx) in layer.racks" :key="'preview-rack-' + tIdx">
               <rect
-                  :x="table.x" :y="table.y"
+                  :x="rack.x" :y="rack.y"
                   :width="rack_width" :height="rack_height"
                   fill="#d2b48c"
                   stroke="#8b4513"
                   stroke-width="1"
-                  :transform="`rotate(${table?.rotation || 0}, ${table.x + rack_width / 2}, ${table.y + rack_height / 2})`"
+                  :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`"
               />
             </g>
 
@@ -1246,6 +1269,15 @@ onUnmounted(() => {
                 stroke="red"
                 stroke-width="1"
                 stroke-dasharray="2, 2"
+            />
+
+            <!-- Viewport representation -->
+            <rect
+                :x="viewportRect.x"
+                :y="viewportRect.y"
+                :width="viewportRect.width"
+                :height="viewportRect.height"
+                class="mini-map-viewport"
             />
           </svg>
         </div>
@@ -1294,13 +1326,13 @@ onUnmounted(() => {
 .canvas-svg.interacting {
   cursor: grabbing;
 }
-.table-rect {
+.rack-rect {
   fill: #d2b48c;
   stroke: #8b4513;
   stroke-width: 2;
   cursor: move;
 }
-.table-rect.selected {
+.rack-rect.selected {
   stroke: #ff4500;
   stroke-width: 3;
 }
@@ -1312,7 +1344,7 @@ onUnmounted(() => {
   fill: rgba(255, 69, 0, 0.1);
   stroke: #ff4500;
 }
-.table-rect.grouped {
+.rack-rect.grouped {
   fill: #e3f2fd;
   stroke: #90caf9;
 }
@@ -1343,7 +1375,7 @@ onUnmounted(() => {
   font-weight: bold;
 }
 
-.table-rect.grouped.selected {
+.rack-rect.grouped.selected {
   stroke: #ff4500;
 }
 .context-menu {
@@ -1383,7 +1415,7 @@ onUnmounted(() => {
   stroke-width: 2;
   cursor: alias;
 }
-.table-label {
+.rack-label {
   pointer-events: none;
   font-size: 12px;
   font-weight: bold;
@@ -1436,11 +1468,6 @@ onUnmounted(() => {
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
-.properties-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
 .actions {
   margin-top: 1.5rem;
   display: flex;
@@ -1448,19 +1475,6 @@ onUnmounted(() => {
   gap: 0.75rem;
   border-top: 1px solid #f3f4f6;
   padding-top: 1rem;
-}
-.layer-selector {
-  display: flex;
-  gap: 5px;
-  margin: 0 10px;
-  padding: 5px;
-  background: #f5f5f5;
-  border-radius: 4px;
-}
-
-.layer-selector .btn {
-  padding: 4px 8px;
-  font-size: 0.8rem;
 }
 
 .layer-inactive {
@@ -1542,5 +1556,12 @@ onUnmounted(() => {
   height: 100px;
   background: #f9fafb;
   border-radius: 4px;
+}
+
+.mini-map-viewport {
+  fill: rgba(100, 100, 100, 0.2);
+  stroke: rgba(100, 100, 100, 0.5);
+  stroke-width: 1;
+  pointer-events: none;
 }
 </style>
