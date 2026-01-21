@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { Layer, Rack, Point } from '../../types/roomBuilder';
 
 const props = defineProps<{
   layers: Layer[];

@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import type { Layer, Rack } from '../../types/roomBuilder';
-
 const props = defineProps<{
   layers: Layer[];
-  currentLayerIndex: number;
   viewportRect: { x: number; y: number; width: number; height: number };
   rackWidth: number;
   rackHeight: number;
@@ -11,9 +8,7 @@ const props = defineProps<{
   getPodBoundaries: (racks: Rack[], pods: { id: string; name: string }[]) => Array<{ id: string; x: number; y: number; width: number; height: number } | null>;
 }>();
 
-const emit = defineEmits<{
-  (e: 'select-layer', index: number): void;
-}>();
+const currentLayerIndex = defineModel<number>('currentLayerIndex');
 </script>
 
 <template>
@@ -22,8 +17,8 @@ const emit = defineEmits<{
       v-for="(layer, index) in props.layers"
       :key="`preview-${layer.id}`"
       class="layer-preview-card"
-      :class="{ active: props.currentLayerIndex === index }"
-      @click="emit('select-layer', index)"
+      :class="{ active: currentLayerIndex === index }"
+      @click="currentLayerIndex = index"
     >
       <div class="preview-title">{{ layer.name }}</div>
       <svg

@@ -1,5 +1,5 @@
-import type { Pod, Rack, Point } from '../types/roomBuilder';
-import { rackHeight, rackWidth } from '../types/roomBuilder';
+export const rackWidth = 50;
+export const rackHeight = 50;
 
 const getRackCorners = (rack: Rack) => {
   return [

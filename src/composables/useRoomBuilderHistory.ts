@@ -1,5 +1,4 @@
 import { ref, type Ref, type WritableComputedRef } from 'vue';
-import type { Layer, Point } from '../types/roomBuilder';
 
 interface HistoryState {
   layers: Layer[];

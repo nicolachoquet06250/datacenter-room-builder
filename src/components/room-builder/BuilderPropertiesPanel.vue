@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Rack } from '../../types/roomBuilder';
 
 const props = defineProps<{
   selectedRackIndices: number[];
