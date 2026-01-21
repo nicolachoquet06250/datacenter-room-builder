@@ -6,7 +6,7 @@ const isPanning = ref(false);
 
 export const usePan = (roomId: number) => {
     const {zoomLevel} = useZoom();
-    const {panOffset} = useRacksCrud(zoomLevel, roomId)
+    const {panOffset} = useRacksCrud(roomId)
 
     const panStart = () => isPanning.value = true;
     const panStop = () => isPanning.value = false;
