@@ -1,10 +1,13 @@
-import {type Ref, ref} from "vue";
+import {ref} from "vue";
 import {useRacksCrud} from "./useRacksCrud.ts";
+import {useZoom} from "./useZoom.ts";
 
 const isPanning = ref(false);
 
-export const usePan = (zoomLevel: Ref<number>) => {
-    const {panOffset} = useRacksCrud(zoomLevel)
+export const usePan = (roomId: number) => {
+    const {zoomLevel} = useZoom();
+    const {panOffset} = useRacksCrud(zoomLevel, roomId)
+
     const panStart = () => isPanning.value = true;
     const panStop = () => isPanning.value = false;
 

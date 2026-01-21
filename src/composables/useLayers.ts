@@ -1,15 +1,15 @@
-import {computed, onMounted, ref} from "vue";
-import {useDrawRoomWalls} from "./useDrawRoomWalls.ts";
+import {computed, onMounted, type Ref, ref} from "vue";
 
 const layers = ref<Layer[]>([]);
 const currentLayerIndex = ref(0);
 
 export const layerNames = ['Circuits électriques', 'Surfaces au sol', 'Baies'];
 
-export const useLayers = (defaultLayers: Layer[]|string = []) => {
+export const useLayers = (walls: Ref<{
+    x: number
+    y: number
+}[]>, defaultLayers: Layer[]|string = []) => {
     defaultLayers = (typeof defaultLayers === 'string' ? JSON.parse(defaultLayers) : defaultLayers) as Layer[];
-
-    const {walls} = useDrawRoomWalls();
 
     const clearLayers = () => layers.value = [];
 

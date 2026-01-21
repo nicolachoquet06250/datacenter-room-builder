@@ -1,8 +1,9 @@
-import {computed, type Ref, ref} from "vue";
+import {computed, ref} from "vue";
 import {useLayers} from "./useLayers.ts";
 import {useRoomBuilderHistory} from "./useRoomBuilderHistory.ts";
 import {useDrawRoomWalls} from "./useDrawRoomWalls.ts";
 import {rackHeight, rackWidth, useRoomBuilderGeometry} from "./useRoomBuilderGeometry.ts";
+import {useZoom} from "./useZoom.ts";
 
 const selectedRackIndices = ref<number[]>([]);
 const rotatingRack = ref<number | null>(null);
@@ -14,9 +15,10 @@ const draggingRack = ref<number | null>(null);
 const rackPositionsBeforeDrag = ref<{ x: number; y: number }[]>([]);
 const lastMousePos = { x: 0, y: 0 };
 
-export const useRacksCrud = (zoomLevel: Ref<number>, roomId: number) => {
-    const {currentLayer, layers, currentLayerIndex} = useLayers();
+export const useRacksCrud = (roomId: number) => {
+    const {zoomLevel} = useZoom();
     const {walls} = useDrawRoomWalls();
+    const {currentLayer, layers, currentLayerIndex} = useLayers(walls);
     const {getWallBoundingBox} = useRoomBuilderGeometry();
 
     const {takeSnapshot} = useRoomBuilderHistory({
@@ -86,7 +88,6 @@ export const useRacksCrud = (zoomLevel: Ref<number>, roomId: number) => {
 
     const duplicateRack = (index: number) => {
         takeSnapshot();
-        if (typeof racks.value === 'string') return;
         const rack = racks.value[index];
         const newRack = JSON.parse(JSON.stringify(rack));
         delete newRack.id;
@@ -118,6 +119,12 @@ export const useRacksCrud = (zoomLevel: Ref<number>, roomId: number) => {
 
         racks.value.push(newRack);
         selectedRackIndices.value = [racks.value.length - 1];
+    };
+
+    const removeRack = (index: number) => {
+        takeSnapshot();
+        racks.value.splice(index, 1);
+        selectedRackIndices.value = [];
     };
 
     const updateRackName = (value: string) => {
@@ -214,6 +221,12 @@ export const useRacksCrud = (zoomLevel: Ref<number>, roomId: number) => {
         rack!.rotation = Math.round(rawRotation / 45) * 45;
     }
 
+    const resetRackState = () => {
+        draggingRack.value = null;
+        rotatingRack.value = null;
+        rackPositionsBeforeDrag.value = [];
+    }
+
     return {
         racks,
         selectedRackIndices,
@@ -222,6 +235,7 @@ export const useRacksCrud = (zoomLevel: Ref<number>, roomId: number) => {
         startRotationAngle,
         initialRackRotation,
         draggingRack,
+        rackPositionsBeforeDrag,
         lastMousePos,
 
         createRack,
@@ -233,6 +247,8 @@ export const useRacksCrud = (zoomLevel: Ref<number>, roomId: number) => {
         updateRackName,
         updateRackRotation,
         startRotateRack,
-        rotateRack
+        rotateRack,
+        removeRack,
+        resetRackState
     };
 }

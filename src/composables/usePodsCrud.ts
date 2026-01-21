@@ -1,4 +1,4 @@
-import {computed, type Ref} from "vue";
+import {computed} from "vue";
 import {useContextMenu} from "./useContextMenu.ts";
 import {useNotify} from "./useNotify.ts";
 import {useDrawRoomWalls} from "./useDrawRoomWalls.ts";
@@ -6,18 +6,18 @@ import {useLayers} from "./useLayers.ts";
 import {useRacksCrud} from "./useRacksCrud.ts";
 import {useRoomBuilderHistory} from "./useRoomBuilderHistory.ts";
 
-export const usePodsCrud = (
-    selectedRackIndices: Ref<number[]>,
-    startDragRack: (event: MouseEvent, index: number) => void
-) => {
-    const {racks} = useRacksCrud();
+export const usePodsCrud = (roomId: number) => {
+    const {selectedRackIndices, startDragRack} = useRacksCrud(roomId);
+    const {racks} = useRacksCrud(roomId);
     const {closeContextMenu} = useContextMenu(
-        computed(() => typeof racks.value === 'string' ? JSON.parse(racks.value) : racks.value),
+        computed(() => typeof (racks.value as unknown as string) === 'string'
+            ? JSON.parse(racks.value as unknown as string)
+            : racks.value),
         selectedRackIndices
     );
     const {success: notifySuccess} = useNotify();
-    const {layers, currentLayerIndex, currentLayer} = useLayers();
     const {walls, isDrawingWalls, isWallSelected} = useDrawRoomWalls();
+    const {layers, currentLayerIndex, currentLayer} = useLayers(walls);
 
     const { takeSnapshot } = useRoomBuilderHistory({
         layers,
@@ -44,7 +44,6 @@ export const usePodsCrud = (
         pods.value.push({ id: podId, name: podName });
 
         selectedRackIndices.value.forEach(index => {
-            if (typeof racks.value === 'string') return;
             racks.value[index]!.podId = podId;
         });
 
@@ -61,7 +60,6 @@ export const usePodsCrud = (
         takeSnapshot();
 
         selectedRackIndices.value.forEach(index => {
-            if (typeof racks.value === 'string') return;
             racks.value[index]!.podId = null;
         });
 
@@ -75,8 +73,6 @@ export const usePodsCrud = (
 
     const deletePod = (podId: string) => {
         takeSnapshot();
-
-        if (typeof racks.value === 'string') return;
 
         racks.value.forEach(r => {
             if (r.podId === podId) {
@@ -105,7 +101,6 @@ export const usePodsCrud = (
         isWallSelected.value = false;
 
         const podRacksIndices: number[] = [];
-        if (typeof racks.value === 'string') return;
 
         racks.value.forEach((rack, index) => {
             if (rack.podId === podId) {

@@ -5,8 +5,18 @@ const isDrawingWalls = ref(false);
 const wallPreviewPoint = ref<Point | null>(null);
 const wallsRef = ref<Point[]>([]);
 const isWallSelected = ref(false);
+
 export const useDrawRoomWalls = () => {
-    const {layers, currentLayerIndex} = useLayers();
+    const walls = computed({
+        get: () => layers.value.length > 0 ? (layers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value,
+        set: (val) => {
+            if (layers.value.length > 0 && unref(layers)[currentLayerIndex.value]) {
+                layers.value[currentLayerIndex.value]!.walls = val;
+            } else {
+                wallsRef.value = val;
+            }
+        }
+    });
     const cancelDrawingWalls = () => {
         isDrawingWalls.value = false;
         wallPreviewPoint.value = null;
@@ -18,16 +28,7 @@ export const useDrawRoomWalls = () => {
         walls.value.push(point);
     }
 
-    const walls = computed({
-        get: () => layers.value.length > 0 ? (layers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value,
-        set: (val) => {
-            if (layers.value.length > 0 && unref(layers)[currentLayerIndex.value]) {
-                layers.value[currentLayerIndex.value]!.walls = val;
-            } else {
-                wallsRef.value = val;
-            }
-        }
-    });
+    const {layers, currentLayerIndex} = useLayers(walls);
 
     return {
         isDrawingWalls,

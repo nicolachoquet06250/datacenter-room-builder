@@ -18,6 +18,8 @@ import {useContextMenu} from "../composables/useContextMenu.ts";
 import {usePodsCrud} from "../composables/usePodsCrud.ts";
 import {useRacksCrud} from "../composables/useRacksCrud.ts";
 import {useWalls} from "../composables/useWalls.ts";
+import {useZoom} from "../composables/useZoom.ts";
+import {useModal} from "../composables/useModal.ts";
 
 const props = withDefaults(
   defineProps<{
@@ -36,22 +38,23 @@ const emit = defineEmits<{
 
 const {
   getPodBoundaries, getWallBoundingBox,
-  getConstrainedPoint, isPointInPolygon
+  getConstrainedPoint
 } = useRoomBuilderGeometry();
 const {error: notifyError} = useNotify();
+
+const {
+  wallPreviewPoint, isWallSelected, isDrawingWalls, wallsRef, walls,
+  cancelDrawingWalls, toggleIsDrawingWalls, createWall
+} = useDrawRoomWalls();
 
 const {
   layers,
   currentLayerIndex,
   clearLayers,
   initialize: initializeLayers
-} = useLayers(props.layers);
-const roomName = ref(props.roomName);
+} = useLayers(walls, props.layers);
 
-const {
-  wallPreviewPoint, isWallSelected, isDrawingWalls, wallsRef, walls,
-  cancelDrawingWalls, toggleIsDrawingWalls, createWall
-} = useDrawRoomWalls();
+const roomName = ref(props.roomName);
 
 watch(currentLayerIndex, () => {
   selectedRackIndices.value = [];
@@ -63,22 +66,23 @@ const {
   updateCanvasSize
 } = useCanvas(useTemplateRef<InstanceType<typeof BuilderCanvas>>('canvasComponent'));
 
-const zoomLevel = ref(1);
+const {zoomLevel, zoomIn, zoomOut, onWheel} = useZoom();
 
-const {isPanning, panStart, panStop, panRunning} = usePan(zoomLevel);
+const {isPanning, panStart, panStop, panRunning} = usePan(props.roomId);
 
 const {
   racks, selectedRackIndices,
   rotatingRack,
   panOffset, draggingRack,
   createRack: addRack,
-  rotateRack,
+  rotateRack, removeRack,
   startDragRack, dragRack,
   startRotateRack,
   duplicateRack, copyRack,
   pastRack, updateRackName,
-  updateRackRotation
-} = useRacksCrud(zoomLevel, props.roomId);
+  updateRackRotation,
+  resetRackState
+} = useRacksCrud(props.roomId);
 
 const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
 
@@ -145,27 +149,14 @@ const {
   contextMenu,
   openContextMenu
 } = useContextMenu(
-    computed(() => typeof racks.value === 'string' ? JSON.parse(racks.value) : racks.value),
+    computed(() => typeof (racks.value as unknown as string) === 'string'
+        ? JSON.parse(racks.value as unknown as string)
+        : racks.value),
     selectedRackIndices
 );
 
-const {selectWall} = useWalls();
-
-const showClearModal = ref(false);
-const clearModalConfig = ref({
-  title: 'Supprimer la pièce',
-  message: 'Voulez-vous vraiment supprimer la pièce ainsi que tous les racks et pods à l\'intérieur ?',
-  confirmText: 'Supprimer',
-  onConfirm: () => {}
-});
-
-const triggerClearWalls = () => {
-  clearModalConfig.value.onConfirm = () => {
-    confirmClearWalls();
-    showClearModal.value = false;
-  };
-  showClearModal.value = true;
-};
+const {selectWall} = useWalls(props.roomId);
+const {pods, createPod, selectPod, leavePod, deletePod} = usePodsCrud(props.roomId);
 
 const confirmClearWalls = () => {
   takeSnapshot();
@@ -177,28 +168,16 @@ const confirmClearWalls = () => {
   cancelDrawingWalls();
 };
 
-const zoomIn = () => {
-  zoomLevel.value = Math.min(zoomLevel.value + 0.1, 3);
-};
-
-const zoomOut = () => {
-  zoomLevel.value = Math.max(zoomLevel.value - 0.1, 0.2);
-};
+const {
+  showClearModal, clearModalConfig,
+  triggerClearWalls, cancelModal
+} = useModal(confirmClearWalls);
 
 watch(() => props.roomId, async (newId) => {
   if (newId) {
     roomName.value = props.roomName;
   }
 });
-
-const removeRack = (index: number) => {
-  takeSnapshot();
-  if (typeof racks.value === 'string') return;
-  racks.value.splice(index, 1);
-  selectedRackIndices.value = [];
-};
-
-const rackPositionsBeforeDrag = ref<{ x: number; y: number }[]>([]);
 
 const isInteracting = computed(() =>
   draggingRack.value !== null ||
@@ -207,8 +186,6 @@ const isInteracting = computed(() =>
   isDrawingWalls.value ||
   contextMenu.value.show
 );
-
-const {pods, createPod, selectPod, leavePod, deletePod} = usePodsCrud(selectedRackIndices, startDragRack);
 
 const onMouseMoveSVG = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
@@ -237,9 +214,7 @@ const onMouseMove = (event: MouseEvent) => {
 
 const stopDrag = () => {
   panStop();
-  draggingRack.value = null;
-  rotatingRack.value = null;
-  rackPositionsBeforeDrag.value = [];
+  resetRackState()
 };
 
 const deselect = (event: MouseEvent) => {
@@ -307,7 +282,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
       takeSnapshot();
       const sortedIndices = [...selectedRackIndices.value].sort((a, b) => b - a);
       sortedIndices.forEach(index => {
-        if (typeof racks.value === 'string') return;
         racks.value.splice(index, 1);
       });
       selectedRackIndices.value = [];
@@ -359,26 +333,19 @@ const pasteFromClipboard = async () => {
 
 const save = async () => {
   try {
-    if (typeof racks.value === 'string') return;
-
     emit('saved', {
       racks: racks.value,
       pods: pods.value,
       walls: walls.value,
       layers: layers.value
     });
+    undoStack.value = [];
+    redoStack.value = [];
   } catch (e) {
     console.error(e);
     notifyError({
       text: 'Erreur lors de la sauvegarde'
     });
-  }
-};
-
-const onWheel = (event: WheelEvent) => {
-  if (event.ctrlKey) {
-    event.preventDefault();
-    event.deltaY < 0 ? zoomIn() : zoomOut();
   }
 };
 
@@ -464,7 +431,7 @@ onUnmounted(() => {
         :confirm-text="clearModalConfig.confirmText"
 
         @confirm="clearModalConfig.onConfirm"
-        @cancel="showClearModal = false"
+        @cancel="cancelModal"
       />
 
       <BuilderPropertiesPanel
