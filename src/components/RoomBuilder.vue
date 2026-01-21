@@ -1,77 +1,42 @@
-<script lang="ts">
-export interface Rack {
-  id: number;
-  roomId: number;
-  name: string;
-  x: number;
-  y: number;
-  rotation: number | null;
-  podId?: string | null;
-}
-
-export interface Pod {
-  id: string;
-  name: string;
-}
-
-export interface Point {
-  x: number;
-  y: number;
-}
-
-export interface Layer {
-  id: number;
-  name: string;
-  racks: Rack[];
-  pods: Pod[];
-  walls: Point[];
-}
-
-const rack_width = 50;
-const rack_height = 50;
-</script>
-
 <script setup lang="ts">
-import 'simple-notify/dist/simple-notify.css'
+import 'simple-notify/dist/simple-notify.css';
 import Notify from 'simple-notify';
-import {computed, onMounted, onUnmounted, ref, watch} from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import Modal from './Modal.vue';
+import BuilderToolbar from './room-builder/BuilderToolbar.vue';
+import BuilderCanvas from './room-builder/BuilderCanvas.vue';
+import BuilderContextMenu from './room-builder/BuilderContextMenu.vue';
+import BuilderPropertiesPanel from './room-builder/BuilderPropertiesPanel.vue';
+import BuilderLayerPreviews from './room-builder/BuilderLayerPreviews.vue';
+import { useRoomBuilderGeometry } from '../composables/useRoomBuilderGeometry';
+import { useRoomBuilderHistory } from '../composables/useRoomBuilderHistory';
+import type { Layer, Pod, Point, Rack } from '../types/roomBuilder';
+import { rackHeight, rackWidth } from '../types/roomBuilder';
 
 const props = withDefaults(
-    defineProps<{
-      roomId: number;
-      roomName: string;
-      layers?: Layer[] | string;
-    }>(),
-    {
-      layers: () => []
-    }
+  defineProps<{
+    roomId: number;
+    roomName: string;
+    layers?: Layer[] | string;
+  }>(),
+  {
+    layers: () => []
+  }
 );
+
+const emit = defineEmits<{
+  (e: 'saved', payload: { racks: Rack[]; pods: Pod[]; walls: Point[]; layers: Layer[] }): void;
+}>();
+
+const { getPodBoundaries, getWallBoundingBox, getConstrainedPoint, isPointInPolygon } = useRoomBuilderGeometry();
 
 const layers = ref<Layer[]>([]);
 const currentLayerIndex = ref(0);
-const canvasSvg = ref<SVGSVGElement | null>(null);
-const canvasWidth = ref(800); // Valeur par défaut
-const canvasHeight = ref(600);
+const roomName = ref(props.roomName);
 
-const updateCanvasSize = () => {
-  if (canvasSvg.value) {
-    canvasWidth.value = canvasSvg.value.clientWidth;
-    canvasHeight.value = canvasSvg.value.clientHeight;
-  }
-};
-
-const viewportRect = computed(() => {
-  return {
-    x: -panOffset.value.x,
-    y: -panOffset.value.y,
-    width: canvasWidth.value / zoomLevel.value,
-    height: canvasHeight.value / zoomLevel.value
-  };
-});
-
+const wallsRef = ref<Point[]>([]);
 const racks = computed({
-  get: () => (layers.value[currentLayerIndex.value]?.racks || []) as Rack[]|string,
+  get: () => (layers.value[currentLayerIndex.value]?.racks || []) as Rack[] | string,
   set: (val) => {
     if (layers.value[currentLayerIndex.value]) {
       layers.value[currentLayerIndex.value]!.racks = val as Rack[];
@@ -88,7 +53,6 @@ const pods = computed({
   }
 });
 
-const wallsRef = ref<Point[]>([]);
 const walls = computed({
   get: () => layers.value.length > 0 ? (layers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value,
   set: (val) => {
@@ -99,10 +63,83 @@ const walls = computed({
     }
   }
 });
-const roomName = ref(props.roomName);
 
 const isDrawingWalls = ref(false);
 const wallPreviewPoint = ref<Point | null>(null);
+const isWallSelected = ref(false);
+const selectedRackIndices = ref<number[]>([]);
+
+const canvasComponent = ref<InstanceType<typeof BuilderCanvas> | null>(null);
+const canvasWidth = ref(800);
+const canvasHeight = ref(600);
+
+const updateCanvasSize = () => {
+  const svgElement = canvasComponent.value?.svgRef ?? null;
+  if (svgElement) {
+    canvasWidth.value = svgElement.clientWidth;
+    canvasHeight.value = svgElement.clientHeight;
+  }
+};
+
+const zoomLevel = ref(1);
+const panOffset = ref({ x: 0, y: 0 });
+
+const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
+
+const wallBoundingBox = computed(() => {
+  if (isDrawingWalls.value) return null;
+  return getWallBoundingBox(walls.value);
+});
+
+const horizontalCoords = computed(() => {
+  if (!wallBoundingBox.value) return [];
+  const coords = [] as Array<{ label: string; x: number; y: number }>;
+  const steps = Math.floor(wallBoundingBox.value.width / 20);
+  for (let i = 0; i < steps; i++) {
+    const label = (i + 1).toString();
+    coords.push({
+      label,
+      x: wallBoundingBox.value.minX + (i * 20) + 10,
+      y: wallBoundingBox.value.maxY + 20
+    });
+  }
+  return coords;
+});
+
+const verticalCoords = computed(() => {
+  if (!wallBoundingBox.value) return [];
+  const coords = [] as Array<{ label: string; x: number; y: number }>;
+  const steps = Math.floor(wallBoundingBox.value.height / 20);
+  for (let i = 0; i < steps; i++) {
+    const label = String.fromCharCode(65 + (i % 26));
+    let finalLabel = label;
+    if (i >= 26) {
+      const prefix = String.fromCharCode(65 + Math.floor(i / 26) - 1);
+      finalLabel = prefix + label;
+    }
+    coords.push({
+      label: finalLabel,
+      x: wallBoundingBox.value.minX - 20,
+      y: wallBoundingBox.value.maxY - (i * 20) - 10
+    });
+  }
+  return coords;
+});
+
+const viewportRect = computed(() => {
+  return {
+    x: -panOffset.value.x,
+    y: -panOffset.value.y,
+    width: canvasWidth.value / zoomLevel.value,
+    height: canvasHeight.value / zoomLevel.value
+  };
+});
+
+const { undoStack, redoStack, takeSnapshot, undo, redo } = useRoomBuilderHistory({
+  layers,
+  walls,
+  currentLayerIndex
+});
 
 const showClearModal = ref(false);
 const clearModalConfig = ref({
@@ -131,152 +168,6 @@ const confirmClearWalls = () => {
   wallPreviewPoint.value = null;
 };
 
-const getPodBoundaries = (layerRacks: Rack[], layerPods: Pod[]) => {
-  return layerPods.map(pod => {
-    const podRacks = layerRacks.filter(r => r.podId === pod.id);
-    if (podRacks.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    podRacks.forEach(rack => {
-      const corners = [
-        { x: rack.x, y: rack.y },
-        { x: rack.x + rack_width, y: rack.y },
-        { x: rack.x, y: rack.y + rack_height },
-        { x: rack.x + rack_width, y: rack.y + rack_height }
-      ];
-
-      if (rack.rotation) {
-        const angle = (rack.rotation * Math.PI) / 180;
-        const cx = rack.x + rack_width / 2;
-        const cy = rack.y + rack_height / 2;
-        
-        corners.forEach(c => {
-          const x = cx + (c.x - cx) * Math.cos(angle) - (c.y - cy) * Math.sin(angle);
-          const y = cy + (c.x - cx) * Math.sin(angle) + (c.y - cy) * Math.cos(angle);
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
-        });
-      } else {
-        corners.forEach(c => {
-          minX = Math.min(minX, c.x);
-          minY = Math.min(minY, c.y);
-          maxX = Math.max(maxX, c.x);
-          maxY = Math.max(maxY, c.y);
-        });
-      }
-    });
-
-    const padding = 10;
-    return {
-      id: pod.id,
-      x: minX - padding,
-      y: minY - padding,
-      width: (maxX - minX) + 2 * padding,
-      height: (maxY - minY) + 2 * padding
-    };
-  }).filter(Boolean);
-};
-
-const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
-
-const zoomLevel = ref(1);
-const panOffset = ref({ x: 0, y: 0 });
-
-const getWallBoundingBox = (walls: Point[]) => {
-  if (walls.length < 3) return null;
-  
-  let minX = Math.min(...walls.map(p => p.x));
-  let minY = Math.min(...walls.map(p => p.y));
-  let maxX = Math.max(...walls.map(p => p.x));
-  let maxY = Math.max(...walls.map(p => p.y));
-  
-  return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
-};
-
-const wallBoundingBox = computed(() => {
-  if (isDrawingWalls.value) return null;
-  return getWallBoundingBox(walls.value);
-});
-
-const horizontalCoords = computed(() => {
-  if (!wallBoundingBox.value) return [];
-  const coords = [];
-  const steps = Math.floor(wallBoundingBox.value.width / 20);
-  for (let i = 0; i < steps; i++) {
-    const label = (i + 1).toString();
-    coords.push({
-      label,
-      x: wallBoundingBox.value.minX + (i * 20) + 10, // centré dans la cellule de 20px
-      y: wallBoundingBox.value.maxY + 20
-    });
-  }
-  return coords;
-});
-
-const verticalCoords = computed(() => {
-  if (!wallBoundingBox.value) return [];
-  const coords = [];
-  const steps = Math.floor(wallBoundingBox.value.height / 20);
-  for (let i = 0; i < steps; i++) {
-    const label = String.fromCharCode(65 + (i % 26)); // A-Z
-    let finalLabel = label;
-    if (i >= 26) {
-      const prefix = String.fromCharCode(65 + Math.floor(i / 26) - 1);
-      finalLabel = prefix + label;
-    }
-    coords.push({
-      label: finalLabel,
-      x: wallBoundingBox.value.minX - 20,
-      y: wallBoundingBox.value.maxY - (i * 20) - 10 // de bas en haut
-    });
-  }
-  return coords;
-});
-
-// Undo/Redo logic
-const undoStack = ref<string[]>([]);
-const redoStack = ref<string[]>([]);
-
-const takeSnapshot = () => {
-  undoStack.value.push(JSON.stringify({ layers: layers.value, walls: walls.value, currentLayerIndex: currentLayerIndex.value }));
-  redoStack.value = []; // Clear redo stack on new action
-  if (undoStack.value.length > 50) { // Limit history size
-    undoStack.value.shift();
-  }
-};
-
-const undo = () => {
-  if (undoStack.value.length > 0) {
-    redoStack.value.push(JSON.stringify({ layers: layers.value, walls: walls.value, currentLayerIndex: currentLayerIndex.value }));
-    const previousState = undoStack.value.pop();
-    if (previousState) {
-      const state = JSON.parse(previousState);
-      if (state.layers) layers.value = state.layers;
-      if (state.walls && !state.layers) walls.value = state.walls;
-      if (state.currentLayerIndex !== undefined) currentLayerIndex.value = state.currentLayerIndex;
-    }
-  }
-};
-
-const redo = () => {
-  if (redoStack.value.length > 0) {
-    undoStack.value.push(JSON.stringify({ layers: layers.value, walls: walls.value, currentLayerIndex: currentLayerIndex.value }));
-    const nextState = redoStack.value.pop();
-    if (nextState) {
-      const state = JSON.parse(nextState);
-      if (state.layers) layers.value = state.layers;
-      if (state.walls && !state.layers) walls.value = state.walls;
-      if (state.currentLayerIndex !== undefined) currentLayerIndex.value = state.currentLayerIndex;
-    }
-  }
-};
-
 const zoomIn = () => {
   zoomLevel.value = Math.min(zoomLevel.value + 0.1, 3);
 };
@@ -285,16 +176,11 @@ const zoomOut = () => {
   zoomLevel.value = Math.max(zoomLevel.value - 0.1, 0.2);
 };
 
-// Watch for props changes to reload data
 watch(() => props.roomId, async (newId) => {
   if (newId) {
     roomName.value = props.roomName;
-    // await loadRoom();
   }
 });
-
-const selectedRackIndices = ref<number[]>([]);
-const isWallSelected = ref(false);
 
 const addRack = () => {
   if (walls.value.length === 0) return;
@@ -305,24 +191,19 @@ const addRack = () => {
   let startY = 40;
 
   if (wallBoundingBox.value) {
-    // Positionner au centre de la boîte englobante des murs
     const centerX = wallBoundingBox.value.minX + wallBoundingBox.value.width / 2;
     const centerY = wallBoundingBox.value.minY + wallBoundingBox.value.height / 2;
-    
-    // Aligner sur la grille (20px) et centrer le rack (rack_width/2)
-    startX = Math.round((centerX - rack_width / 2) / 20) * 20;
-    startY = Math.round((centerY - rack_height / 2) / 20) * 20;
 
-    // Si le centre est en dehors de la pièce (cas d'une pièce en L ou U),
-    // on essaie de trouver un point à l'intérieur en parcourant la boîte englobante.
-    if (!isPointInPolygon(startX + rack_width / 2, startY + rack_height / 2, walls.value)) {
+    startX = Math.round((centerX - rackWidth / 2) / 20) * 20;
+    startY = Math.round((centerY - rackHeight / 2) / 20) * 20;
+
+    if (!isPointInPolygon(startX + rackWidth / 2, startY + rackHeight / 2, walls.value)) {
       let found = false;
-      // Parcourir la grille à l'intérieur du bounding box pour trouver un point valide
       for (let x = wallBoundingBox.value.minX + 20; x < wallBoundingBox.value.maxX; x += 20) {
         for (let y = wallBoundingBox.value.minY + 20; y < wallBoundingBox.value.maxY; y += 20) {
           if (isPointInPolygon(x, y, walls.value)) {
-            startX = Math.round((x - rack_width / 2) / 20) * 20;
-            startY = Math.round((y - rack_height / 2) / 20) * 20;
+            startX = Math.round((x - rackWidth / 2) / 20) * 20;
+            startY = Math.round((y - rackHeight / 2) / 20) * 20;
             found = true;
             break;
           }
@@ -345,37 +226,36 @@ const addRack = () => {
   selectedRackIndices.value = [racks.value.length - 1];
 };
 
-const removeRack = async (index: number) => {
+const removeRack = (index: number) => {
   takeSnapshot();
   if (typeof racks.value === 'string') return;
   racks.value.splice(index, 1);
   selectedRackIndices.value = [];
 };
 
-// Drag & Drop logic simple
 const draggingRack = ref<number | null>(null);
 const isPanning = ref(false);
 const rotatingRack = ref<number | null>(null);
+const rackPositionsBeforeDrag = ref<{ x: number; y: number }[]>([]);
+const startRotationAngle = ref(0);
+const initialRackRotation = ref(0);
+const lastMousePos = { x: 0, y: 0 };
 
-const isInteracting = computed(() => 
+const isInteracting = computed(() =>
   draggingRack.value !== null ||
   rotatingRack.value !== null ||
   isPanning.value ||
   isDrawingWalls.value ||
   contextMenu.value.show
 );
-const lastMousePos = { x: 0, y: 0 };
-const rackPositionsBeforeDrag = ref<{x: number, y: number}[]>([]);
-const startRotationAngle = ref(0);
-const initialRackRotation = ref(0);
 
 const startDragRack = (event: MouseEvent, index: number) => {
   if (isDrawingWalls.value) return;
-  if (event.button !== 0) return; // Only left click for dragging
+  if (event.button !== 0) return;
   isWallSelected.value = false;
   takeSnapshot();
   draggingRack.value = index;
-  
+
   if (event.ctrlKey || event.metaKey) {
     if (selectedRackIndices.value.includes(index)) {
       selectedRackIndices.value = selectedRackIndices.value.filter(i => i !== index);
@@ -390,9 +270,8 @@ const startDragRack = (event: MouseEvent, index: number) => {
 
   if (typeof racks.value === 'string') return;
 
-  // Store initial positions of all racks (to keep track of "real" non-snapped positions during drag)
   rackPositionsBeforeDrag.value = racks.value.map(r => ({ x: r.x, y: r.y }));
-  
+
   lastMousePos.x = event.clientX;
   lastMousePos.y = event.clientY;
 };
@@ -406,60 +285,13 @@ const startRotateRack = (event: MouseEvent, index: number) => {
   selectedRackIndices.value = [index];
 
   if (typeof racks.value === 'string') return;
-  
+
   const rack = racks.value[index];
-  const centerX = (rack?.x ?? 0) + rack_width / 2 + panOffset.value.x;
-  const centerY = (rack?.y ?? 0) + rack_height / 2 + panOffset.value.y;
+  const centerX = (rack?.x ?? 0) + rackWidth / 2 + panOffset.value.x;
+  const centerY = (rack?.y ?? 0) + rackHeight / 2 + panOffset.value.y;
 
   startRotationAngle.value = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
   initialRackRotation.value = rack?.rotation || 0;
-};
-
-const getConstrainedPoint = (currentX: number, currentY: number, lastPoint: Point | null): Point => {
-  const snapX = Math.round(currentX / 20) * 20;
-  const snapY = Math.round(currentY / 20) * 20;
-
-  if (!lastPoint) {
-    return { x: snapX, y: snapY };
-  }
-
-  const dx = snapX - lastPoint.x;
-  const dy = snapY - lastPoint.y;
-
-  const absDx = Math.abs(dx);
-  const absDy = Math.abs(dy);
-
-  // Seuil pour décider si on est plus proche du diagonal ou des axes
-  // Si absDx est proche de absDy, on prend le diagonal
-  // Sinon on prend l'axe le plus long
-  
-  if (absDx > absDy * 1.5) {
-    // Horizontal
-    return { x: snapX, y: lastPoint.y };
-  } else if (absDy > absDx * 1.5) {
-    // Vertical
-    return { x: lastPoint.x, y: snapY };
-  } else {
-    // 45 degrés
-    const dist = Math.round((absDx + absDy) / 2 / 20) * 20;
-    return {
-      x: lastPoint.x + (dx >= 0 ? dist : -dist),
-      y: lastPoint.y + (dy >= 0 ? dist : -dist)
-    };
-  }
-};
-
-const isPointInPolygon = (x: number, y: number, polygon: Point[]) => {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i]!.x, yi = polygon[i]!.y;
-    const xj = polygon[j]!.x, yj = polygon[j]!.y;
-
-    const intersect = ((yi > y) !== (yj > y))
-        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
 };
 
 const onMouseMoveSVG = (event: MouseEvent) => {
@@ -469,11 +301,10 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     pt.x = event.clientX;
     pt.y = event.clientY;
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
-    
-    // On doit aussi compenser le scale et le translate du groupe <g>
+
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
-    
+
     const lastPoint = walls.value.length > 0 ? walls.value[walls.value.length - 1] : null;
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
   }
@@ -495,17 +326,15 @@ const onMouseMove = (event: MouseEvent) => {
       const rack = racks.value[index] as Rack;
       const initialPos = rackPositionsBeforeDrag.value[index];
       if (!rack || !initialPos) return;
-      
+
       const rawX = initialPos.x + deltaX;
       const rawY = initialPos.y + deltaY;
-      
-      // Snap to grid (20px)
+
       const snapX = Math.round(rawX / 20) * 20;
       const snapY = Math.round(rawY / 20) * 20;
 
-      // Vérifier si la nouvelle position (centre du rack) est à l'intérieur des murs
       if (walls.value.length > 2) {
-        if (isPointInPolygon(snapX + rack_width / 2, snapY + rack_height / 2, walls.value)) {
+        if (isPointInPolygon(snapX + rackWidth / 2, snapY + rackHeight / 2, walls.value)) {
           rack.x = snapX;
           rack.y = snapY;
         }
@@ -516,14 +345,13 @@ const onMouseMove = (event: MouseEvent) => {
     });
   } else if (rotatingRack.value !== null) {
     const rack = racks.value[rotatingRack.value];
-    const centerX = (rack?.x ?? 0) + (rack_width ?? 0) / 2 + panOffset.value.x;
-    const centerY = (rack?.y ?? 0) + (rack_height ?? 0) / 2 + panOffset.value.y;
-    
+    const centerX = (rack?.x ?? 0) + (rackWidth ?? 0) / 2 + panOffset.value.x;
+    const centerY = (rack?.y ?? 0) + (rackHeight ?? 0) / 2 + panOffset.value.y;
+
     const currentAngle = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
     const deltaAngle = (currentAngle - startRotationAngle.value) * (180 / Math.PI);
-    
+
     const rawRotation = (initialRackRotation.value + deltaAngle) % 360;
-    // Snap to 45° increments
     rack!.rotation = Math.round(rawRotation / 45) * 45;
   }
 };
@@ -538,22 +366,21 @@ const stopDrag = () => {
 const deselect = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
     if (event.button !== 0) return;
-    
+
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
     pt.y = event.clientY;
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
-    
+
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
-    
+
     const lastPoint = walls.value.length > 0 ? walls.value[walls.value.length - 1] : null;
     const constrained = getConstrainedPoint(x, y, lastPoint!);
     const snapX = constrained.x;
     const snapY = constrained.y;
-    
-    // Si on clique sur le premier point, on ferme le polygone et on arrête le mode dessin
+
     if (walls.value.length > 2) {
       const firstPoint = walls.value[0];
       const dist = Math.sqrt(Math.pow(snapX - (firstPoint?.x ?? 0), 2) + Math.pow(snapY - (firstPoint?.y ?? 0), 2));
@@ -562,21 +389,20 @@ const deselect = (event: MouseEvent) => {
         isDrawingWalls.value = false;
         wallPreviewPoint.value = null;
 
-        // Génération des 3 layers
         const layerNames = ['Circuits électriques', 'Surfaces au sol', 'Baies'];
         layers.value = layerNames.map((name, index) => ({
           id: index + 1,
-          name: name,
+          name,
           racks: [],
           pods: [],
           walls: JSON.parse(JSON.stringify(finalWalls))
         }));
         currentLayerIndex.value = 0;
-        
+
         return;
       }
     }
-    
+
     takeSnapshot();
     walls.value.push({ x: snapX, y: snapY });
     return;
@@ -588,9 +414,10 @@ const deselect = (event: MouseEvent) => {
   }
 };
 
-const emit = defineEmits<{
-  (e: 'saved', payload: {racks: Rack[], pods: Pod[], walls: Point[], layers: Layer[]}): void;
-}>();
+const selectWall = () => {
+  isWallSelected.value = true;
+  selectedRackIndices.value = [];
+};
 
 const handleKeyDown = (event: KeyboardEvent) => {
   if (isDrawingWalls.value && event.key === 'Escape') {
@@ -600,7 +427,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
   const isCtrl = event.ctrlKey || event.metaKey;
 
-  // Undo / Redo
   if (isCtrl && event.key.toLowerCase() === 'z') {
     event.preventDefault();
     if (event.shiftKey) {
@@ -611,9 +437,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
     return;
   }
 
-  // Suppression
   if (event.key === 'Delete' || event.key === 'Backspace') {
-    // Si on est dans un input, on ne supprime pas la rack/chaise
     if (event.composedPath().some((el) => {
       if (!(el instanceof HTMLElement)) return false;
       return (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
@@ -624,7 +448,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
     if (selectedRackIndices.value.length > 0) {
       event.preventDefault();
       takeSnapshot();
-      // On trie par index décroissant pour ne pas décaler les index lors de la suppression
       const sortedIndices = [...selectedRackIndices.value].sort((a, b) => b - a);
       sortedIndices.forEach(index => {
         if (typeof racks.value === 'string') return;
@@ -654,7 +477,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 
   if (selectedRackIndices.value.length === 0) return;
-  
+
   if (isCtrl && event.key.toLowerCase() === 'd') {
     event.preventDefault();
     duplicateRack(selectedRackIndices.value[0]!);
@@ -673,7 +496,7 @@ const duplicateRack = (index: number) => {
   newRack.name = `${rack?.name} (copie)`;
   newRack.x += 20;
   newRack.y += 20;
-  
+
   racks.value.push(newRack);
   selectedRackIndices.value = [racks.value.length - 1];
 };
@@ -682,9 +505,8 @@ const copyRack = (index: number) => {
   const rack = racks.value[index];
   const copyData = JSON.parse(JSON.stringify(rack));
   delete copyData.id;
-  copyData._type = 'rack'; // Tag to identify it as a rack
-  
-  // Copy to system clipboard as JSON string
+  copyData._type = 'rack';
+
   navigator.clipboard.writeText(JSON.stringify(copyData))
     .then(() => console.log('Rack copied to clipboard'))
     .catch(err => console.error('Failed to copy rack: ', err));
@@ -694,10 +516,9 @@ const pasteFromClipboard = async () => {
   try {
     const text = await navigator.clipboard.readText();
     const data = JSON.parse(text);
-    
+
     if (!data || typeof data !== 'object') return;
 
-    // Handle pasting a rack
     if (data._type === 'rack') {
       takeSnapshot();
       if (typeof racks.value === 'string') return;
@@ -706,7 +527,7 @@ const pasteFromClipboard = async () => {
       delete newRack._type;
       newRack.x += 20;
       newRack.y += 20;
-      
+
       racks.value.push(newRack);
       selectedRackIndices.value = [racks.value.length - 1];
     }
@@ -720,14 +541,13 @@ const save = async () => {
     if (typeof racks.value === 'string') return;
 
     emit('saved', {
-      racks: racks.value, 
-      pods: pods.value, 
+      racks: racks.value,
+      pods: pods.value,
       walls: walls.value,
       layers: layers.value
     });
   } catch (e) {
     console.error(e);
-    // @ts-ignore
     new Notify({
       status: 'error',
       title: 'Erreur',
@@ -753,43 +573,40 @@ const onWheel = (event: WheelEvent) => {
   }
 };
 
-const contextMenu = ref<{ x: number, y: number, show: boolean }>({ x: 0, y: 0, show: false });
+const contextMenu = ref<{ x: number; y: number; show: boolean }>({ x: 0, y: 0, show: false });
 
-const contextMenuOptions = computed<{type: string, podId: string}>(() => {
-  if (selectedRackIndices.value.length === 0) return { type: 'none' } as {type: string, podId: string};
+const contextMenuOptions = computed<{ type: string; podId?: string }>(() => {
+  if (selectedRackIndices.value.length === 0) return { type: 'none' } as { type: string; podId?: string };
 
-  if (typeof racks.value === 'string') return { type: 'none' } as {type: string, podId: string};
+  if (typeof racks.value === 'string') return { type: 'none' } as { type: string; podId?: string };
 
   const selectedRacks = selectedRackIndices.value.map(idx => racks.value[idx]!) as Rack[];
   const podsInSelection = [...new Set(selectedRacks.map(r => r.podId).filter(Boolean))];
 
   if (podsInSelection.length === 0) {
-    return { type: 'create_pod' } as {type: string, podId: string};
+    return { type: 'create_pod' } as { type: string; podId?: string };
   }
 
   if (podsInSelection.length === 1) {
     const podId = podsInSelection[0]!;
     const racksInPod = racks.value.filter(r => r.podId === podId);
-    const allRacksOfPodSelected = racksInPod.every(r => 
+    const allRacksOfPodSelected = racksInPod.every(r =>
       selectedRackIndices.value.includes(racks.value.indexOf(r as Rack & string))
     );
 
     if (allRacksOfPodSelected) {
-      return { type: 'delete_pod', podId } as {type: string, podId: string};
-    } else {
-      return { type: 'leave_pod', podId } as {type: string, podId: string};
+      return { type: 'delete_pod', podId } as { type: string; podId?: string };
     }
+    return { type: 'leave_pod', podId } as { type: string; podId?: string };
   }
 
-  // Multiple pods or mixed selected - for now just leave pod of the first one or ignore
-  return { type: 'leave_pod', podId: podsInSelection[0]! };
+  return { type: 'leave_pod', podId: podsInSelection[0] } as { type: string; podId?: string };
 });
 
 const openContextMenu = (event: MouseEvent, index: number) => {
   event.preventDefault();
   event.stopPropagation();
-  
-  // Si le rack n'est pas déjà sélectionné, on le sélectionne (et on déselectionne les autres sauf si Ctrl est pressé)
+
   if (!selectedRackIndices.value.includes(index)) {
     if (event.ctrlKey || event.metaKey) {
       selectedRackIndices.value.push(index);
@@ -797,13 +614,13 @@ const openContextMenu = (event: MouseEvent, index: number) => {
       selectedRackIndices.value = [index];
     }
   }
-  
+
   contextMenu.value = {
     x: event.clientX,
     y: event.clientY,
     show: true
   };
-  
+
   window.addEventListener('click', closeContextMenu);
 };
 
@@ -814,21 +631,20 @@ const closeContextMenu = () => {
 
 const createPod = () => {
   if (selectedRackIndices.value.length < 1) return;
-  
+
   takeSnapshot();
   const podId = `pod-${Date.now()}`;
   const podName = `Pod ${pods.value.length + 1}`;
-  
+
   pods.value.push({ id: podId, name: podName });
-  
+
   selectedRackIndices.value.forEach(index => {
     if (typeof racks.value === 'string') return;
-
     racks.value[index]!.podId = podId;
   });
-  
+
   closeContextMenu();
-  
+
   new Notify({
     status: 'success',
     title: 'Pod créé',
@@ -845,19 +661,18 @@ const createPod = () => {
 const leavePod = () => {
   if (selectedRackIndices.value.length < 1) return;
   takeSnapshot();
-  
+
   selectedRackIndices.value.forEach(index => {
     if (typeof racks.value === 'string') return;
-
     racks.value[index]!.podId = null;
   });
-  
+
   closeContextMenu();
-  
+
   new Notify({
     status: 'success',
     title: 'Pod quitté',
-    text: `Les racks sélectionnés ont été sortis de leur pod`,
+    text: 'Les racks sélectionnés ont été sortis de leur pod',
     autoclose: true,
     autotimeout: 3000,
     notificationsGap: 20,
@@ -869,9 +684,7 @@ const leavePod = () => {
 
 const deletePod = (podId: string) => {
   takeSnapshot();
-  
-  // Sortir tous les racks de ce pod (au cas où certains n'étaient pas sélectionnés, 
-  // même si la logique actuelle dit qu'on ne propose l'option que si tout est sélectionné)
+
   if (typeof racks.value === 'string') return;
 
   racks.value.forEach(r => {
@@ -879,13 +692,12 @@ const deletePod = (podId: string) => {
       r.podId = null;
     }
   });
-  
-  // Supprimer le pod de la liste
+
   const podIndex = pods.value.findIndex(p => p.id === podId);
   if (podIndex !== -1) {
     const podName = pods.value[podIndex]!.name;
     pods.value.splice(podIndex, 1);
-    
+
     new Notify({
       status: 'success',
       title: 'Pod supprimé',
@@ -898,7 +710,7 @@ const deletePod = (podId: string) => {
       customClass: 'custom-notify'
     });
   }
-  
+
   closeContextMenu();
 };
 
@@ -907,7 +719,7 @@ const selectPod = (event: MouseEvent, podId: string) => {
   if (event.button !== 0) return;
   event.stopPropagation();
   isWallSelected.value = false;
-  
+
   const podRacksIndices: number[] = [];
   if (typeof racks.value === 'string') return;
 
@@ -919,16 +731,31 @@ const selectPod = (event: MouseEvent, podId: string) => {
 
   if (podRacksIndices.length > 0) {
     selectedRackIndices.value = podRacksIndices;
-    // On simule le début d'un drag pour le premier rack du pod pour activer la logique de déplacement
     startDragRack(event, podRacksIndices[0]!);
   }
+};
+
+const updateRackName = (value: string) => {
+  if (selectedRackIndices.value.length !== 1) return;
+  if (typeof racks.value === 'string') return;
+  const rack = racks.value[selectedRackIndices.value[0]!];
+  if (!rack) return;
+  rack.name = value;
+};
+
+const updateRackRotation = (value: number) => {
+  if (selectedRackIndices.value.length !== 1) return;
+  if (typeof racks.value === 'string') return;
+  const rack = racks.value[selectedRackIndices.value[0]!];
+  if (!rack) return;
+  rack.rotation = Math.round((value ?? 0) / 45) * 45;
 };
 
 const clearWalls = () => {
   triggerClearWalls();
 };
 
-onMounted(async () => {
+onMounted(() => {
   updateCanvasSize();
   window.addEventListener('resize', updateCanvasSize);
   if (props.layers && props.layers.length > 0) {
@@ -946,249 +773,66 @@ onUnmounted(() => {
 
 <template>
   <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel">
-    <div class="toolbar">
-      <div class="room-info">
-        <label>Nom: <input v-model="roomName" /></label>
-      </div>
-      <div class="history-controls">
-        <button class="btn btn-sm btn-secondary" @click="undo" :disabled="undoStack.length === 0" title="Annuler (Ctrl+Z)">↶</button>
-        <button class="btn btn-sm btn-secondary" @click="redo" :disabled="redoStack.length === 0" title="Rétablir (Ctrl+Maj+Z)">↷</button>
-      </div>
-      <button class="btn btn-secondary" @click="addRack" :disabled="walls.length === 0" :title="walls.length === 0 ? 'Dessinez d\'abord les murs pour ajouter des racks' : ''">Ajouter un rack</button>
-      <button class="btn" :class="isDrawingWalls ? 'btn-primary' : 'btn-secondary'" @click="isDrawingWalls = !isDrawingWalls">
-        {{ isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs' }}
-      </button>
-      <button v-if="walls.length > 0" class="btn btn-danger" @click="clearWalls">Supprimer la pièce</button>
-
-      <div class="zoom-controls">
-        <button class="btn btn-sm btn-secondary" @click="zoomOut" :disabled="zoomLevel <= 0.2">-</button>
-        <span class="zoom-text">{{ Math.round(zoomLevel * 100) }}%</span>
-        <button class="btn btn-sm btn-secondary" @click="zoomIn" :disabled="zoomLevel >= 3">+</button>
-      </div>
-      <button @click="save" class="btn btn-primary">Sauvegarder</button>
-      <p class="hint">Glissez les éléments pour les placer.</p>
-    </div>
+    <BuilderToolbar
+      :room-name="roomName"
+      :undo-disabled="undoStack.length === 0"
+      :redo-disabled="redoStack.length === 0"
+      :can-add-rack="walls.length > 0"
+      :can-clear-walls="walls.length > 0"
+      :is-drawing-walls="isDrawingWalls"
+      :zoom-level="zoomLevel"
+      :can-zoom-out="zoomLevel > 0.2"
+      :can-zoom-in="zoomLevel < 3"
+      @update:roomName="roomName = $event"
+      @undo="undo"
+      @redo="redo"
+      @add-rack="addRack"
+      @toggle-walls="isDrawingWalls = !isDrawingWalls"
+      @clear-walls="clearWalls"
+      @zoom-out="zoomOut"
+      @zoom-in="zoomIn"
+      @save="save"
+    />
 
     <div class="canvas-area">
-      <svg
-          ref="canvasSvg"
-          width="100%"
-          height="600"
-          class="canvas-svg"
-          :class="{ interacting: isInteracting, 'drawing-walls': isDrawingWalls }"
-          @mousedown="deselect"
-          @mousemove="onMouseMoveSVG"
-      >
-        <defs>
-          <pattern id="grid" :width="20 * zoomLevel" :height="20 * zoomLevel" patternUnits="userSpaceOnUse">
-            <path :d="`M ${20 * zoomLevel} 0 L 0 0 0 ${20 * zoomLevel}`" fill="none" stroke="#eee" stroke-width="1"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" class="canvas-background" :transform="`translate(${(panOffset.x * zoomLevel) % (20 * zoomLevel)}, ${(panOffset.y * zoomLevel) % (20 * zoomLevel)})`" />
+      <BuilderCanvas
+        ref="canvasComponent"
+        :layers="layers"
+        :current-layer-index="currentLayerIndex"
+        :walls="walls"
+        :racks="racks"
+        :is-drawing-walls="isDrawingWalls"
+        :wall-preview-point="wallPreviewPoint"
+        :pod-boundaries="podBoundaries"
+        :wall-bounding-box="wallBoundingBox"
+        :horizontal-coords="horizontalCoords"
+        :vertical-coords="verticalCoords"
+        :selected-rack-indices="selectedRackIndices"
+        :zoom-level="zoomLevel"
+        :pan-offset="panOffset"
+        :is-wall-selected="isWallSelected"
+        :rack-width="rackWidth"
+        :rack-height="rackHeight"
+        :is-interacting="isInteracting"
+        :get-pod-boundaries="getPodBoundaries"
+        @deselect="deselect"
+        @mousemove-svg="onMouseMoveSVG"
+        @start-drag="startDragRack"
+        @open-context-menu="openContextMenu"
+        @start-rotate="startRotateRack"
+        @select-pod="selectPod"
+        @select-wall="selectWall"
+      />
 
-        <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`">
-          <!-- Non-active layers (background) -->
-          <g v-for="(layer, lIdx) in (layers as Layer[])" :key="'layer-' + layer.id"
-             v-show="lIdx !== currentLayerIndex"
-             class="layer-inactive"
-          >
-            <!-- Walls -->
-            <polyline
-                v-if="layer.walls.length > 0"
-                :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-                fill="none"
-                stroke="#333"
-                stroke-width="4"
-                stroke-linejoin="round"
-                stroke-linecap="round"
-            />
-            <polygon
-                v-if="layer.walls.length > 2"
-                :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-                class="room-surface"
-                stroke="#333"
-                stroke-width="4"
-                stroke-linejoin="round"
-            />
-
-            <!-- Pods boundaries -->
-            <rect
-                v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
-                :key="pod!.id"
-                :x="pod!.x"
-                :y="pod!.y"
-                :width="pod!.width"
-                :height="pod!.height"
-                class="pod-rect"
-            />
-
-            <!-- Racks -->
-            <g v-for="(rack, tIdx) in layer.racks" :key="'rack-' + tIdx">
-              <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`">
-                <rect
-                    :x="rack.x" :y="rack.y"
-                    :width="rack_width" :height="rack_height"
-                    class="rack-rect"
-                    :class="{ grouped: rack.podId }"
-                />
-                <text
-                    :x="rack.x + rack_width / 2"
-                    :y="rack.y + rack_height / 2"
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    class="rack-label"
-                >{{ rack.name }}</text>
-              </g>
-            </g>
-          </g>
-
-          <!-- Active Layer -->
-          <g class="layer-active">
-            <!-- Walls -->
-            <polyline
-                v-if="walls.length > 0"
-                :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
-                fill="none"
-                stroke="#333"
-                stroke-width="4"
-                stroke-linejoin="round"
-                stroke-linecap="round"
-            />
-            <polygon
-                v-if="!isDrawingWalls && walls.length > 2"
-                :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
-                class="room-surface"
-                :class="{ selected: isWallSelected }"
-                @mousedown.stop="isWallSelected = true; selectedRackIndices = []"
-                stroke="#333"
-                stroke-width="4"
-                stroke-linejoin="round"
-            />
-          <!-- Preview line when drawing -->
-          <circle
-              v-if="isDrawingWalls && wallPreviewPoint"
-              :cx="wallPreviewPoint.x"
-              :cy="wallPreviewPoint.y"
-              r="4"
-              fill="#333"
-          />
-          <line
-              v-if="isDrawingWalls && walls.length > 0 && wallPreviewPoint"
-              :x1="walls[walls.length - 1]?.x"
-              :y1="walls[walls.length - 1]?.y"
-              :x2="wallPreviewPoint.x"
-              :y2="wallPreviewPoint.y"
-              stroke="#333"
-              stroke-width="4"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-          />
-          <!-- Closing line preview -->
-          <line
-              v-if="isDrawingWalls && walls.length > 2 && wallPreviewPoint"
-              :x1="wallPreviewPoint.x"
-              :y1="wallPreviewPoint.y"
-              :x2="walls[0]?.x"
-              :y2="walls[0]?.y"
-              stroke="rgba(0,0,0,0.2)"
-              stroke-width="2"
-              stroke-dasharray="2,2"
-          />
-
-          <!-- Pods boundaries -->
-          <rect
-              v-for="pod in podBoundaries"
-              :key="pod!.id"
-              :x="pod!.x"
-              :y="pod!.y"
-              :width="pod!.width"
-              :height="pod!.height"
-              class="pod-rect"
-              :class="{ selected: selectedRackIndices.length > 0 && (racks as Rack[])[selectedRackIndices[0]!]?.podId === pod!.id }"
-              @mousedown="selectPod($event, pod!.id)"
-          />
-
-          <!-- Coordinates -->
-          <g v-if="wallBoundingBox" class="coordinates-labels">
-            <text
-                v-for="(coord, idx) in horizontalCoords"
-                :key="'h-' + idx"
-                :x="coord.x"
-                :y="coord.y"
-                text-anchor="middle"
-                class="coord-text"
-            >{{ coord.label }}</text>
-            <text
-                v-for="(coord, idx) in verticalCoords"
-                :key="'v-' + idx"
-                :x="coord.x"
-                :y="coord.y"
-                text-anchor="end"
-                dominant-baseline="middle"
-                class="coord-text"
-            >{{ coord.label }}</text>
-          </g>
-
-          <g v-for="(rack, tIdx) in racks" :key="tIdx">
-            <template v-if="typeof rack !== 'string'">
-              <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`">
-                <!-- Rack -->
-                <rect
-                    :x="rack.x" :y="rack.y"
-                    :width="rack_width" :height="rack_height"
-                    class="rack-rect"
-                    :class="{ selected: selectedRackIndices.includes(tIdx), grouped: rack.podId }"
-                    @mousedown="startDragRack($event, tIdx)"
-                    @contextmenu="openContextMenu($event, tIdx)"
-                />
-
-                <!-- Indicateur de l'avant du rack (en bas du carré par défaut) -->
-                <line
-                    :x1="rack.x + 1" :y1="rack.y + (rack_height / 10) * 9"
-                    :x2="rack.x + (rack_width - 1)" :y2="rack.y + (rack_height / 10) * 9"
-                    class="rack-front-line"
-                />
-
-                <text
-                    :x="rack.x + rack_width / 2"
-                    :y="rack.y + rack_height / 2"
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    class="rack-label"
-                    :transform="`rotate(${- (rack?.rotation || 0)}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`"
-                >
-                  {{ rack.name }}
-                </text>
-
-                <!-- Poignées de rotation sur les coins (visibles seulement si sélectionnée seule) -->
-                <template v-if="selectedRackIndices.length === 1 && selectedRackIndices[0] === tIdx">
-                  <circle
-                      v-for="(pos, pIdx) in [
-                      {x: rack.x, y: rack.y},
-                      {x: rack.x + rack_width, y: rack.y},
-                      {x: rack.x, y: rack.y + rack_height},
-                      {x: rack.x + rack_width, y: rack.y + rack_height}
-                    ]"
-                      :key="pIdx"
-                      :cx="pos.x" :cy="pos.y" r="6"
-                      class="rotation-handle"
-                      @mousedown="startRotateRack($event, tIdx)"
-                  />
-                </template>
-              </g>
-            </template>
-          </g>
-        </g>
-      </g>
-    </svg>
-
-      <div v-if="contextMenu.show" class="context-menu" :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }">
-        <ul>
-          <li v-if="contextMenuOptions.type === 'create_pod'" @click="createPod">Créer un nouveau pod</li>
-          <li v-if="contextMenuOptions.type === 'leave_pod'" @click="leavePod">Sortir du pod</li>
-          <li v-if="contextMenuOptions.type === 'delete_pod'" @click="deletePod(contextMenuOptions.podId!)">Supprimer le pod</li>
-        </ul>
-      </div>
+      <BuilderContextMenu
+        :show="contextMenu.show"
+        :x="contextMenu.x"
+        :y="contextMenu.y"
+        :options="contextMenuOptions"
+        @create-pod="createPod"
+        @leave-pod="leavePod"
+        @delete-pod="deletePod"
+      />
 
       <Modal
         :show="showClearModal"
@@ -1199,89 +843,30 @@ onUnmounted(() => {
         @cancel="showClearModal = false"
       />
 
-      <div v-if="selectedRackIndices.length === 1 && !isWallSelected" class="properties-panel">
-        <div v-if="racks[selectedRackIndices[0]!]">
-          <h3>Rack</h3>
-          <label>Nom: <input v-model="(racks as Rack[])[selectedRackIndices[0]!]!.name" @keyup.delete.stop.prevent="() => {}" /></label>
-          <label>Rotation (°): <input type="number" v-model.number="(racks as Rack[])[selectedRackIndices[0]!]!.rotation" step="45" @change="(racks as Rack[])[selectedRackIndices[0]!]!.rotation = Math.round(((racks as Rack[])[selectedRackIndices[0]!]?.rotation ?? 0) / 45) * 45" /></label>
-          <label v-if="(racks as Rack[])[selectedRackIndices[0]!]?.podId">Pod ID: <span>{{ (racks as Rack[])[selectedRackIndices[0]!]?.podId }}</span></label>
+      <BuilderPropertiesPanel
+        :selected-rack-indices="selectedRackIndices"
+        :racks="racks"
+        :is-wall-selected="isWallSelected"
+        :context-menu-options="contextMenuOptions"
+        @remove-rack="removeRack"
+        @create-pod="createPod"
+        @leave-pod="leavePod"
+        @delete-pod="deletePod"
+        @clear-selection="selectedRackIndices = []"
+        @update-rack-name="updateRackName"
+        @update-rack-rotation="updateRackRotation"
+      />
 
-          <div class="actions">
-            <button @click="removeRack(selectedRackIndices[0]!)" class="btn btn-danger">Supprimer le rack</button>
-          </div>
-        </div>
-      </div>
-      <div v-else-if="selectedRackIndices.length > 1" class="properties-panel">
-        <div>
-          <h3>Sélection multiple</h3>
-          <p>{{ selectedRackIndices.length }} racks sélectionnés</p>
-          <div class="actions">
-             <button v-if="contextMenuOptions.type === 'create_pod'" @click="createPod" class="btn btn-secondary">Créer un pod</button>
-             <button v-if="contextMenuOptions.type === 'leave_pod'" @click="leavePod" class="btn btn-secondary">Sortir du pod</button>
-             <button v-if="contextMenuOptions.type === 'delete_pod'" @click="deletePod(contextMenuOptions.podId!)" class="btn btn-danger">Supprimer le pod</button>
-             <button @click="selectedRackIndices = []" class="btn btn-outline-secondary">Désélectionner tout</button>
-          </div>
-        </div>
-      </div>
-      <div v-if="layers.length > 0" class="layer-previews">
-        <div 
-          v-for="(layer, index) in (layers as Layer[])"
-          :key="'preview-' + layer.id"
-          class="layer-preview-card"
-          :class="{ active: currentLayerIndex === index }"
-          @click="currentLayerIndex = index"
-        >
-          <div class="preview-title">{{ layer.name }}</div>
-          <svg
-            :viewBox="getWallBoundingBox(layer.walls) ? `${getWallBoundingBox(layer.walls)!.minX - 20} ${getWallBoundingBox(layer.walls)!.minY - 20} ${getWallBoundingBox(layer.walls)!.width + 40} ${getWallBoundingBox(layer.walls)!.height + 40}` : '0 0 100 100'"
-            class="mini-map"
-          >
-            <!-- Walls -->
-            <polygon
-                v-if="layer.walls.length > 2"
-                :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-                fill="rgba(0,0,0,0.05)"
-                stroke="#333"
-                stroke-width="2"
-            />
-            
-            <!-- Racks -->
-            <g v-for="(rack, tIdx) in layer.racks" :key="'preview-rack-' + tIdx">
-              <rect
-                  :x="rack.x" :y="rack.y"
-                  :width="rack_width" :height="rack_height"
-                  fill="#d2b48c"
-                  stroke="#8b4513"
-                  stroke-width="1"
-                  :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rack_width / 2}, ${rack.y + rack_height / 2})`"
-              />
-            </g>
-
-            <!-- Pods -->
-            <rect
-                v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
-                :key="'preview-pod-' + pod!.id"
-                :x="pod!.x"
-                :y="pod!.y"
-                :width="pod!.width"
-                :height="pod!.height"
-                fill="none"
-                stroke="red"
-                stroke-width="1"
-                stroke-dasharray="2, 2"
-            />
-
-            <!-- Viewport representation -->
-            <rect
-                :x="viewportRect.x"
-                :y="viewportRect.y"
-                :width="viewportRect.width"
-                :height="viewportRect.height"
-                class="mini-map-viewport"
-            />
-          </svg>
-        </div>
-      </div>
+      <BuilderLayerPreviews
+        :layers="layers"
+        :current-layer-index="currentLayerIndex"
+        :viewport-rect="viewportRect"
+        :rack-width="rackWidth"
+        :rack-height="rackHeight"
+        :get-wall-bounding-box="getWallBoundingBox"
+        :get-pod-boundaries="getPodBoundaries"
+        @select-layer="currentLayerIndex = $event"
+      />
     </div>
   </div>
 </template>
@@ -1293,275 +878,10 @@ onUnmounted(() => {
   height: 100vh;
   font-family: sans-serif;
 }
-.toolbar {
-  padding: 1rem;
-  background: #f4f4f4;
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  border-bottom: 1px solid #ccc;
-  flex-wrap: wrap;
-}
-.history-controls {
-  display: flex;
-  gap: 5px;
-}
-.room-info input {
-  padding: 0.4rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
 .canvas-area {
   flex: 1;
   position: relative;
   overflow: hidden;
   background: white;
-}
-.canvas-svg {
-  cursor: grab;
-}
-.canvas-svg:active {
-  cursor: grabbing;
-}
-.canvas-svg.interacting {
-  cursor: grabbing;
-}
-.rack-rect {
-  fill: #d2b48c;
-  stroke: #8b4513;
-  stroke-width: 2;
-  cursor: move;
-}
-.rack-rect.selected {
-  stroke: #ff4500;
-  stroke-width: 3;
-}
-.room-surface {
-  fill: rgba(0,0,0,0.03);
-  cursor: pointer;
-}
-.room-surface.selected {
-  fill: rgba(255, 69, 0, 0.1);
-  stroke: #ff4500;
-}
-.rack-rect.grouped {
-  fill: #e3f2fd;
-  stroke: #90caf9;
-}
-
-.pod-rect {
-  fill: rgba(255, 0, 0, 0.05);
-  stroke: red;
-  stroke-width: 2;
-  stroke-dasharray: 5, 5;
-  cursor: pointer;
-  pointer-events: all;
-  transition: fill 0.2s;
-}
-.pod-rect:hover {
-  fill: rgba(255, 0, 0, 0.1);
-}
-.pod-rect.selected {
-  stroke: #ff4500;
-  fill: rgba(255, 69, 0, 0.1);
-  stroke-dasharray: none;
-}
-
-.coord-text {
-  font-size: 10px;
-  fill: #666;
-  user-select: none;
-  pointer-events: none;
-  font-weight: bold;
-}
-
-.rack-rect.grouped.selected {
-  stroke: #ff4500;
-}
-.context-menu {
-  position: fixed;
-  background: white;
-  border: 1px solid #ccc;
-  box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-  z-index: 1000;
-}
-.context-menu ul {
-  list-style: none;
-  margin: 0;
-  padding: 5px 0;
-}
-.context-menu li {
-  padding: 8px 15px;
-  cursor: pointer;
-}
-.context-menu li:hover {
-  background-color: #f0f0f0;
-}
-.btn-outline-secondary {
-  background: transparent;
-  border: 1px solid #ccc;
-  color: #333;
-}
-.btn-outline-secondary:hover {
-  background: #f4f4f4;
-}
-.rack-front-line {
-  stroke: #ff4500;
-  stroke-width: 4;
-}
-.rotation-handle {
-  fill: white;
-  stroke: #ff4500;
-  stroke-width: 2;
-  cursor: alias;
-}
-.rack-label {
-  pointer-events: none;
-  font-size: 12px;
-  font-weight: bold;
-  user-select: none;
-}
-.canvas-svg.interacting {
-  user-select: none;
-}
-.properties-panel {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 280px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  padding: 1.25rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border-radius: 8px;
-  max-height: calc(100% - 2rem);
-  overflow-y: auto;
-  z-index: 10;
-}
-.properties-panel h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1f2937;
-  border-bottom: 1px solid #f3f4f6;
-  padding-bottom: 0.5rem;
-}
-.properties-panel label {
-  display: block;
-  margin-bottom: 1rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #4b5563;
-}
-.properties-panel input, .properties-panel select {
-  width: calc(100% - 10px);
-  margin-top: 0.25rem;
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  color: #1f2937;
-  transition: border-color 0.2s;
-}
-.properties-panel input:focus, .properties-panel select:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-}
-.actions {
-  margin-top: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  border-top: 1px solid #f3f4f6;
-  padding-top: 1rem;
-}
-
-.layer-inactive {
-  opacity: 0.3;
-  pointer-events: none;
-}
-
-.zoom-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: white;
-  padding: 4px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-}
-
-.zoom-text {
-  font-size: 0.8rem;
-  min-width: 45px;
-  text-align: center;
-  font-weight: 600;
-  color: #374151;
-}
-
-.hint {
-  font-size: 0.8rem;
-  color: #666;
-}
-.canvas-svg.drawing-walls {
-  cursor: crosshair !important;
-}
-
-.layer-previews {
-  position: absolute;
-  bottom: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-  z-index: 20;
-  pointer-events: none;
-}
-
-.layer-preview-card {
-  width: 150px;
-  background: white;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  padding: 5px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  pointer-events: auto;
-  transition: all 0.2s;
-}
-
-.layer-preview-card:hover {
-  border-color: #2563eb;
-  transform: scale(1.05);
-}
-
-.layer-preview-card.active {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-}
-
-.preview-title {
-  font-size: 0.7rem;
-  font-weight: bold;
-  margin-bottom: 4px;
-  color: #4b5563;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mini-map {
-  width: 100%;
-  height: 100px;
-  background: #f9fafb;
-  border-radius: 4px;
-}
-
-.mini-map-viewport {
-  fill: rgba(100, 100, 100, 0.2);
-  stroke: rgba(100, 100, 100, 0.5);
-  stroke-width: 1;
-  pointer-events: none;
 }
 </style>
