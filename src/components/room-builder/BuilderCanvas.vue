@@ -20,6 +20,7 @@ const props = defineProps<{
   rackHeight: number;
   isInteracting: boolean;
   getPodBoundaries: (racks: Rack[], pods: { id: string; name: string }[]) => Array<{ id: string; x: number; y: number; width: number; height: number } | null>;
+  selectedUnits: Point[];
 }>();
 
 const emit = defineEmits<{
@@ -29,7 +30,7 @@ const emit = defineEmits<{
   (e: 'open-context-menu', event: MouseEvent, index: number): void;
   (e: 'start-rotate', event: MouseEvent, index: number): void;
   (e: 'select-pod', event: MouseEvent, podId: string): void;
-  (e: 'select-wall'): void;
+  (e: 'select-wall', event: MouseEvent): void;
 }>();
 
 const svgRef = ref<SVGSVGElement | null>(null);
@@ -61,14 +62,28 @@ defineExpose({ svgRef });
     />
 
     <g :transform="`scale(${props.zoomLevel}) translate(${props.panOffset.x}, ${props.panOffset.y})`">
-      <g
-        v-for="(layer, lIdx) in props.layers"
-        :key="`layer-${layer.id}`"
-        v-show="lIdx !== props.currentLayerIndex"
-        class="layer-inactive"
-      >
-        <polyline
-          v-if="layer.walls.length > 0"
+        <g
+          v-for="(layer, lIdx) in props.layers"
+          :key="`layer-${layer.id}`"
+          v-show="lIdx !== props.currentLayerIndex"
+          class="layer-inactive"
+        >
+          <g v-if="lIdx === 1" class="footprints-layer">
+            <g v-for="footprint in layer.footprints" :key="footprint.id">
+              <rect
+                v-for="(unit, uIdx) in footprint.units"
+                :key="uIdx"
+                :x="unit.x"
+                :y="unit.y"
+                :width="20"
+                :height="20"
+                :fill="footprint.color"
+                fill-opacity="0.2"
+              />
+            </g>
+          </g>
+          <polyline
+            v-if="layer.walls.length > 0"
           :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
           fill="none"
           stroke="#333"
@@ -117,6 +132,34 @@ defineExpose({ svgRef });
       </g>
 
       <g class="layer-active">
+        <g v-if="props.currentLayerIndex === 1" class="footprints-layer">
+          <g v-for="footprint in props.layers[1]?.footprints" :key="footprint.id">
+            <rect
+              v-for="(unit, uIdx) in footprint.units"
+              :key="uIdx"
+              :x="unit.x"
+              :y="unit.y"
+              :width="20"
+              :height="20"
+              :fill="footprint.color"
+              fill-opacity="0.4"
+              stroke="white"
+              stroke-width="0.5"
+            />
+          </g>
+          <rect
+            v-for="(unit, uIdx) in props.selectedUnits"
+            :key="`selected-${uIdx}`"
+            :x="unit.x"
+            :y="unit.y"
+            :width="20"
+            :height="20"
+            fill="rgba(0, 123, 255, 0.4)"
+            stroke="white"
+            stroke-width="0.5"
+          />
+        </g>
+
         <polyline
           v-if="props.walls.length > 0"
           :points="props.walls.map(p => `${p.x},${p.y}`).join(' ')"
@@ -130,8 +173,8 @@ defineExpose({ svgRef });
           v-if="!props.isDrawingWalls && props.walls.length > 2"
           :points="props.walls.map(p => `${p.x},${p.y}`).join(' ')"
           class="room-surface"
-          :class="{ selected: props.isWallSelected }"
-          @mousedown.stop="emit('select-wall')"
+          :class="{ selected: props.isWallSelected, 'layer-footprints': props.currentLayerIndex === 1 }"
+          @mousedown="emit('select-wall', $event)"
           stroke="#333"
           stroke-width="4"
           stroke-linejoin="round"
@@ -284,6 +327,9 @@ defineExpose({ svgRef });
 .room-surface {
   fill: rgba(0,0,0,0.03);
   cursor: pointer;
+}
+.room-surface.layer-footprints {
+  pointer-events: all;
 }
 .room-surface.selected {
   fill: rgba(255, 69, 0, 0.1);

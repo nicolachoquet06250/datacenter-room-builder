@@ -3,13 +3,16 @@ const props = defineProps<{
   show: boolean;
   x: number;
   y: number;
-  options: { type: string; podId?: string };
+  options: { type: string; podId?: string; footprintId?: string };
 }>();
 
 const emit = defineEmits<{
   (e: 'create-pod'): void;
   (e: 'leave-pod'): void;
   (e: 'delete-pod', podId: string): void;
+  (e: 'create-footprint'): void;
+  (e: 'delete-footprint', footprintId: string): void;
+  (e: 'change-footprint-color', footprintId: string): void;
 }>();
 </script>
 
@@ -19,6 +22,11 @@ const emit = defineEmits<{
       <li v-if="props.options.type === 'create_pod'" @click="emit('create-pod')">Créer un nouveau pod</li>
       <li v-if="props.options.type === 'leave_pod'" @click="emit('leave-pod')">Sortir du pod</li>
       <li v-if="props.options.type === 'delete_pod'" @click="emit('delete-pod', props.options.podId!)">Supprimer le pod</li>
+      <li v-if="props.options.type === 'create_footprint'" @click="emit('create-footprint')">Créer un footprint</li>
+      <template v-if="props.options.type === 'footprint_actions'">
+        <li @click="emit('change-footprint-color', props.options.footprintId!)">Changer la couleur</li>
+        <li @click="emit('delete-footprint', props.options.footprintId!)">Supprimer le footprint</li>
+      </template>
     </ul>
   </div>
 </template>

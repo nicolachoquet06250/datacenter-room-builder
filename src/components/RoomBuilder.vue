@@ -20,6 +20,7 @@ import {useRacksCrud} from "../composables/useRacksCrud.ts";
 import {useWalls} from "../composables/useWalls.ts";
 import {useZoom} from "../composables/useZoom.ts";
 import {useModal} from "../composables/useModal.ts";
+import {useFootprints} from "../composables/useFootprints.ts";
 
 const props = withDefaults(
   defineProps<{
@@ -33,7 +34,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'saved', payload: { racks: Rack[]; pods: Pod[]; walls: Point[]; layers: Layer[] }): void;
+  (e: 'saved', payload: { layers: Layer[] }): void;
 }>();
 
 const {
@@ -51,8 +52,21 @@ const {
   layers,
   currentLayerIndex,
   clearLayers,
-  initialize: initializeLayers
+  initialize: initializeLayers,
+  currentLayer
 } = useLayers(walls, props.layers);
+
+const {
+  selectedUnits,
+  isSelecting,
+  startSelection,
+  updateSelection,
+  stopSelection,
+  createFootprint,
+  deleteFootprint,
+  changeFootprintColor,
+  getFootprintAt
+} = useFootprints(currentLayer, walls);
 
 const roomName = ref(props.roomName);
 
@@ -144,6 +158,7 @@ const {
   currentLayerIndex
 });
 
+
 const {
   contextMenuOptions,
   contextMenu,
@@ -152,10 +167,16 @@ const {
     computed(() => typeof (racks.value as unknown as string) === 'string'
         ? JSON.parse(racks.value as unknown as string)
         : racks.value),
-    selectedRackIndices
+    selectedRackIndices,
+    selectedUnits
 );
 
-const {selectWall} = useWalls(props.roomId);
+const {selectWall: selectWallInternal} = useWalls(props.roomId);
+const selectWall = (event: MouseEvent) => {
+  if (currentLayerIndex.value === 1) return;
+  event.stopPropagation();
+  selectWallInternal();
+};
 const {pods, createPod, selectPod, leavePod, deletePod} = usePodsCrud(props.roomId);
 
 const confirmClearWalls = () => {
@@ -184,6 +205,7 @@ const isInteracting = computed(() =>
   rotatingRack.value !== null ||
   isPanning.value ||
   isDrawingWalls.value ||
+  isSelecting.value ||
   contextMenu.value.show
 );
 
@@ -203,6 +225,17 @@ const onMouseMoveSVG = (event: MouseEvent) => {
         : null;
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
   }
+  
+  if (currentLayerIndex.value === 1 && isSelecting.value) {
+    const svg = event.currentTarget as SVGSVGElement;
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
+    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+    updateSelection(x, y);
+  }
 };
 
 const onMouseMove = (event: MouseEvent) => {
@@ -214,7 +247,10 @@ const onMouseMove = (event: MouseEvent) => {
 
 const stopDrag = () => {
   panStop();
-  resetRackState()
+  resetRackState();
+  if (currentLayerIndex.value === 1) {
+    stopSelection();
+  }
 };
 
 const deselect = (event: MouseEvent) => {
@@ -250,10 +286,53 @@ const deselect = (event: MouseEvent) => {
     createWall({ x: snapX, y: snapY });
     return;
   }
-  if ((event.target as SVGElement).classList.contains('canvas-background')) {
-    selectedRackIndices.value = [];
-    isWallSelected.value = false;
-    panStart();
+  if ((event.target as SVGElement).classList.contains('canvas-background') || 
+      (event.target as SVGElement).closest('.footprints-layer') ||
+      (event.target as SVGElement).classList.contains('room-surface')) {
+    const isFootprintClick = (event.target as SVGElement).closest('.footprints-layer');
+    if (!isFootprintClick) {
+      selectedRackIndices.value = [];
+      isWallSelected.value = false;
+    }
+    
+    const svg = event.currentTarget as SVGSVGElement;
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
+    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+
+    if (currentLayerIndex.value === 1) {
+      if (event.button === 0) { // Left click
+        startSelection(x, y);
+        // Si on a cliqué à l'intérieur de la pièce pour sélectionner, on ne pan pas au clic gauche
+        const { isPointInPolygon } = useRoomBuilderGeometry();
+        if (!isPointInPolygon(x, y, walls.value)) {
+           panStart();
+        }
+      } else if (event.button === 2) { // Right click
+        const footprint = getFootprintAt(x, y);
+        const clickedUnitX = Math.floor(x / 20) * 20;
+        const clickedUnitY = Math.floor(y / 20) * 20;
+        const isUnitSelected = selectedUnits.value.some(u => u.x === clickedUnitX && u.y === clickedUnitY);
+
+        if (footprint) {
+          openContextMenu(event, null, footprint.id);
+        } else if (isUnitSelected) {
+          openContextMenu(event);
+        }
+      }
+    } else {
+      if (event.button === 0) {
+        panStart();
+      }
+    }
+
+    // Toujours autoriser le pan avec le clic milieu
+    if (event.button === 1) {
+      panStart();
+    }
   }
 };
 
@@ -334,9 +413,6 @@ const pasteFromClipboard = async () => {
 const save = async () => {
   try {
     emit('saved', {
-      racks: racks.value,
-      pods: pods.value,
-      walls: walls.value,
       layers: layers.value
     });
     undoStack.value = [];
@@ -360,12 +436,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel">
+  <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel" @contextmenu.prevent>
     <BuilderToolbar
       v-model:room-name="roomName"
       :undo-disabled="undoStack.length === 0"
       :redo-disabled="redoStack.length === 0"
-      :can-add-rack="walls.length > 0"
+      :can-add-rack="walls.length > 0 && currentLayerIndex !== 1"
       :can-clear-walls="walls.length > 0"
       :is-drawing-walls="isDrawingWalls"
       :zoom-level="zoomLevel"
@@ -403,6 +479,7 @@ onUnmounted(() => {
         :rack-height="rackHeight"
         :is-interacting="isInteracting"
         :get-pod-boundaries="getPodBoundaries"
+        :selected-units="selectedUnits"
 
         @deselect="deselect"
         @mousemove-svg="onMouseMoveSVG"
@@ -410,7 +487,7 @@ onUnmounted(() => {
         @open-context-menu="openContextMenu"
         @start-rotate="startRotateRack"
         @select-pod="selectPod"
-        @select-wall="selectWall"
+        @select-wall="selectWall($event)"
       />
 
       <BuilderContextMenu
@@ -422,6 +499,9 @@ onUnmounted(() => {
         @create-pod="createPod"
         @leave-pod="leavePod"
         @delete-pod="deletePod"
+        @create-footprint="createFootprint"
+        @delete-footprint="deleteFootprint"
+        @change-footprint-color="changeFootprintColor"
       />
 
       <Modal

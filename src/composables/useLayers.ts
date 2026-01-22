@@ -5,10 +5,7 @@ const currentLayerIndex = ref(0);
 
 export const layerNames = ['Circuits électriques', 'Surfaces au sol', 'Baies'];
 
-export const useLayers = (walls: Ref<{
-    x: number
-    y: number
-}[]>, defaultLayers: Layer[]|string = []) => {
+export const useLayers = (walls: Ref<Point[]>, defaultLayers: Layer[]|string = []) => {
     defaultLayers = (typeof defaultLayers === 'string' ? JSON.parse(defaultLayers) : defaultLayers) as Layer[];
 
     const clearLayers = () => layers.value = [];
@@ -21,7 +18,8 @@ export const useLayers = (walls: Ref<{
             name,
             racks: [],
             pods: [],
-            walls: JSON.parse(JSON.stringify(finalWalls))
+            walls: JSON.parse(JSON.stringify(finalWalls)),
+            footprints: []
         }));
         currentLayerIndex.value = 0;
     }

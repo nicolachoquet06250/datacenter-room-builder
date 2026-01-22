@@ -11,7 +11,7 @@ const getRackCorners = (rack: Rack) => {
 };
 
 export const useRoomBuilderGeometry = () => {
-  const getPodBoundaries = (layerRacks: Rack[], layerPods: Pod[]) => {
+  const getPodBoundaries = (layerRacks: Rack[], layerPods: Pod[] = []) => {
     return layerPods.map(pod => {
       const podRacks = layerRacks.filter(r => r.podId === pod.id);
       if (podRacks.length === 0) return null;

@@ -142,7 +142,7 @@ export const useRacksCrud = (roomId: number) => {
     };
 
     const startRotateRack = (event: MouseEvent, index: number) => {
-        if (isDrawingWalls.value) return;
+        if (isDrawingWalls.value || currentLayerIndex.value === 1) return;
         isWallSelected.value = false;
         takeSnapshot();
         event.stopPropagation();
@@ -158,7 +158,7 @@ export const useRacksCrud = (roomId: number) => {
     };
 
     const startDragRack = (event: MouseEvent, index: number) => {
-        if (isDrawingWalls.value) return;
+        if (isDrawingWalls.value || currentLayerIndex.value === 1) return;
         if (event.button !== 0) return;
         isWallSelected.value = false;
         takeSnapshot();
@@ -198,6 +198,7 @@ export const useRacksCrud = (roomId: number) => {
             const snapY = Math.round(rawY / 20) * 20;
 
             if (walls.value.length > 2) {
+                const { isPointInPolygon } = useRoomBuilderGeometry();
                 if (isPointInPolygon(snapX + rackWidth / 2, snapY + rackHeight / 2, walls.value)) {
                     rack.x = snapX;
                     rack.y = snapY;

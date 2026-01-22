@@ -35,6 +35,19 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
           stroke-width="2"
         />
 
+        <g v-for="footprint in layer.footprints" :key="`preview-footprint-${footprint.id}`">
+          <rect
+            v-for="(unit, uIdx) in footprint.units"
+            :key="`preview-footprint-unit-${footprint.id}-${uIdx}`"
+            :x="unit.x"
+            :y="unit.y"
+            width="20"
+            height="20"
+            :fill="footprint.color"
+            fill-opacity="0.4"
+          />
+        </g>
+
         <g v-for="(rack, tIdx) in layer.racks" :key="`preview-rack-${tIdx}`">
           <rect
             :x="rack.x"
