@@ -831,19 +831,21 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  background-color: #ff4d4f;
+  padding: 0 16px;
+  height: 32px;
+  background-color: #e74c3c;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 13px;
   transition: background-color 0.2s, transform 0.1s;
 }
 
 .floating-delete-btn:hover {
-  background-color: #ff7875;
+  background-color: #c0392b;
 }
 
 .floating-delete-btn:active {

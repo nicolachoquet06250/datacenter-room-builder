@@ -25,21 +25,30 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
       @click="currentLayerIndex = index"
     >
       <div class="preview-header">
-        <span class="preview-index">{{ index + 1 }}</span>
+        <div class="preview-index-badge">{{ index + 1 }}</div>
         <div class="preview-title" :title="layer.name">{{ layer.name }}</div>
+        <div v-if="currentLayerIndex === index" class="active-indicator"></div>
       </div>
       <div class="mini-map-container">
         <svg
           :viewBox="props.getWallBoundingBox(layer.walls)
-            ? `${props.getWallBoundingBox(layer.walls)!.minX - 20} ${props.getWallBoundingBox(layer.walls)!.minY - 20} ${props.getWallBoundingBox(layer.walls)!.width + 40} ${props.getWallBoundingBox(layer.walls)!.height + 40}`
+            ? `${props.getWallBoundingBox(layer.walls)!.minX - 40} ${props.getWallBoundingBox(layer.walls)!.minY - 40} ${props.getWallBoundingBox(layer.walls)!.width + 80} ${props.getWallBoundingBox(layer.walls)!.height + 80}`
             : '0 0 100 100'"
           class="mini-map"
         >
+          <!-- Grille de fond pour la mini-map -->
+          <defs>
+            <pattern id="grid-mini" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid-mini)" />
+
           <polygon
             v-if="layer.walls?.length > 2"
             :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-            fill="rgba(255,255,255,0.05)"
-            stroke="#666"
+            fill="rgba(255, 255, 255, 0.03)"
+            stroke="rgba(255, 255, 255, 0.2)"
             stroke-width="2"
             stroke-linejoin="round"
           />
@@ -47,7 +56,7 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
             v-else-if="layer.walls?.length > 0"
             :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
             fill="none"
-            stroke="#666"
+            stroke="rgba(255, 255, 255, 0.2)"
             stroke-width="2"
             stroke-linejoin="round"
           />
@@ -61,7 +70,7 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
               width="20"
               height="20"
               :fill="footprint.color"
-              fill-opacity="0.4"
+              fill-opacity="0.3"
             />
           </g>
 
@@ -71,8 +80,9 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
               :y="rack.y"
               :width="props.rackWidth"
               :height="props.rackHeight"
-              fill="#d2b48c"
-              stroke="#8b4513"
+              fill="#004a99"
+              fill-opacity="0.6"
+              stroke="rgba(255, 255, 255, 0.4)"
               stroke-width="1"
               :transform="`rotate(${rack?.rotation || 0}, ${rack.x + props.rackWidth / 2}, ${rack.y + props.rackHeight / 2})`"
             />
@@ -86,9 +96,9 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
             :width="pod!.width"
             :height="pod!.height"
             fill="none"
-            stroke="#e74c3c"
-            stroke-width="1"
-            stroke-dasharray="2, 2"
+            stroke="#ff4d4f"
+            stroke-width="1.5"
+            stroke-dasharray="3, 3"
           />
 
           <!-- Circuits Électriques -->
@@ -99,9 +109,10 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
               :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
               fill="none"
               stroke="#3498db"
-              stroke-width="2"
+              stroke-width="3"
               stroke-linejoin="round"
               stroke-linecap="round"
+              opacity="0.8"
             />
           </g>
 
@@ -121,101 +132,113 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
 <style scoped>
 .layer-previews {
   position: absolute;
-  bottom: 1rem;
-  right: 1rem;
+  bottom: 1.5rem;
+  right: 1.5rem;
   display: flex;
   flex-direction: row;
-  gap: 12px;
-  z-index: 20;
+  gap: 16px;
+  z-index: 100;
   pointer-events: none;
   padding: 8px;
 }
 
 .layer-preview-card {
-  width: 140px;
-  background: #2c3e50;
-  border: 1px solid #1a252f;
-  border-radius: 4px;
+  width: 160px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   pointer-events: auto;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
 }
 
 .layer-preview-card:hover {
-  border-color: #3498db;
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  border-color: #475569;
+  transform: translateY(-6px);
+  box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.3);
 }
 
 .layer-preview-card.active {
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
-  transform: translateY(-4px) scale(1.02);
-}
-
-.layer-preview-card.active .preview-header {
-  background: rgba(52, 152, 219, 0.2);
-}
-
-.layer-preview-card.active .preview-index {
-  background: #2ecc71;
-  box-shadow: 0 0 8px rgba(46, 204, 113, 0.4);
+  border-color: #004a99;
+  border-width: 2px;
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
 }
 
 .preview-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.2);
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.5);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
 }
 
-.preview-index {
+.preview-index-badge {
   font-size: 10px;
-  font-weight: bold;
-  background: #3498db;
-  color: white;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  font-weight: 800;
+  background: #334155;
+  color: #94a3b8;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.layer-preview-card.active .preview-index-badge {
+  background: #004a99;
+  color: white;
 }
 
 .preview-title {
   font-size: 11px;
-  font-weight: 600;
-  color: #ecf0f1;
+  font-weight: 700;
+  color: #cbd5e1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
 }
 
+.layer-preview-card.active .preview-title {
+  color: white;
+}
+
+.active-indicator {
+  width: 6px;
+  height: 6px;
+  background-color: #2ecc71;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #2ecc71;
+}
+
 .mini-map-container {
-  padding: 4px;
-  background: #1a252f;
+  padding: 6px;
+  background: #0f172a;
 }
 
 .mini-map {
   width: 100%;
-  height: 80px;
-  background: #1e2a36;
-  border-radius: 2px;
+  height: 90px;
+  background: #1e293b;
+  border-radius: 6px;
   display: block;
 }
 
 .mini-map-viewport {
-  fill: rgba(52, 152, 219, 0.15);
-  stroke: rgba(52, 152, 219, 0.6);
-  stroke-width: 1.5;
+  fill: rgba(0, 74, 153, 0.1);
+  stroke: #004a99;
+  stroke-width: 2;
+  stroke-dasharray: none;
   pointer-events: none;
 }
 </style>
