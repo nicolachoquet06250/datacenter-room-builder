@@ -79,6 +79,7 @@ const roomName = ref(props.roomName);
 const circuitPreviewPoint = ref<Point | null>(null);
 const isDrawingCircuit = ref(false);
 const currentCircuitPathIndex = ref<number | null>(null);
+const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
 const circuitPaths = computed({
   get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
   set: (val) => {
@@ -91,6 +92,7 @@ const circuitPaths = computed({
 watch(currentLayerIndex, () => {
   selectedRackIndices.value = [];
   isWallSelected.value = false;
+  selectedCircuitSegments.value = [];
   circuitPreviewPoint.value = null;
   isDrawingCircuit.value = false;
   currentCircuitPathIndex.value = null;
@@ -241,6 +243,45 @@ const stopCircuitDrawing = () => {
   currentCircuitPathIndex.value = null;
 };
 
+const setSelectedCircuitSegments = (segments: Array<{ pathIndex: number; segmentIndex: number }>) => {
+  selectedCircuitSegments.value = segments;
+};
+
+const selectCircuitSegment = (pathIndex: number, segmentIndex: number, includeAdjacent = false) => {
+  const circuits = layers.value[currentLayerIndex.value]?.circuits ?? [];
+  const circuit = circuits[pathIndex];
+  if (!circuit || segmentIndex < 0 || segmentIndex >= circuit.length - 1) {
+    return;
+  }
+
+  const selected = [{ pathIndex, segmentIndex }];
+  if (includeAdjacent) {
+    if (segmentIndex > 0) {
+      selected.unshift({ pathIndex, segmentIndex: segmentIndex - 1 });
+    }
+    if (segmentIndex < circuit.length - 2) {
+      selected.push({ pathIndex, segmentIndex: segmentIndex + 1 });
+    }
+  }
+  setSelectedCircuitSegments(selected);
+};
+
+const onCircuitSegmentClick = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
+  if (currentLayerIndex.value !== 0) return;
+  event.stopPropagation();
+  stopCircuitDrawing();
+  circuitPreviewPoint.value = null;
+  selectCircuitSegment(pathIndex, segmentIndex, false);
+};
+
+const onCircuitSegmentDoubleClick = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
+  if (currentLayerIndex.value !== 0) return;
+  event.stopPropagation();
+  stopCircuitDrawing();
+  circuitPreviewPoint.value = null;
+  selectCircuitSegment(pathIndex, segmentIndex, true);
+};
+
 const onMouseMoveSVG = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
     const svg = event.currentTarget as SVGSVGElement;
@@ -259,6 +300,10 @@ const onMouseMoveSVG = (event: MouseEvent) => {
   }
 
   if (currentLayerIndex.value === 0 && !isDrawingWalls.value) {
+    if ((event.target as Element | null)?.closest('.circuit-segment')) {
+      circuitPreviewPoint.value = null;
+      return;
+    }
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
@@ -355,6 +400,7 @@ const deselect = (event: MouseEvent) => {
 
     if (currentLayerIndex.value === 0) {
       if (event.button === 0) {
+        setSelectedCircuitSegments([]);
         if (event.detail > 1) {
           stopCircuitDrawing();
           return;
@@ -568,6 +614,7 @@ onUnmounted(() => {
         :is-interacting="isInteracting"
         :get-pod-boundaries="getPodBoundaries"
         :selected-units="selectedUnits"
+        :selected-circuit-segments="selectedCircuitSegments"
 
         @deselect="deselect"
         @mousemove-svg="onMouseMoveSVG"
@@ -576,6 +623,8 @@ onUnmounted(() => {
         @start-rotate="startRotateRack"
         @select-pod="selectPod"
         @select-wall="selectWall($event)"
+        @select-circuit-segment="onCircuitSegmentClick"
+        @select-circuit-segment-adjacent="onCircuitSegmentDoubleClick"
       />
 
       <BuilderContextMenu
