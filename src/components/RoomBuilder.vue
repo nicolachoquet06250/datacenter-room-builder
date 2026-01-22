@@ -71,6 +71,7 @@ const {
 
 const roomName = ref(props.roomName);
 const circuitPreviewPoint = ref<Point | null>(null);
+const isDrawingCircuit = ref(false);
 const circuitPoints = computed({
   get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
   set: (val) => {
@@ -84,6 +85,7 @@ watch(currentLayerIndex, () => {
   selectedRackIndices.value = [];
   isWallSelected.value = false;
   circuitPreviewPoint.value = null;
+  isDrawingCircuit.value = false;
 });
 
 const {
@@ -220,6 +222,11 @@ const isInteracting = computed(() =>
   contextMenu.value.show
 );
 
+const stopCircuitDrawing = () => {
+  isDrawingCircuit.value = false;
+  circuitPreviewPoint.value = null;
+};
+
 const onMouseMoveSVG = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
     const svg = event.currentTarget as SVGSVGElement;
@@ -237,7 +244,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
   }
   
-  if (currentLayerIndex.value === 0 && !isDrawingWalls.value) {
+  if (currentLayerIndex.value === 0 && !isDrawingWalls.value && (isDrawingCircuit.value || circuitPoints.value.length === 0)) {
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
@@ -334,6 +341,10 @@ const deselect = (event: MouseEvent) => {
 
     if (currentLayerIndex.value === 0) {
       if (event.button === 0) {
+        if (event.detail > 1) {
+          stopCircuitDrawing();
+          return;
+        }
         if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
           const lastPoint = circuitPoints.value.length > 0
             ? circuitPoints.value[circuitPoints.value.length - 1]
@@ -342,6 +353,7 @@ const deselect = (event: MouseEvent) => {
           takeSnapshot();
           circuitPoints.value = [...circuitPoints.value, constrained];
           circuitPreviewPoint.value = constrained;
+          isDrawingCircuit.value = true;
           return;
         }
         panStart();
@@ -381,6 +393,10 @@ const deselect = (event: MouseEvent) => {
 const handleKeyDown = (event: KeyboardEvent) => {
   if (isDrawingWalls.value && event.key === 'Escape') {
     cancelDrawingWalls();
+    return;
+  }
+  if (!isDrawingWalls.value && currentLayerIndex.value === 0 && (event.key === 'Escape' || event.key === 'Enter')) {
+    stopCircuitDrawing();
     return;
   }
   const isCtrl = event.ctrlKey || event.metaKey;
