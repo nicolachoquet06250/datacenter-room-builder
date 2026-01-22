@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps<{
   layers: Layer[];
@@ -7,6 +7,7 @@ const props = defineProps<{
   walls: Point[];
   racks: Array<Rack | string>;
   isDrawingWalls: boolean;
+  isDrawingCircuit: boolean;
   wallPreviewPoint: Point | null;
   circuitPreviewPoint: Point | null;
   podBoundaries: Array<{ id: string; x: number; y: number; width: number; height: number } | null>;
@@ -35,6 +36,13 @@ const emit = defineEmits<{
 }>();
 
 const svgRef = ref<SVGSVGElement | null>(null);
+const lastCircuitPoint = computed(() => {
+  const circuits = props.layers[props.currentLayerIndex]?.circuits;
+  if (!circuits?.length) return null;
+  const lastPath = circuits[circuits.length - 1];
+  if (!lastPath?.length) return null;
+  return lastPath[lastPath.length - 1];
+});
 
 defineExpose({ svgRef });
 </script>
@@ -102,14 +110,19 @@ defineExpose({ svgRef });
         />
         <polyline
           v-if="layer.circuits?.length"
-          :points="layer.circuits.map(p => `${p.x},${p.y}`).join(' ')"
-          fill="none"
-          stroke="#0d6efd"
-          stroke-width="3"
-          stroke-linejoin="round"
-          stroke-linecap="round"
-          class="circuit-line"
-        />
+        >
+          <polyline
+            v-for="(circuit, circuitIdx) in layer.circuits"
+            :key="`circuit-${layer.id}-${circuitIdx}`"
+            :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
+            fill="none"
+            stroke="#0d6efd"
+            stroke-width="3"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            class="circuit-line"
+          />
+        </g>
 
         <rect
           v-for="pod in props.getPodBoundaries(layer.racks, layer.pods)"
@@ -219,16 +232,19 @@ defineExpose({ svgRef });
           stroke-width="2"
           stroke-dasharray="2,2"
         />
-        <polyline
-          v-if="props.layers[props.currentLayerIndex]?.circuits?.length"
-          :points="props.layers[props.currentLayerIndex]?.circuits?.map(p => `${p.x},${p.y}`).join(' ')"
-          fill="none"
-          stroke="#0d6efd"
-          stroke-width="3"
-          stroke-linejoin="round"
-          stroke-linecap="round"
-          class="circuit-line"
-        />
+        <g v-if="props.layers[props.currentLayerIndex]?.circuits?.length">
+          <polyline
+            v-for="(circuit, circuitIdx) in props.layers[props.currentLayerIndex]?.circuits"
+            :key="`circuit-active-${circuitIdx}`"
+            :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
+            fill="none"
+            stroke="#0d6efd"
+            stroke-width="3"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            class="circuit-line"
+          />
+        </g>
         <circle
           v-if="props.currentLayerIndex === 0 && props.circuitPreviewPoint"
           :cx="props.circuitPreviewPoint.x"
@@ -237,9 +253,9 @@ defineExpose({ svgRef });
           fill="#0d6efd"
         />
         <line
-          v-if="props.currentLayerIndex === 0 && props.layers[props.currentLayerIndex]?.circuits?.length && props.circuitPreviewPoint"
-          :x1="props.layers[props.currentLayerIndex]?.circuits?.[props.layers[props.currentLayerIndex]?.circuits?.length - 1]?.x"
-          :y1="props.layers[props.currentLayerIndex]?.circuits?.[props.layers[props.currentLayerIndex]?.circuits?.length - 1]?.y"
+          v-if="props.currentLayerIndex === 0 && props.isDrawingCircuit && lastCircuitPoint && props.circuitPreviewPoint"
+          :x1="lastCircuitPoint.x"
+          :y1="lastCircuitPoint.y"
           :x2="props.circuitPreviewPoint.x"
           :y2="props.circuitPreviewPoint.y"
           stroke="#0d6efd"

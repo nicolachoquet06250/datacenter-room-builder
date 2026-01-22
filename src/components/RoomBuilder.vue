@@ -72,7 +72,8 @@ const {
 const roomName = ref(props.roomName);
 const circuitPreviewPoint = ref<Point | null>(null);
 const isDrawingCircuit = ref(false);
-const circuitPoints = computed({
+const currentCircuitPathIndex = ref<number | null>(null);
+const circuitPaths = computed({
   get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
   set: (val) => {
     if (layers.value[currentLayerIndex.value]) {
@@ -86,6 +87,7 @@ watch(currentLayerIndex, () => {
   isWallSelected.value = false;
   circuitPreviewPoint.value = null;
   isDrawingCircuit.value = false;
+  currentCircuitPathIndex.value = null;
 });
 
 const {
@@ -225,6 +227,7 @@ const isInteracting = computed(() =>
 const stopCircuitDrawing = () => {
   isDrawingCircuit.value = false;
   circuitPreviewPoint.value = null;
+  currentCircuitPathIndex.value = null;
 };
 
 const onMouseMoveSVG = (event: MouseEvent) => {
@@ -244,7 +247,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
   }
   
-  if (currentLayerIndex.value === 0 && !isDrawingWalls.value && (isDrawingCircuit.value || circuitPoints.value.length === 0)) {
+  if (currentLayerIndex.value === 0 && !isDrawingWalls.value) {
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
@@ -253,10 +256,10 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
     if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
-      const lastPoint = circuitPoints.value.length > 0
-        ? circuitPoints.value[circuitPoints.value.length - 1]
+      const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
+        ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
         : null;
-      circuitPreviewPoint.value = getConstrainedPoint(x, y, lastPoint);
+      circuitPreviewPoint.value = getConstrainedPoint(x, y, lastPoint ?? null);
     } else {
       circuitPreviewPoint.value = null;
     }
@@ -346,14 +349,23 @@ const deselect = (event: MouseEvent) => {
           return;
         }
         if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
-          const lastPoint = circuitPoints.value.length > 0
-            ? circuitPoints.value[circuitPoints.value.length - 1]
+          const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
+            ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
             : null;
-          const constrained = getConstrainedPoint(x, y, lastPoint);
+          const constrained = getConstrainedPoint(x, y, lastPoint ?? null);
           takeSnapshot();
-          circuitPoints.value = [...circuitPoints.value, constrained];
+          if (!isDrawingCircuit.value || currentCircuitPathIndex.value === null) {
+            const nextPaths = [...circuitPaths.value, [constrained]];
+            circuitPaths.value = nextPaths;
+            currentCircuitPathIndex.value = nextPaths.length - 1;
+            isDrawingCircuit.value = true;
+          } else {
+            const nextPaths = [...circuitPaths.value];
+            const activePath = [...(nextPaths[currentCircuitPathIndex.value] ?? [])];
+            nextPaths[currentCircuitPathIndex.value] = [...activePath, constrained];
+            circuitPaths.value = nextPaths;
+          }
           circuitPreviewPoint.value = constrained;
-          isDrawingCircuit.value = true;
           return;
         }
         panStart();
@@ -524,6 +536,7 @@ onUnmounted(() => {
         :walls="walls"
         :racks="racks as Rack[]"
         :is-drawing-walls="isDrawingWalls"
+        :is-drawing-circuit="isDrawingCircuit"
         :wall-preview-point="wallPreviewPoint"
         :circuit-preview-point="circuitPreviewPoint"
         :pod-boundaries="podBoundaries"

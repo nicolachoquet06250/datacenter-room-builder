@@ -29,7 +29,9 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers: Layer[]|string = [
         if (defaultLayers && defaultLayers.length > 0) {
             layers.value = defaultLayers.map((layer) => ({
                 ...layer,
-                circuits: layer.circuits ?? []
+                circuits: Array.isArray(layer.circuits?.[0])
+                    ? layer.circuits
+                    : (layer.circuits?.length ? [layer.circuits as unknown as Point[]] : [])
             }));
             currentLayerIndex.value = 0;
         }
