@@ -32,6 +32,7 @@ declare global {
     pods: Pod[];
     walls: Point[];
     footprints: Footprint[];
+    circuits: Point[];
   }
 }
 

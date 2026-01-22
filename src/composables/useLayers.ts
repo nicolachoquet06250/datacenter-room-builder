@@ -19,14 +19,18 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers: Layer[]|string = [
             racks: [],
             pods: [],
             walls: JSON.parse(JSON.stringify(finalWalls)),
-            footprints: []
+            footprints: [],
+            circuits: []
         }));
         currentLayerIndex.value = 0;
     }
 
     onMounted(() => {
         if (defaultLayers && defaultLayers.length > 0) {
-            layers.value = defaultLayers;
+            layers.value = defaultLayers.map((layer) => ({
+                ...layer,
+                circuits: layer.circuits ?? []
+            }));
             currentLayerIndex.value = 0;
         }
     })

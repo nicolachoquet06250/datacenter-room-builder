@@ -8,6 +8,7 @@ const props = defineProps<{
   racks: Array<Rack | string>;
   isDrawingWalls: boolean;
   wallPreviewPoint: Point | null;
+  circuitPreviewPoint: Point | null;
   podBoundaries: Array<{ id: string; x: number; y: number; width: number; height: number } | null>;
   wallBoundingBox: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null;
   horizontalCoords: Array<{ label: string; x: number; y: number }>;
@@ -98,6 +99,16 @@ defineExpose({ svgRef });
           stroke="#333"
           stroke-width="4"
           stroke-linejoin="round"
+        />
+        <polyline
+          v-if="layer.circuits?.length"
+          :points="layer.circuits.map(p => `${p.x},${p.y}`).join(' ')"
+          fill="none"
+          stroke="#0d6efd"
+          stroke-width="3"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+          class="circuit-line"
         />
 
         <rect
@@ -207,6 +218,34 @@ defineExpose({ svgRef });
           stroke="rgba(0,0,0,0.2)"
           stroke-width="2"
           stroke-dasharray="2,2"
+        />
+        <polyline
+          v-if="props.layers[props.currentLayerIndex]?.circuits?.length"
+          :points="props.layers[props.currentLayerIndex]?.circuits?.map(p => `${p.x},${p.y}`).join(' ')"
+          fill="none"
+          stroke="#0d6efd"
+          stroke-width="3"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+          class="circuit-line"
+        />
+        <circle
+          v-if="props.currentLayerIndex === 0 && props.circuitPreviewPoint"
+          :cx="props.circuitPreviewPoint.x"
+          :cy="props.circuitPreviewPoint.y"
+          r="3"
+          fill="#0d6efd"
+        />
+        <line
+          v-if="props.currentLayerIndex === 0 && props.layers[props.currentLayerIndex]?.circuits?.length && props.circuitPreviewPoint"
+          :x1="props.layers[props.currentLayerIndex]?.circuits?.[props.layers[props.currentLayerIndex]?.circuits?.length - 1]?.x"
+          :y1="props.layers[props.currentLayerIndex]?.circuits?.[props.layers[props.currentLayerIndex]?.circuits?.length - 1]?.y"
+          :x2="props.circuitPreviewPoint.x"
+          :y2="props.circuitPreviewPoint.y"
+          stroke="#0d6efd"
+          stroke-width="2"
+          stroke-linejoin="round"
+          stroke-linecap="round"
         />
 
         <rect
@@ -384,6 +423,9 @@ defineExpose({ svgRef });
 }
 .layer-inactive {
   opacity: 0.3;
+  pointer-events: none;
+}
+.circuit-line {
   pointer-events: none;
 }
 </style>

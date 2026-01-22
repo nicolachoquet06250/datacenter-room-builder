@@ -39,7 +39,8 @@ const emit = defineEmits<{
 
 const {
   getPodBoundaries, getWallBoundingBox,
-  getConstrainedPoint
+  getConstrainedPoint,
+  isPointInPolygon
 } = useRoomBuilderGeometry();
 const {error: notifyError} = useNotify();
 
@@ -69,10 +70,20 @@ const {
 } = useFootprints(currentLayer, walls);
 
 const roomName = ref(props.roomName);
+const circuitPreviewPoint = ref<Point | null>(null);
+const circuitPoints = computed({
+  get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
+  set: (val) => {
+    if (layers.value[currentLayerIndex.value]) {
+      layers.value[currentLayerIndex.value]!.circuits = val;
+    }
+  }
+});
 
 watch(currentLayerIndex, () => {
   selectedRackIndices.value = [];
   isWallSelected.value = false;
+  circuitPreviewPoint.value = null;
 });
 
 const {
@@ -173,7 +184,7 @@ const {
 
 const {selectWall: selectWallInternal} = useWalls(props.roomId);
 const selectWall = (event: MouseEvent) => {
-  if (currentLayerIndex.value === 1) return;
+  if (currentLayerIndex.value === 0 || currentLayerIndex.value === 1) return;
   event.stopPropagation();
   selectWallInternal();
 };
@@ -226,6 +237,24 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
   }
   
+  if (currentLayerIndex.value === 0 && !isDrawingWalls.value) {
+    const svg = event.currentTarget as SVGSVGElement;
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
+    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+    if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
+      const lastPoint = circuitPoints.value.length > 0
+        ? circuitPoints.value[circuitPoints.value.length - 1]
+        : null;
+      circuitPreviewPoint.value = getConstrainedPoint(x, y, lastPoint);
+    } else {
+      circuitPreviewPoint.value = null;
+    }
+  }
+
   if (currentLayerIndex.value === 1 && isSelecting.value) {
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
@@ -303,11 +332,24 @@ const deselect = (event: MouseEvent) => {
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
 
-    if (currentLayerIndex.value === 1) {
+    if (currentLayerIndex.value === 0) {
+      if (event.button === 0) {
+        if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
+          const lastPoint = circuitPoints.value.length > 0
+            ? circuitPoints.value[circuitPoints.value.length - 1]
+            : null;
+          const constrained = getConstrainedPoint(x, y, lastPoint);
+          takeSnapshot();
+          circuitPoints.value = [...circuitPoints.value, constrained];
+          circuitPreviewPoint.value = constrained;
+          return;
+        }
+        panStart();
+      }
+    } else if (currentLayerIndex.value === 1) {
       if (event.button === 0) { // Left click
         startSelection(x, y);
         // Si on a cliqué à l'intérieur de la pièce pour sélectionner, on ne pan pas au clic gauche
-        const { isPointInPolygon } = useRoomBuilderGeometry();
         if (!isPointInPolygon(x, y, walls.value)) {
            panStart();
         }
@@ -467,6 +509,7 @@ onUnmounted(() => {
         :racks="racks as Rack[]"
         :is-drawing-walls="isDrawingWalls"
         :wall-preview-point="wallPreviewPoint"
+        :circuit-preview-point="circuitPreviewPoint"
         :pod-boundaries="podBoundaries"
         :wall-bounding-box="wallBoundingBox"
         :horizontal-coords="horizontalCoords"
