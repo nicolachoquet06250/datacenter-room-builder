@@ -123,9 +123,9 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
             fill="#0d6efd"
           />
           <line
-            v-if="layer.circuits && layer.circuits.length > 0 && layer.circuits[layer.circuits.length - 1].length > 0"
-            :x1="layer.circuits[layer.circuits.length - 1][layer.circuits[layer.circuits.length - 1].length - 1].x"
-            :y1="layer.circuits[layer.circuits.length - 1][layer.circuits[layer.circuits.length - 1].length - 1].y"
+            v-if="layer.circuits && layer.circuits.length > 0 && layer.circuits[layer.circuits.length - 1]!.length > 0"
+            :x1="layer.circuits[layer.circuits.length - 1]![layer.circuits[layer.circuits.length - 1]!.length - 1]!.x"
+            :y1="layer.circuits[layer.circuits.length - 1]![layer.circuits[layer.circuits.length - 1]!.length - 1]!.y"
             :x2="props.circuitPreviewPoint.x"
             :y2="props.circuitPreviewPoint.y"
             stroke="#0d6efd"
