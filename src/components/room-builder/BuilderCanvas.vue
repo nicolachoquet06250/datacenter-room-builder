@@ -33,6 +33,7 @@ const props = defineProps<{
     height: number
   } | null>;
   selectedUnits: Point[];
+  selectedCircuitSegmentKeys: string[];
 }>();
 
 const emit = defineEmits<{
@@ -43,6 +44,8 @@ const emit = defineEmits<{
   (e: 'start-rotate', event: MouseEvent, index: number): void;
   (e: 'select-pod', event: MouseEvent, podId: string): void;
   (e: 'select-wall', event: MouseEvent): void;
+  (e: 'select-circuit-segment', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
+  (e: 'select-circuit-path', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
 }>();
 
 const svgRef = ref<SVGSVGElement | null>(null);
@@ -53,6 +56,11 @@ const lastCircuitPoint = computed(() => {
   if (!lastPath?.length) return null;
   return lastPath[lastPath.length - 1];
 });
+
+const selectedSegmentKeys = computed(() => new Set(props.selectedCircuitSegmentKeys));
+
+const isSegmentSelected = (pathIndex: number, segmentIndex: number) =>
+  selectedSegmentKeys.value.has(`${pathIndex}-${segmentIndex}`);
 
 defineExpose({svgRef});
 </script>
@@ -272,17 +280,22 @@ defineExpose({svgRef});
             stroke-dasharray="2,2"
         />
         <g v-if="props.layers[props.currentLayerIndex]?.circuits?.length">
-          <polyline
-              v-for="(circuit, circuitIdx) in props.layers[props.currentLayerIndex]?.circuits"
-              :key="`circuit-active-${circuitIdx}`"
-              :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
-              fill="none"
-              stroke="#0d6efd"
-              stroke-width="3"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-              class="circuit-line"
-          />
+          <g v-for="(circuit, circuitIdx) in props.layers[props.currentLayerIndex]?.circuits"
+             :key="`circuit-active-${circuitIdx}`">
+            <line
+                v-for="(point, pointIdx) in circuit.slice(0, -1)"
+                :key="`circuit-segment-${circuitIdx}-${pointIdx}`"
+                :x1="point.x"
+                :y1="point.y"
+                :x2="circuit[pointIdx + 1]!.x"
+                :y2="circuit[pointIdx + 1]!.y"
+                class="circuit-segment"
+                :class="{ selected: isSegmentSelected(circuitIdx, pointIdx) }"
+                @mousedown.stop
+                @click.stop="emit('select-circuit-segment', $event, circuitIdx, pointIdx)"
+                @dblclick.stop="emit('select-circuit-path', $event, circuitIdx, pointIdx)"
+            />
+          </g>
         </g>
         <circle
             v-if="props.currentLayerIndex === 0 && props.circuitPreviewPoint"
@@ -516,5 +529,18 @@ defineExpose({svgRef});
 .circuit-line {
   pointer-events: none;
   stroke: #3498db;
+}
+
+.circuit-segment {
+  pointer-events: stroke;
+  stroke: #3498db;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.circuit-segment.selected {
+  stroke: #ff4500;
+  stroke-width: 4;
 }
 </style>

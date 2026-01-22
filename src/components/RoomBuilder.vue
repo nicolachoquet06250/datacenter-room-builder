@@ -79,6 +79,10 @@ const roomName = ref(props.roomName);
 const circuitPreviewPoint = ref<Point | null>(null);
 const isDrawingCircuit = ref(false);
 const currentCircuitPathIndex = ref<number | null>(null);
+const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
+const selectedCircuitSegmentKeys = computed(() =>
+  selectedCircuitSegments.value.map(segment => `${segment.pathIndex}-${segment.segmentIndex}`)
+);
 const circuitPaths = computed({
   get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
   set: (val) => {
@@ -94,6 +98,7 @@ watch(currentLayerIndex, () => {
   circuitPreviewPoint.value = null;
   isDrawingCircuit.value = false;
   currentCircuitPathIndex.value = null;
+  selectedCircuitSegments.value = [];
 });
 
 const {
@@ -241,6 +246,56 @@ const stopCircuitDrawing = () => {
   currentCircuitPathIndex.value = null;
 };
 
+const getDistanceToSegment = (point: Point, start: Point, end: Point) => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy);
+  const clampedT = Math.max(0, Math.min(1, t));
+  const projX = start.x + clampedT * dx;
+  const projY = start.y + clampedT * dy;
+  return Math.hypot(point.x - projX, point.y - projY);
+};
+
+const getCircuitSegmentAtPoint = (x: number, y: number, tolerance = 6) => {
+  const point = {x, y};
+  for (let pathIndex = 0; pathIndex < circuitPaths.value.length; pathIndex += 1) {
+    const circuit = circuitPaths.value[pathIndex];
+    if (!circuit || circuit.length < 2) continue;
+    for (let segmentIndex = 0; segmentIndex < circuit.length - 1; segmentIndex += 1) {
+      const start = circuit[segmentIndex]!;
+      const end = circuit[segmentIndex + 1]!;
+      if (getDistanceToSegment(point, start, end) <= tolerance) {
+        return {pathIndex, segmentIndex};
+      }
+    }
+  }
+  return null;
+};
+
+const selectCircuitSegment = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
+  if (event.detail > 1) return;
+  event.stopPropagation();
+  stopCircuitDrawing();
+  selectedCircuitSegments.value = [{pathIndex, segmentIndex}];
+};
+
+const selectCircuitPath = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
+  event.stopPropagation();
+  stopCircuitDrawing();
+  const circuit = circuitPaths.value[pathIndex];
+  if (!circuit || circuit.length < 2) {
+    selectedCircuitSegments.value = [{pathIndex, segmentIndex}];
+    return;
+  }
+  selectedCircuitSegments.value = circuit.slice(0, -1).map((_, idx) => ({
+    pathIndex,
+    segmentIndex: idx
+  }));
+};
+
 const onMouseMoveSVG = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
     const svg = event.currentTarget as SVGSVGElement;
@@ -266,6 +321,10 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+    if (getCircuitSegmentAtPoint(x, y)) {
+      circuitPreviewPoint.value = null;
+      return;
+    }
     if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
       const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
         ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
@@ -359,7 +418,12 @@ const deselect = (event: MouseEvent) => {
           stopCircuitDrawing();
           return;
         }
+        const hadSelection = selectedCircuitSegments.value.length > 0;
+        selectedCircuitSegments.value = [];
         if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
+          if (hadSelection) {
+            return;
+          }
           const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
             ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
             : null;
@@ -413,6 +477,86 @@ const deselect = (event: MouseEvent) => {
   }
 };
 
+const deleteSelectedCircuitSegments = () => {
+  if (selectedCircuitSegments.value.length === 0) return;
+
+  takeSnapshot();
+  const nextPaths = [...circuitPaths.value.map(p => [...p])];
+
+  // Regrouper les segments par chemin pour les supprimer plus facilement
+  const segmentsByPath: Record<number, number[]> = {};
+  selectedCircuitSegments.value.forEach(({ pathIndex, segmentIndex }) => {
+    if (!segmentsByPath[pathIndex]) {
+      segmentsByPath[pathIndex] = [];
+    }
+    segmentsByPath[pathIndex].push(segmentIndex);
+  });
+
+  // Pour chaque chemin, supprimer les segments du plus grand index au plus petit
+  Object.keys(segmentsByPath).forEach(pIdxStr => {
+    const pathIndex = parseInt(pIdxStr);
+    const indicesToDelete = segmentsByPath[pathIndex]!.sort((a, b) => b - a);
+    
+    indicesToDelete.forEach(() => {
+      // Un segment relie le point segmentIndex au point segmentIndex + 1
+      // Si on supprime un segment, on doit décider si on supprime un point ou si on coupe le chemin.
+      // Dans le contexte d'un outil de dessin simple, si on sélectionne un segment, 
+      // on veut généralement le faire disparaître.
+      
+      const path = nextPaths[pathIndex];
+      if (path) {
+        // Pour supprimer un segment, on peut soit supprimer l'un des points, 
+        // soit diviser le chemin en deux.
+        // Ici, si on supprime le segment entre i et i+1 :
+        // Si c'est un segment au milieu, on peut éventuellement scinder le chemin.
+        // Mais si l'utilisateur veut juste "effacer" des segments, on peut simplifier.
+        
+        // Approche : on retire le point de fin du segment. 
+        // Si c'est le dernier segment, on retire le dernier point.
+        // Si c'est au milieu, on risque de relier i à i+2, ce qui n'est pas "supprimer le segment".
+        
+        // Correction de l'approche : On va reconstruire les chemins.
+        // Un chemin de N points a N-1 segments.
+        // Marquer les segments à supprimer.
+      }
+    });
+  });
+
+  // Nouvelle approche plus robuste : recréer les chemins en filtrant les segments supprimés
+  const finalPaths: Point[][] = [];
+  
+  circuitPaths.value.forEach((path, pathIndex) => {
+    let currentNewPath: Point[] = [];
+    const pathSegmentsToDelete = segmentsByPath[pathIndex] || [];
+    
+    for (let i = 0; i < path.length - 1; i++) {
+      if (pathSegmentsToDelete.includes(i)) {
+        // Segment supprimé : on termine le chemin actuel s'il existe
+        if (currentNewPath.length > 1) {
+          finalPaths.push(currentNewPath);
+        }
+        currentNewPath = [];
+      } else {
+        // Segment conservé
+        if (currentNewPath.length === 0) {
+          currentNewPath.push(path[i]!);
+        }
+        currentNewPath.push(path[i+1]!);
+      }
+    }
+    
+    if (currentNewPath.length > 1) {
+      finalPaths.push(currentNewPath);
+    }
+  });
+
+  circuitPaths.value = finalPaths;
+  selectedCircuitSegments.value = [];
+  if (currentCircuitPathIndex.value !== null) {
+    stopCircuitDrawing();
+  }
+};
+
 const handleKeyDown = (event: KeyboardEvent) => {
   if (isDrawingWalls.value && event.key === 'Escape') {
     cancelDrawingWalls();
@@ -451,6 +595,12 @@ const handleKeyDown = (event: KeyboardEvent) => {
     if (isWallSelected.value) {
       event.preventDefault();
       triggerClearWalls();
+      return;
+    }
+
+    if (selectedCircuitSegments.value.length > 0) {
+      event.preventDefault();
+      deleteSelectedCircuitSegments();
       return;
     }
   }
@@ -568,6 +718,7 @@ onUnmounted(() => {
         :is-interacting="isInteracting"
         :get-pod-boundaries="getPodBoundaries"
         :selected-units="selectedUnits"
+        :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
 
         @deselect="deselect"
         @mousemove-svg="onMouseMoveSVG"
@@ -576,7 +727,26 @@ onUnmounted(() => {
         @start-rotate="startRotateRack"
         @select-pod="selectPod"
         @select-wall="selectWall($event)"
+        @select-circuit-segment="selectCircuitSegment"
+        @select-circuit-path="selectCircuitPath"
       />
+
+      <!-- Bouton de suppression flottant pour les segments de circuit -->
+      <button
+        v-if="selectedCircuitSegments.length > 0"
+        class="floating-delete-btn"
+        title="Supprimer la sélection"
+        @click="deleteSelectedCircuitSegments"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18"></path>
+          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+          <line x1="10" y1="11" x2="10" y2="17"></line>
+          <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+        <span>Supprimer</span>
+      </button>
 
       <BuilderContextMenu
         :show="contextMenu.show"
@@ -647,5 +817,32 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   background: #004a99; /* Bleu iTop Designer */
+}
+
+.floating-delete-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-weight: 500;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.floating-delete-btn:hover {
+  background-color: #ff7875;
+}
+
+.floating-delete-btn:active {
+  transform: translateY(1px);
 }
 </style>
