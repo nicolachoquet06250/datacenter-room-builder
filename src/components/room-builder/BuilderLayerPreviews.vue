@@ -4,6 +4,10 @@ const props = defineProps<{
   viewportRect: { x: number; y: number; width: number; height: number };
   rackWidth: number;
   rackHeight: number;
+  isDrawingWalls: boolean;
+  wallPreviewPoint: Point | null;
+  isDrawingCircuit: boolean;
+  circuitPreviewPoint: Point | null;
   getWallBoundingBox: (walls: { x: number; y: number }[]) => { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null;
   getPodBoundaries: (racks: Rack[], pods: { id: string; name: string }[]) => Array<{ id: string; x: number; y: number; width: number; height: number } | null>;
 }>();
@@ -28,7 +32,7 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
         class="mini-map"
       >
         <polygon
-          v-if="layer.walls.length > 2"
+          v-if="layer.walls?.length > 2"
           :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
           fill="rgba(0,0,0,0.05)"
           stroke="#333"
@@ -73,6 +77,63 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
           stroke-width="1"
           stroke-dasharray="2, 2"
         />
+
+        <!-- Circuits Électriques -->
+        <g v-if="layer.circuits?.length">
+          <polyline
+            v-for="(circuit, circuitIdx) in layer.circuits"
+            :key="`preview-circuit-${layer.id}-${circuitIdx}`"
+            :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
+            fill="none"
+            stroke="#0d6efd"
+            stroke-width="2"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+        </g>
+
+        <!-- Dessin en direct des murs -->
+        <template v-if="props.isDrawingWalls && currentLayerIndex === index">
+          <circle
+            v-if="props.wallPreviewPoint"
+            :cx="props.wallPreviewPoint.x"
+            :cy="props.wallPreviewPoint.y"
+            r="3"
+            fill="#333"
+          />
+          <line
+            v-if="layer.walls?.length > 0 && props.wallPreviewPoint"
+            :x1="layer.walls[layer.walls.length - 1]?.x"
+            :y1="layer.walls[layer.walls.length - 1]?.y"
+            :x2="props.wallPreviewPoint.x"
+            :y2="props.wallPreviewPoint.y"
+            stroke="#333"
+            stroke-width="2"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+        </template>
+
+        <!-- Dessin en direct des circuits -->
+        <template v-if="index === 0 && currentLayerIndex === index && props.isDrawingCircuit && props.circuitPreviewPoint">
+          <circle
+            :cx="props.circuitPreviewPoint.x"
+            :cy="props.circuitPreviewPoint.y"
+            r="2"
+            fill="#0d6efd"
+          />
+          <line
+            v-if="layer.circuits && layer.circuits.length > 0 && layer.circuits[layer.circuits.length - 1].length > 0"
+            :x1="layer.circuits[layer.circuits.length - 1][layer.circuits[layer.circuits.length - 1].length - 1].x"
+            :y1="layer.circuits[layer.circuits.length - 1][layer.circuits[layer.circuits.length - 1].length - 1].y"
+            :x2="props.circuitPreviewPoint.x"
+            :y2="props.circuitPreviewPoint.y"
+            stroke="#0d6efd"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+        </template>
 
         <rect
           :x="props.viewportRect.x"

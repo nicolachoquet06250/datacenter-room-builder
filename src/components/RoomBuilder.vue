@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import 'simple-notify/dist/simple-notify.css';
-import {computed, onMounted, onUnmounted, ref, useTemplateRef, watch} from 'vue';
+import {computed, onMounted, onUnmounted, ref, useTemplateRef, watch, watchEffect} from 'vue';
 import Modal from './Modal.vue';
 import BuilderToolbar from './room-builder/BuilderToolbar.vue';
 import BuilderCanvas from './room-builder/BuilderCanvas.vue';
@@ -33,13 +33,20 @@ const props = withDefaults(
   }
 );
 
+const propsLayers = computed<Layer[]>(() => typeof props.layers === 'string' ? JSON.parse(props.layers) : props.layers)
+
+watchEffect(() => {
+  console.log(propsLayers.value)
+})
+
 const emit = defineEmits<{
   (e: 'saved', payload: { layers: Layer[] }): void;
 }>();
 
 const {
   getPodBoundaries, getWallBoundingBox,
-  getConstrainedPoint
+  getConstrainedPoint,
+  isPointInPolygon
 } = useRoomBuilderGeometry();
 const {error: notifyError} = useNotify();
 
@@ -69,10 +76,24 @@ const {
 } = useFootprints(currentLayer, walls);
 
 const roomName = ref(props.roomName);
+const circuitPreviewPoint = ref<Point | null>(null);
+const isDrawingCircuit = ref(false);
+const currentCircuitPathIndex = ref<number | null>(null);
+const circuitPaths = computed({
+  get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
+  set: (val) => {
+    if (layers.value[currentLayerIndex.value]) {
+      layers.value[currentLayerIndex.value]!.circuits = val;
+    }
+  }
+});
 
 watch(currentLayerIndex, () => {
   selectedRackIndices.value = [];
   isWallSelected.value = false;
+  circuitPreviewPoint.value = null;
+  isDrawingCircuit.value = false;
+  currentCircuitPathIndex.value = null;
 });
 
 const {
@@ -173,7 +194,7 @@ const {
 
 const {selectWall: selectWallInternal} = useWalls(props.roomId);
 const selectWall = (event: MouseEvent) => {
-  if (currentLayerIndex.value === 1) return;
+  if (currentLayerIndex.value === 0 || currentLayerIndex.value === 1) return;
   event.stopPropagation();
   selectWallInternal();
 };
@@ -209,6 +230,12 @@ const isInteracting = computed(() =>
   contextMenu.value.show
 );
 
+const stopCircuitDrawing = () => {
+  isDrawingCircuit.value = false;
+  circuitPreviewPoint.value = null;
+  currentCircuitPathIndex.value = null;
+};
+
 const onMouseMoveSVG = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
     const svg = event.currentTarget as SVGSVGElement;
@@ -226,6 +253,24 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
   }
   
+  if (currentLayerIndex.value === 0 && !isDrawingWalls.value) {
+    const svg = event.currentTarget as SVGSVGElement;
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
+    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+    if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
+      const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
+        ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
+        : null;
+      circuitPreviewPoint.value = getConstrainedPoint(x, y, lastPoint ?? null);
+    } else {
+      circuitPreviewPoint.value = null;
+    }
+  }
+
   if (currentLayerIndex.value === 1 && isSelecting.value) {
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
@@ -303,11 +348,38 @@ const deselect = (event: MouseEvent) => {
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
 
-    if (currentLayerIndex.value === 1) {
+    if (currentLayerIndex.value === 0) {
+      if (event.button === 0) {
+        if (event.detail > 1) {
+          stopCircuitDrawing();
+          return;
+        }
+        if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
+          const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
+            ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
+            : null;
+          const constrained = getConstrainedPoint(x, y, lastPoint ?? null);
+          takeSnapshot();
+          if (!isDrawingCircuit.value || currentCircuitPathIndex.value === null) {
+            const nextPaths = [...circuitPaths.value, [constrained]];
+            circuitPaths.value = nextPaths;
+            currentCircuitPathIndex.value = nextPaths.length - 1;
+            isDrawingCircuit.value = true;
+          } else {
+            const nextPaths = [...circuitPaths.value];
+            const activePath = [...(nextPaths[currentCircuitPathIndex.value] ?? [])];
+            nextPaths[currentCircuitPathIndex.value] = [...activePath, constrained];
+            circuitPaths.value = nextPaths;
+          }
+          circuitPreviewPoint.value = constrained;
+          return;
+        }
+        panStart();
+      }
+    } else if (currentLayerIndex.value === 1) {
       if (event.button === 0) { // Left click
         startSelection(x, y);
         // Si on a cliqué à l'intérieur de la pièce pour sélectionner, on ne pan pas au clic gauche
-        const { isPointInPolygon } = useRoomBuilderGeometry();
         if (!isPointInPolygon(x, y, walls.value)) {
            panStart();
         }
@@ -339,6 +411,10 @@ const deselect = (event: MouseEvent) => {
 const handleKeyDown = (event: KeyboardEvent) => {
   if (isDrawingWalls.value && event.key === 'Escape') {
     cancelDrawingWalls();
+    return;
+  }
+  if (!isDrawingWalls.value && currentLayerIndex.value === 0 && (event.key === 'Escape' || event.key === 'Enter')) {
+    stopCircuitDrawing();
     return;
   }
   const isCtrl = event.ctrlKey || event.metaKey;
@@ -466,7 +542,9 @@ onUnmounted(() => {
         :walls="walls"
         :racks="racks as Rack[]"
         :is-drawing-walls="isDrawingWalls"
+        :is-drawing-circuit="isDrawingCircuit"
         :wall-preview-point="wallPreviewPoint"
+        :circuit-preview-point="circuitPreviewPoint"
         :pod-boundaries="podBoundaries"
         :wall-bounding-box="wallBoundingBox"
         :horizontal-coords="horizontalCoords"
@@ -535,6 +613,10 @@ onUnmounted(() => {
         :viewport-rect="viewportRect"
         :rack-width="rackWidth"
         :rack-height="rackHeight"
+        :is-drawing-walls="isDrawingWalls"
+        :wall-preview-point="wallPreviewPoint"
+        :is-drawing-circuit="isDrawingCircuit"
+        :circuit-preview-point="circuitPreviewPoint"
         :get-wall-bounding-box="getWallBoundingBox"
         :get-pod-boundaries="getPodBoundaries"
       />
