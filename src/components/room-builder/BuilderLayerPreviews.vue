@@ -24,125 +24,87 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
       :class="{ active: currentLayerIndex === index }"
       @click="currentLayerIndex = index"
     >
-      <div class="preview-title">{{ layer.name }}</div>
-      <svg
-        :viewBox="props.getWallBoundingBox(layer.walls)
-          ? `${props.getWallBoundingBox(layer.walls)!.minX - 20} ${props.getWallBoundingBox(layer.walls)!.minY - 20} ${props.getWallBoundingBox(layer.walls)!.width + 40} ${props.getWallBoundingBox(layer.walls)!.height + 40}`
-          : '0 0 100 100'"
-        class="mini-map"
-      >
-        <polygon
-          v-if="layer.walls?.length > 2"
-          :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-          fill="rgba(0,0,0,0.05)"
-          stroke="#333"
-          stroke-width="2"
-        />
-
-        <g v-for="footprint in layer.footprints" :key="`preview-footprint-${footprint.id}`">
-          <rect
-            v-for="(unit, uIdx) in footprint.units"
-            :key="`preview-footprint-unit-${footprint.id}-${uIdx}`"
-            :x="unit.x"
-            :y="unit.y"
-            width="20"
-            height="20"
-            :fill="footprint.color"
-            fill-opacity="0.4"
+      <div class="preview-header">
+        <span class="preview-index">{{ index + 1 }}</span>
+        <div class="preview-title" :title="layer.name">{{ layer.name }}</div>
+      </div>
+      <div class="mini-map-container">
+        <svg
+          :viewBox="props.getWallBoundingBox(layer.walls)
+            ? `${props.getWallBoundingBox(layer.walls)!.minX - 20} ${props.getWallBoundingBox(layer.walls)!.minY - 20} ${props.getWallBoundingBox(layer.walls)!.width + 40} ${props.getWallBoundingBox(layer.walls)!.height + 40}`
+            : '0 0 100 100'"
+          class="mini-map"
+        >
+          <polygon
+            v-if="layer.walls?.length > 2"
+            :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
+            fill="rgba(255,255,255,0.05)"
+            stroke="#666"
+            stroke-width="2"
           />
-        </g>
 
-        <g v-for="(rack, tIdx) in layer.racks" :key="`preview-rack-${tIdx}`">
+          <g v-for="footprint in layer.footprints" :key="`preview-footprint-${footprint.id}`">
+            <rect
+              v-for="(unit, uIdx) in footprint.units"
+              :key="`preview-footprint-unit-${footprint.id}-${uIdx}`"
+              :x="unit.x"
+              :y="unit.y"
+              width="20"
+              height="20"
+              :fill="footprint.color"
+              fill-opacity="0.4"
+            />
+          </g>
+
+          <g v-for="(rack, tIdx) in layer.racks" :key="`preview-rack-${tIdx}`">
+            <rect
+              :x="rack.x"
+              :y="rack.y"
+              :width="props.rackWidth"
+              :height="props.rackHeight"
+              fill="#d2b48c"
+              stroke="#8b4513"
+              stroke-width="1"
+              :transform="`rotate(${rack?.rotation || 0}, ${rack.x + props.rackWidth / 2}, ${rack.y + props.rackHeight / 2})`"
+            />
+          </g>
+
           <rect
-            :x="rack.x"
-            :y="rack.y"
-            :width="props.rackWidth"
-            :height="props.rackHeight"
-            fill="#d2b48c"
-            stroke="#8b4513"
-            stroke-width="1"
-            :transform="`rotate(${rack?.rotation || 0}, ${rack.x + props.rackWidth / 2}, ${rack.y + props.rackHeight / 2})`"
-          />
-        </g>
-
-        <rect
-          v-for="pod in props.getPodBoundaries(layer.racks, layer.pods)"
-          :key="`preview-pod-${pod!.id}`"
-          :x="pod!.x"
-          :y="pod!.y"
-          :width="pod!.width"
-          :height="pod!.height"
-          fill="none"
-          stroke="red"
-          stroke-width="1"
-          stroke-dasharray="2, 2"
-        />
-
-        <!-- Circuits Électriques -->
-        <g v-if="layer.circuits?.length">
-          <polyline
-            v-for="(circuit, circuitIdx) in layer.circuits"
-            :key="`preview-circuit-${layer.id}-${circuitIdx}`"
-            :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
+            v-for="pod in props.getPodBoundaries(layer.racks, layer.pods)"
+            :key="`preview-pod-${pod!.id}`"
+            :x="pod!.x"
+            :y="pod!.y"
+            :width="pod!.width"
+            :height="pod!.height"
             fill="none"
-            stroke="#0d6efd"
-            stroke-width="2"
-            stroke-linejoin="round"
-            stroke-linecap="round"
+            stroke="#e74c3c"
+            stroke-width="1"
+            stroke-dasharray="2, 2"
           />
-        </g>
 
-        <!-- Dessin en direct des murs -->
-        <template v-if="props.isDrawingWalls && currentLayerIndex === index">
-          <circle
-            v-if="props.wallPreviewPoint"
-            :cx="props.wallPreviewPoint.x"
-            :cy="props.wallPreviewPoint.y"
-            r="3"
-            fill="#333"
-          />
-          <line
-            v-if="layer.walls?.length > 0 && props.wallPreviewPoint"
-            :x1="layer.walls[layer.walls.length - 1]?.x"
-            :y1="layer.walls[layer.walls.length - 1]?.y"
-            :x2="props.wallPreviewPoint.x"
-            :y2="props.wallPreviewPoint.y"
-            stroke="#333"
-            stroke-width="2"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-          />
-        </template>
+          <!-- Circuits Électriques -->
+          <g v-if="layer.circuits?.length">
+            <polyline
+              v-for="(circuit, circuitIdx) in layer.circuits"
+              :key="`preview-circuit-${layer.id}-${circuitIdx}`"
+              :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
+              fill="none"
+              stroke="#3498db"
+              stroke-width="2"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+          </g>
 
-        <!-- Dessin en direct des circuits -->
-        <template v-if="index === 0 && currentLayerIndex === index && props.isDrawingCircuit && props.circuitPreviewPoint">
-          <circle
-            :cx="props.circuitPreviewPoint.x"
-            :cy="props.circuitPreviewPoint.y"
-            r="2"
-            fill="#0d6efd"
+          <rect
+            :x="props.viewportRect.x"
+            :y="props.viewportRect.y"
+            :width="props.viewportRect.width"
+            :height="props.viewportRect.height"
+            class="mini-map-viewport"
           />
-          <line
-            v-if="layer.circuits && layer.circuits.length > 0 && layer.circuits[layer.circuits.length - 1]!.length > 0"
-            :x1="layer.circuits[layer.circuits.length - 1]![layer.circuits[layer.circuits.length - 1]!.length - 1]!.x"
-            :y1="layer.circuits[layer.circuits.length - 1]![layer.circuits[layer.circuits.length - 1]!.length - 1]!.y"
-            :x2="props.circuitPreviewPoint.x"
-            :y2="props.circuitPreviewPoint.y"
-            stroke="#0d6efd"
-            stroke-width="1.5"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-          />
-        </template>
-
-        <rect
-          :x="props.viewportRect.x"
-          :y="props.viewportRect.y"
-          :width="props.viewportRect.width"
-          :height="props.viewportRect.height"
-          class="mini-map-viewport"
-        />
-      </svg>
+        </svg>
+      </div>
     </div>
   </div>
 </template>
@@ -154,54 +116,97 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
   right: 1rem;
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: 12px;
   z-index: 20;
   pointer-events: none;
+  padding: 8px;
 }
 
 .layer-preview-card {
-  width: 150px;
-  background: white;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  padding: 5px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  width: 140px;
+  background: #2c3e50;
+  border: 1px solid #1a252f;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   pointer-events: auto;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
 }
 
 .layer-preview-card:hover {
-  border-color: #2563eb;
-  transform: scale(1.05);
+  border-color: #3498db;
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
 .layer-preview-card.active {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+  transform: translateY(-4px) scale(1.02);
+}
+
+.layer-preview-card.active .preview-header {
+  background: rgba(52, 152, 219, 0.2);
+}
+
+.layer-preview-card.active .preview-index {
+  background: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.4);
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.preview-index {
+  font-size: 10px;
+  font-weight: bold;
+  background: #3498db;
+  color: white;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .preview-title {
-  font-size: 0.7rem;
-  font-weight: bold;
-  margin-bottom: 4px;
-  color: #4b5563;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ecf0f1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+}
+
+.mini-map-container {
+  padding: 4px;
+  background: #1a252f;
 }
 
 .mini-map {
   width: 100%;
-  height: 100px;
-  background: #f9fafb;
-  border-radius: 4px;
+  height: 80px;
+  background: #1e2a36;
+  border-radius: 2px;
+  display: block;
 }
 
 .mini-map-viewport {
-  fill: rgba(100, 100, 100, 0.2);
-  stroke: rgba(100, 100, 100, 0.5);
-  stroke-width: 1;
+  fill: rgba(52, 152, 219, 0.15);
+  stroke: rgba(52, 152, 219, 0.6);
+  stroke-width: 1.5;
   pointer-events: none;
 }
 </style>
