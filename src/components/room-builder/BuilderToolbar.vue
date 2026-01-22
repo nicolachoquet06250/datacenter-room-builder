@@ -31,75 +31,193 @@ const onRoomNameInput = (event: Event) => {
 
 <template>
   <div class="toolbar">
-    <div class="room-info">
-      <label>Nom: <input :value="props.roomName" @input="onRoomNameInput" /></label>
+    <div class="toolbar-section room-info">
+      <input 
+        :value="props.roomName" 
+        @input="onRoomNameInput" 
+        placeholder="Nom de la salle"
+        title="Nom de la salle"
+      />
     </div>
-    <div class="history-controls">
-      <button class="btn btn-sm btn-secondary" @click="emit('undo')" :disabled="props.undoDisabled" title="Annuler (Ctrl+Z)">↶</button>
-      <button class="btn btn-sm btn-secondary" @click="emit('redo')" :disabled="props.redoDisabled" title="Rétablir (Ctrl+Maj+Z)">↷</button>
-    </div>
-    <button
-      class="btn btn-secondary"
-      @click="emit('addRack')"
-      :disabled="!props.canAddRack"
-      :title="!props.canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : ''"
-    >
-      Ajouter un rack
-    </button>
-    <button class="btn" :class="props.isDrawingWalls ? 'btn-primary' : 'btn-secondary'" @click="emit('toggleWalls')">
-      {{ props.isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs' }}
-    </button>
-    <button v-if="props.canClearWalls" class="btn btn-danger" @click="emit('clearWalls')">Supprimer la pièce</button>
 
-    <div class="zoom-controls">
-      <button class="btn btn-sm btn-secondary" @click="emit('zoomOut')" :disabled="!props.canZoomOut">-</button>
-      <span class="zoom-text">{{ Math.round(props.zoomLevel * 100) }}%</span>
-      <button class="btn btn-sm btn-secondary" @click="emit('zoomIn')" :disabled="!props.canZoomIn">+</button>
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-section history-controls">
+      <button class="toolbar-btn" @click="emit('undo')" :disabled="props.undoDisabled" title="Annuler (Ctrl+Z)">
+        <span class="icon">↶</span>
+      </button>
+      <button class="toolbar-btn" @click="emit('redo')" :disabled="props.redoDisabled" title="Rétablir (Ctrl+Maj+Z)">
+        <span class="icon">↷</span>
+      </button>
     </div>
-    <button @click="emit('save')" class="btn btn-primary">Sauvegarder</button>
-    <p class="hint">Glissez les éléments pour les placer.</p>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-section action-controls">
+      <button
+        class="toolbar-btn"
+        @click="emit('addRack')"
+        :disabled="!props.canAddRack"
+        :title="!props.canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : 'Ajouter un rack'"
+      >
+        <span class="icon">+</span>
+        <span class="label">Rack</span>
+      </button>
+      
+      <button 
+        class="toolbar-btn" 
+        :class="{ 'active': props.isDrawingWalls }" 
+        @click="emit('toggleWalls')"
+        :title="props.isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs'"
+      >
+        <span class="icon">✏️</span>
+        <span class="label">Murs</span>
+      </button>
+
+      <button 
+        v-if="props.canClearWalls" 
+        class="toolbar-btn btn-danger" 
+        @click="emit('clearWalls')"
+        title="Supprimer la pièce"
+      >
+        <span class="icon">🗑️</span>
+      </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-section zoom-controls">
+      <button class="toolbar-btn" @click="emit('zoomOut')" :disabled="!props.canZoomOut" title="Zoom arrière">-</button>
+      <span class="zoom-text">{{ Math.round(props.zoomLevel * 100) }}%</span>
+      <button class="toolbar-btn" @click="emit('zoomIn')" :disabled="!props.canZoomIn" title="Zoom avant">+</button>
+    </div>
+
+    <div class="toolbar-spacer"></div>
+
+    <div class="toolbar-section finish-controls">
+      <button @click="emit('save')" class="toolbar-btn btn-primary">
+        <span class="icon">💾</span>
+        <span class="label">Sauvegarder</span>
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .toolbar {
-  padding: 1rem;
-  background: #f4f4f4;
+  height: 40px;
+  padding: 0 8px;
+  background: #2c3e50;
   display: flex;
-  gap: 1rem;
+  gap: 4px;
   align-items: center;
-  border-bottom: 1px solid #ccc;
-  flex-wrap: wrap;
+  border-bottom: 1px solid #1a252f;
+  color: white;
+  font-size: 13px;
+  user-select: none;
 }
-.history-controls {
+
+.toolbar-section {
   display: flex;
-  gap: 5px;
+  align-items: center;
+  gap: 4px;
 }
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
 .room-info input {
-  padding: 0.4rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  padding: 4px 8px;
+  color: white;
+  font-size: 13px;
+  width: 150px;
+  transition: all 0.2s;
 }
-.zoom-controls {
+
+.room-info input:focus {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #3498db;
+  outline: none;
+}
+
+.toolbar-btn {
+  height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #ecf0f1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: white;
-  padding: 4px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: all 0.1s;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbar-btn.active {
+  background: #3498db;
+  color: white;
+}
+
+.toolbar-btn.btn-primary {
+  background: #27ae60;
+  color: white;
+  font-weight: 600;
+}
+
+.toolbar-btn.btn-primary:hover:not(:disabled) {
+  background: #2ecc71;
+}
+
+.toolbar-btn.btn-danger:hover:not(:disabled) {
+  background: #e74c3c;
+}
+
+.icon {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .zoom-text {
-  font-size: 0.8rem;
-  min-width: 45px;
+  font-size: 11px;
+  min-width: 40px;
   text-align: center;
   font-weight: 600;
-  color: #374151;
+  color: #bdc3c7;
 }
 
-.hint {
-  font-size: 0.8rem;
-  color: #666;
+.label {
+  display: inline-block;
+}
+
+@media (max-width: 800px) {
+  .label {
+    display: none;
+  }
 }
 </style>

@@ -109,7 +109,7 @@ const {
   racks, selectedRackIndices,
   rotatingRack,
   panOffset, draggingRack,
-  createRack: addRack,
+  createRack: addRackRaw,
   rotateRack, removeRack,
   startDragRack, dragRack,
   startRotateRack,
@@ -118,6 +118,11 @@ const {
   updateRackRotation,
   resetRackState
 } = useRacksCrud(props.roomId);
+
+const addRack = () => {
+  if (currentLayerIndex.value === 0) return;
+  addRackRaw();
+};
 
 const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
 
@@ -458,7 +463,9 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
   if (isCtrl && event.key.toLowerCase() === 'v') {
     event.preventDefault();
-    pasteFromClipboard();
+    if (currentLayerIndex.value !== 0) {
+      pasteFromClipboard();
+    }
     return;
   }
 
@@ -466,7 +473,9 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
   if (isCtrl && event.key.toLowerCase() === 'd') {
     event.preventDefault();
-    duplicateRack(selectedRackIndices.value[0]!);
+    if (currentLayerIndex.value !== 0) {
+      duplicateRack(selectedRackIndices.value[0]!);
+    }
   } else if (isCtrl && event.key.toLowerCase() === 'c') {
     event.preventDefault();
     copyRack(selectedRackIndices.value[0]!);
@@ -517,7 +526,7 @@ onUnmounted(() => {
       v-model:room-name="roomName"
       :undo-disabled="undoStack.length === 0"
       :redo-disabled="redoStack.length === 0"
-      :can-add-rack="walls.length > 0 && currentLayerIndex !== 1"
+      :can-add-rack="walls.length > 0 && currentLayerIndex !== 0"
       :can-clear-walls="walls.length > 0"
       :is-drawing-walls="isDrawingWalls"
       :zoom-level="zoomLevel"
@@ -629,12 +638,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  font-family: sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #2c3e50;
 }
 .canvas-area {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: white;
+  background: #f8f9fa;
 }
 </style>
