@@ -1,3 +1,7 @@
+<script lang="ts">
+const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
+</script>
+
 <script setup lang="ts">
 import {computed, ref} from 'vue';
 
@@ -57,7 +61,7 @@ defineExpose({svgRef});
   <svg
       ref="svgRef"
       width="100%"
-      height="600"
+      height="100%"
       class="canvas-svg"
       :class="{ interacting: props.isInteracting, 'drawing-walls': props.isDrawingWalls }"
       @mousedown="emit('deselect', $event)"
@@ -150,6 +154,13 @@ defineExpose({svgRef});
                 :height="props.rackHeight"
                 class="rack-rect"
                 :class="{ grouped: rack.podId }"
+            />
+            <image
+                :x="rack.x + 2"
+                :y="rack.y + 2"
+                :width="12"
+                :height="12"
+                :href="`${itop_url}/images/icons/icons8-rack.svg`"
             />
             <text
                 :x="rack.x + props.rackWidth / 2"
@@ -320,6 +331,14 @@ defineExpose({svgRef});
                   @contextmenu="emit('open-context-menu', $event, tIdx)"
               />
 
+              <image
+                  :x="rack.x + 2"
+                  :y="rack.y + 2"
+                  :width="12"
+                  :height="12"
+                  :href="`${itop_url}/images/icons/icons8-rack.svg`"
+              />
+
               <line
                   :x1="rack.x + 1"
                   :y1="rack.y + (props.rackHeight / 10) * 9"
@@ -367,6 +386,7 @@ defineExpose({svgRef});
 .canvas-svg {
   cursor: grab;
   user-select: none;
+  display: block;
 }
 
 .canvas-svg:active {
