@@ -79,6 +79,10 @@ const roomName = ref(props.roomName);
 const circuitPreviewPoint = ref<Point | null>(null);
 const isDrawingCircuit = ref(false);
 const currentCircuitPathIndex = ref<number | null>(null);
+const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
+const selectedCircuitSegmentKeys = computed(() =>
+  selectedCircuitSegments.value.map(segment => `${segment.pathIndex}-${segment.segmentIndex}`)
+);
 const circuitPaths = computed({
   get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
   set: (val) => {
@@ -94,6 +98,7 @@ watch(currentLayerIndex, () => {
   circuitPreviewPoint.value = null;
   isDrawingCircuit.value = false;
   currentCircuitPathIndex.value = null;
+  selectedCircuitSegments.value = [];
 });
 
 const {
@@ -241,6 +246,56 @@ const stopCircuitDrawing = () => {
   currentCircuitPathIndex.value = null;
 };
 
+const getDistanceToSegment = (point: Point, start: Point, end: Point) => {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy);
+  const clampedT = Math.max(0, Math.min(1, t));
+  const projX = start.x + clampedT * dx;
+  const projY = start.y + clampedT * dy;
+  return Math.hypot(point.x - projX, point.y - projY);
+};
+
+const getCircuitSegmentAtPoint = (x: number, y: number, tolerance = 6) => {
+  const point = {x, y};
+  for (let pathIndex = 0; pathIndex < circuitPaths.value.length; pathIndex += 1) {
+    const circuit = circuitPaths.value[pathIndex];
+    if (!circuit || circuit.length < 2) continue;
+    for (let segmentIndex = 0; segmentIndex < circuit.length - 1; segmentIndex += 1) {
+      const start = circuit[segmentIndex]!;
+      const end = circuit[segmentIndex + 1]!;
+      if (getDistanceToSegment(point, start, end) <= tolerance) {
+        return {pathIndex, segmentIndex};
+      }
+    }
+  }
+  return null;
+};
+
+const selectCircuitSegment = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
+  if (event.detail > 1) return;
+  event.stopPropagation();
+  stopCircuitDrawing();
+  selectedCircuitSegments.value = [{pathIndex, segmentIndex}];
+};
+
+const selectCircuitPath = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
+  event.stopPropagation();
+  stopCircuitDrawing();
+  const circuit = circuitPaths.value[pathIndex];
+  if (!circuit || circuit.length < 2) {
+    selectedCircuitSegments.value = [{pathIndex, segmentIndex}];
+    return;
+  }
+  selectedCircuitSegments.value = circuit.slice(0, -1).map((_, idx) => ({
+    pathIndex,
+    segmentIndex: idx
+  }));
+};
+
 const onMouseMoveSVG = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
     const svg = event.currentTarget as SVGSVGElement;
@@ -266,6 +321,10 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+    if (getCircuitSegmentAtPoint(x, y)) {
+      circuitPreviewPoint.value = null;
+      return;
+    }
     if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
       const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
         ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
@@ -359,6 +418,7 @@ const deselect = (event: MouseEvent) => {
           stopCircuitDrawing();
           return;
         }
+        selectedCircuitSegments.value = [];
         if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
           const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
             ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
@@ -568,6 +628,7 @@ onUnmounted(() => {
         :is-interacting="isInteracting"
         :get-pod-boundaries="getPodBoundaries"
         :selected-units="selectedUnits"
+        :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
 
         @deselect="deselect"
         @mousemove-svg="onMouseMoveSVG"
@@ -576,6 +637,8 @@ onUnmounted(() => {
         @start-rotate="startRotateRack"
         @select-pod="selectPod"
         @select-wall="selectWall($event)"
+        @select-circuit-segment="selectCircuitSegment"
+        @select-circuit-path="selectCircuitPath"
       />
 
       <BuilderContextMenu
