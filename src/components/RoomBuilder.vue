@@ -48,7 +48,7 @@ const {
   getConstrainedPoint,
   isPointInPolygon
 } = useRoomBuilderGeometry();
-const {error: notifyError} = useNotify();
+const {error: notifyError, success: notifySuccess} = useNotify();
 
 const {
   wallPreviewPoint, isWallSelected, isDrawingWalls, wallsRef, walls,
@@ -649,6 +649,10 @@ const save = async () => {
   try {
     emit('saved', {
       layers: layers.value
+    });
+    notifySuccess({
+      title: 'Sauvegarde',
+      text: 'Sauvegarde réussie'
     });
     undoStack.value = [];
     redoStack.value = [];
