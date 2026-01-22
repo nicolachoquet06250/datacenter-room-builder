@@ -41,6 +41,15 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
             fill="rgba(255,255,255,0.05)"
             stroke="#666"
             stroke-width="2"
+            stroke-linejoin="round"
+          />
+          <polyline
+            v-else-if="layer.walls?.length > 0"
+            :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
+            fill="none"
+            stroke="#666"
+            stroke-width="2"
+            stroke-linejoin="round"
           />
 
           <g v-for="footprint in layer.footprints" :key="`preview-footprint-${footprint.id}`">

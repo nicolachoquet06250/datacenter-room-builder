@@ -4,6 +4,7 @@ const props = defineProps<{
   undoDisabled: boolean;
   redoDisabled: boolean;
   canAddRack: boolean;
+  showAddRack: boolean;
   canClearWalls: boolean;
   isDrawingWalls: boolean;
   zoomLevel: number;
@@ -54,16 +55,6 @@ const onRoomNameInput = (event: Event) => {
     <div class="toolbar-divider"></div>
 
     <div class="toolbar-section action-controls">
-      <button
-        class="toolbar-btn"
-        @click="emit('addRack')"
-        :disabled="!props.canAddRack"
-        :title="!props.canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : 'Ajouter un rack'"
-      >
-        <span class="icon">+</span>
-        <span class="label">Rack</span>
-      </button>
-      
       <button 
         class="toolbar-btn" 
         :class="{ 'active': props.isDrawingWalls }" 
@@ -90,6 +81,20 @@ const onRoomNameInput = (event: Event) => {
       <button class="toolbar-btn" @click="emit('zoomOut')" :disabled="!props.canZoomOut" title="Zoom arrière">-</button>
       <span class="zoom-text">{{ Math.round(props.zoomLevel * 100) }}%</span>
       <button class="toolbar-btn" @click="emit('zoomIn')" :disabled="!props.canZoomIn" title="Zoom avant">+</button>
+    </div>
+
+    <div class="toolbar-divider" v-if="props.showAddRack"></div>
+
+    <div class="toolbar-section rack-controls" v-if="props.showAddRack">
+      <button
+        class="toolbar-btn"
+        @click="emit('addRack')"
+        :disabled="!props.canAddRack"
+        :title="!props.canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : 'Ajouter un rack'"
+      >
+        <span class="icon">+</span>
+        <span class="label">Rack</span>
+      </button>
     </div>
 
     <div class="toolbar-spacer"></div>

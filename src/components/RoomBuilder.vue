@@ -526,7 +526,8 @@ onUnmounted(() => {
       v-model:room-name="roomName"
       :undo-disabled="undoStack.length === 0"
       :redo-disabled="redoStack.length === 0"
-      :can-add-rack="walls.length > 0 && currentLayerIndex !== 0"
+      :can-add-rack="walls.length > 2"
+      :show-add-rack="currentLayerIndex === 2"
       :can-clear-walls="walls.length > 0"
       :is-drawing-walls="isDrawingWalls"
       :zoom-level="zoomLevel"
@@ -645,6 +646,6 @@ onUnmounted(() => {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: #f8f9fa;
+  background: #004a99; /* Bleu iTop Designer */
 }
 </style>

@@ -69,8 +69,8 @@ defineExpose({svgRef});
   >
     <defs>
       <pattern id="grid" :width="20 * props.zoomLevel" :height="20 * props.zoomLevel" patternUnits="userSpaceOnUse">
-        <path :d="`M ${20 * props.zoomLevel} 0 L 0 0 0 ${20 * props.zoomLevel}`" fill="none" stroke="#eee"
-              stroke-width="1"/>
+        <path :d="`M ${20 * props.zoomLevel} 0 L 0 0 0 ${20 * props.zoomLevel}`" fill="none" stroke="rgba(255,255,255,0.2)"
+              stroke-width="0.5"/>
       </pattern>
     </defs>
     <rect
@@ -102,8 +102,17 @@ defineExpose({svgRef});
             />
           </g>
         </g>
+        <polygon
+            v-if="layer.walls?.length > 2"
+            :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
+            fill="none"
+            stroke="#333"
+            stroke-width="4"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+        />
         <polyline
-            v-if="layer.walls?.length > 0"
+            v-else-if="layer.walls?.length > 0"
             :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
             fill="none"
             stroke="#333"
@@ -115,8 +124,8 @@ defineExpose({svgRef});
             v-if="layer.walls?.length > 2"
             :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
             class="room-surface"
-            stroke="#333"
-            stroke-width="4"
+            stroke="rgba(255,255,255,0.3)"
+            stroke-width="1"
             stroke-linejoin="round"
         />
         <g
@@ -203,14 +212,25 @@ defineExpose({svgRef});
           />
         </g>
 
-        <polyline
-            v-if="props.walls.length > 0"
+        <polygon
+            v-if="props.walls.length > 2"
             :points="props.walls.map(p => `${p.x},${p.y}`).join(' ')"
             fill="none"
             stroke="#333"
             stroke-width="4"
             stroke-linejoin="round"
             stroke-linecap="round"
+            style="pointer-events: none;"
+        />
+        <polyline
+            v-else-if="props.walls.length > 0"
+            :points="props.walls.map(p => `${p.x},${p.y}`).join(' ')"
+            fill="none"
+            stroke="#333"
+            stroke-width="4"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            style="pointer-events: none;"
         />
         <polygon
             v-if="!props.isDrawingWalls && props.walls.length > 2"
@@ -218,8 +238,8 @@ defineExpose({svgRef});
             class="room-surface"
             :class="{ selected: props.isWallSelected, 'layer-footprints': props.currentLayerIndex === 1 }"
             @mousedown="emit('select-wall', $event)"
-            stroke="#333"
-            stroke-width="4"
+            stroke="rgba(255,255,255,0.3)"
+            stroke-width="1"
             stroke-linejoin="round"
         />
 
@@ -402,19 +422,22 @@ defineExpose({svgRef});
 }
 
 .rack-rect {
-  fill: #d2b48c;
-  stroke: #8b4513;
-  stroke-width: 2;
+  fill: #ffffff;
+  stroke: #007bff;
+  stroke-width: 1;
   cursor: move;
 }
 
 .rack-rect.selected {
   stroke: #ff4500;
-  stroke-width: 3;
+  stroke-width: 2;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
 .room-surface {
-  fill: rgba(0, 0, 0, 0.03);
+  fill: rgba(255, 255, 255, 0.1);
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1;
   cursor: pointer;
 }
 
@@ -423,13 +446,14 @@ defineExpose({svgRef});
 }
 
 .room-surface.selected {
-  fill: rgba(255, 69, 0, 0.1);
+  fill: rgba(255, 69, 0, 0.15);
   stroke: #ff4500;
+  stroke-width: 2;
 }
 
 .rack-rect.grouped {
-  fill: #e3f2fd;
-  stroke: #90caf9;
+  fill: #e8f4fd;
+  stroke: #3498db;
 }
 
 .rack-rect.grouped.selected {
@@ -458,7 +482,7 @@ defineExpose({svgRef});
 
 .coord-text {
   font-size: 10px;
-  fill: #666;
+  fill: #ecf0f1;
   user-select: none;
   pointer-events: none;
   font-weight: bold;
@@ -466,20 +490,21 @@ defineExpose({svgRef});
 
 .rack-front-line {
   stroke: #ff4500;
-  stroke-width: 4;
+  stroke-width: 2;
 }
 
 .rotation-handle {
   fill: white;
   stroke: #ff4500;
-  stroke-width: 2;
+  stroke-width: 1.5;
   cursor: alias;
 }
 
 .rack-label {
   pointer-events: none;
-  font-size: 12px;
-  font-weight: bold;
+  font-size: 11px;
+  font-weight: 500;
+  fill: #333;
   user-select: none;
 }
 
@@ -490,5 +515,6 @@ defineExpose({svgRef});
 
 .circuit-line {
   pointer-events: none;
+  stroke: #3498db;
 }
 </style>
