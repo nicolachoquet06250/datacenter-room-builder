@@ -58,7 +58,7 @@ export const useRoomBuilderGeometry = () => {
     }).filter(Boolean);
   };
 
-  const getWallBoundingBox = (walls: Point[]) => {
+  const getWallBoundingBox = (walls: Point[] = []) => {
     if (walls.length < 3) return null;
 
     const minX = Math.min(...walls.map(p => p.x));

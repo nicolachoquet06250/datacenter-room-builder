@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import 'simple-notify/dist/simple-notify.css';
-import {computed, onMounted, onUnmounted, ref, useTemplateRef, watch} from 'vue';
+import {computed, onMounted, onUnmounted, ref, useTemplateRef, watch, watchEffect} from 'vue';
 import Modal from './Modal.vue';
 import BuilderToolbar from './room-builder/BuilderToolbar.vue';
 import BuilderCanvas from './room-builder/BuilderCanvas.vue';
@@ -32,6 +32,12 @@ const props = withDefaults(
     layers: () => []
   }
 );
+
+const propsLayers = computed<Layer[]>(() => typeof props.layers === 'string' ? JSON.parse(props.layers) : props.layers)
+
+watchEffect(() => {
+  console.log(propsLayers.value)
+})
 
 const emit = defineEmits<{
   (e: 'saved', payload: { layers: Layer[] }): void;
@@ -607,6 +613,10 @@ onUnmounted(() => {
         :viewport-rect="viewportRect"
         :rack-width="rackWidth"
         :rack-height="rackHeight"
+        :is-drawing-walls="isDrawingWalls"
+        :wall-preview-point="wallPreviewPoint"
+        :is-drawing-circuit="isDrawingCircuit"
+        :circuit-preview-point="circuitPreviewPoint"
         :get-wall-bounding-box="getWallBoundingBox"
         :get-pod-boundaries="getPodBoundaries"
       />
