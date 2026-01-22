@@ -1,5 +1,5 @@
-export const rackWidth = 50;
-export const rackHeight = 50;
+export const rackWidth = 40;
+export const rackHeight = 40;
 
 const getRackCorners = (rack: Rack) => {
   return [
