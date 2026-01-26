@@ -23,6 +23,18 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     const snapX = Math.floor(x / 20) * 20;
     const snapY = Math.floor(y / 20) * 20;
     
+    // Ne pas pouvoir sélectionner une unité qui est déjà dans un footprint
+    const isAlreadyInFootprint = currentLayer.value.footprints?.some(f => 
+      f.units.some((u: any) => u.x === snapX && u.y === snapY)
+    );
+
+    if (isAlreadyInFootprint) {
+      selectionStart.value = null;
+      selectionMode.value = null;
+      initialSelection.value = [...selectedUnits.value];
+      return;
+    }
+
     if (walls.value.length > 2 && !isPointInPolygon(snapX + 10, snapY + 10, walls.value)) {
       selectionStart.value = null;
       selectionMode.value = null;
@@ -77,7 +89,15 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
           allInside = false;
           break;
         }
-        rectUnits.push({ x, y });
+        
+        // Ne pas ajouter les unités qui sont déjà dans un footprint
+        const isAlreadyInFootprint = currentLayer.value.footprints?.some(f => 
+          f.units.some((u: any) => u.x === x && u.y === y)
+        );
+
+        if (!isAlreadyInFootprint) {
+          rectUnits.push({ x, y });
+        }
       }
       if (!allInside) break;
     }

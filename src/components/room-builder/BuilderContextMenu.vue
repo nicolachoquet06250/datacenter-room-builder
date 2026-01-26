@@ -1,12 +1,12 @@
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   show: boolean;
   x: number;
   y: number;
   options: { type: string; podId?: string; footprintId?: string };
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'create-pod'): void;
   (e: 'leave-pod'): void;
   (e: 'delete-pod', podId: string): void;
@@ -17,15 +17,15 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div v-if="props.show" class="context-menu" :style="{ top: props.y + 'px', left: props.x + 'px' }">
+  <div v-if="show" class="context-menu" :style="{ top: y + 'px', left: x + 'px' }">
     <ul>
-      <li v-if="props.options.type === 'create_pod'" @click="emit('create-pod')">Créer un nouveau pod</li>
-      <li v-if="props.options.type === 'leave_pod'" @click="emit('leave-pod')">Sortir du pod</li>
-      <li v-if="props.options.type === 'delete_pod'" @click="emit('delete-pod', props.options.podId!)">Supprimer le pod</li>
-      <li v-if="props.options.type === 'create_footprint'" @click="emit('create-footprint')">Créer un footprint</li>
-      <template v-if="props.options.type === 'footprint_actions'">
-        <li @click="emit('change-footprint-color', props.options.footprintId!)">Changer la couleur</li>
-        <li @click="emit('delete-footprint', props.options.footprintId!)">Supprimer le footprint</li>
+      <li v-if="options.type === 'create_pod'" @click="$emit('create-pod')">Créer un nouveau pod</li>
+      <li v-if="options.type === 'leave_pod'" @click="$emit('leave-pod')">Sortir du pod</li>
+      <li v-if="options.type === 'delete_pod'" @click="$emit('delete-pod', options.podId!)">Supprimer le pod</li>
+      <li v-if="options.type === 'create_footprint'" @click="$emit('create-footprint')">Créer un footprint</li>
+      <template v-if="options.type === 'footprint_actions'">
+        <li @click="$emit('change-footprint-color', options.footprintId!)">Changer la couleur</li>
+        <li @click="$emit('delete-footprint', options.footprintId!)">Supprimer le footprint</li>
       </template>
     </ul>
   </div>

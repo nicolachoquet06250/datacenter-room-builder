@@ -226,9 +226,10 @@ const addRack = () => {
 };
 
 const selectWall = (event: MouseEvent) => {
-  if (currentLayerIndex.value === 0 || currentLayerIndex.value === 1) return;
-  event.stopPropagation();
-  selectWallInternal();
+  if (currentLayerIndex.value === 0) {
+    event.stopPropagation();
+    selectWallInternal();
+  }
 };
 
 const stopCircuitDrawing = () => {
@@ -304,7 +305,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
   }
 
-  if (currentLayerIndex.value === 0 && !isDrawingWalls.value) {
+  if (currentLayerIndex.value === 1 && !isDrawingWalls.value) {
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
@@ -312,10 +313,13 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+    
+    // Vérifier si on survole un segment existant (pour ne pas afficher la preview de dessin)
     if (getCircuitSegmentAtPoint(x, y)) {
       circuitPreviewPoint.value = null;
       return;
     }
+
     if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
       const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
         ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
@@ -326,7 +330,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     }
   }
 
-  if (currentLayerIndex.value === 1 && isSelecting.value) {
+  if (currentLayerIndex.value === 2 && isSelecting.value) {
     const svg = event.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
@@ -348,7 +352,7 @@ const onMouseMove = (event: MouseEvent) => {
 const stopDrag = () => {
   panStop();
   resetRackState();
-  if (currentLayerIndex.value === 1) {
+  if (currentLayerIndex.value === 2) {
     stopSelection();
   }
 };
@@ -403,63 +407,73 @@ const deselect = (event: MouseEvent) => {
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
 
-    if (currentLayerIndex.value === 0) {
-      if (event.button === 0) {
-        if (event.detail > 1) {
-          stopCircuitDrawing();
-          return;
-        }
-        const hadSelection = selectedCircuitSegments.value.length > 0;
-        selectedCircuitSegments.value = [];
-        if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
-          if (hadSelection) {
-            return;
-          }
-          const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
-            ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
-            : null;
-          const constrained = getConstrainedPoint(x, y, lastPoint ?? null);
-          takeSnapshot();
-          if (!isDrawingCircuit.value || currentCircuitPathIndex.value === null) {
-            const nextPaths = [...circuitPaths.value, [constrained]];
-            circuitPaths.value = nextPaths;
-            currentCircuitPathIndex.value = nextPaths.length - 1;
-            isDrawingCircuit.value = true;
-          } else {
-            const nextPaths = [...circuitPaths.value];
-            const activePath = [...(nextPaths[currentCircuitPathIndex.value] ?? [])];
-            nextPaths[currentCircuitPathIndex.value] = [...activePath, constrained];
-            circuitPaths.value = nextPaths;
-          }
-          circuitPreviewPoint.value = constrained;
-          return;
-        }
-        panStart();
+  if (currentLayerIndex.value === 1) {
+    if (event.button === 0) {
+      if (event.detail > 1) {
+        stopCircuitDrawing();
+        return;
       }
-    } else if (currentLayerIndex.value === 1) {
-      if (event.button === 0) { // Left click
-        startSelection(x, y);
-        // Si on a cliqué à l'intérieur de la pièce pour sélectionner, on ne pan pas au clic gauche
-        if (!isPointInPolygon(x, y, walls.value)) {
-           panStart();
+      const hadSelection = selectedCircuitSegments.value.length > 0;
+      selectedCircuitSegments.value = [];
+      if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
+        if (hadSelection) {
+          return;
         }
-      } else if (event.button === 2) { // Right click
-        const footprint = getFootprintAt(x, y);
-        const clickedUnitX = Math.floor(x / 20) * 20;
-        const clickedUnitY = Math.floor(y / 20) * 20;
-        const isUnitSelected = selectedUnits.value.some(u => u.x === clickedUnitX && u.y === clickedUnitY);
+        const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
+          ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
+          : null;
+        const constrained = getConstrainedPoint(x, y, lastPoint ?? null);
+        takeSnapshot();
+        if (!isDrawingCircuit.value || currentCircuitPathIndex.value === null) {
+          const nextPaths = [...circuitPaths.value, [constrained]];
+          circuitPaths.value = nextPaths;
+          currentCircuitPathIndex.value = nextPaths.length - 1;
+          isDrawingCircuit.value = true;
+        } else {
+          const nextPaths = [...circuitPaths.value];
+          const activePath = [...(nextPaths[currentCircuitPathIndex.value] ?? [])];
+          nextPaths[currentCircuitPathIndex.value] = [...activePath, constrained];
+          circuitPaths.value = nextPaths;
+        }
+        circuitPreviewPoint.value = constrained;
+        return;
+      }
+      panStart();
+    }
+  } else if (currentLayerIndex.value === 2) {
+    if (event.button === 0) { // Left click
+      startSelection(x, y);
+      // Si on a cliqué à l'intérieur de la pièce pour sélectionner, on ne pan pas au clic gauche
+      if (!isPointInPolygon(x, y, walls.value)) {
+         panStart();
+      }
+    } else if (event.button === 2) { // Right click
+      const footprint = getFootprintAt(x, y);
+      const clickedUnitX = Math.floor(x / 20) * 20;
+      const clickedUnitY = Math.floor(y / 20) * 20;
+      const isUnitSelected = selectedUnits.value.some(u => u.x === clickedUnitX && u.y === clickedUnitY);
 
-        if (footprint) {
-          openContextMenu(event, null, footprint.id);
-        } else if (isUnitSelected) {
-          openContextMenu(event);
-        }
-      }
-    } else {
-      if (event.button === 0) {
-        panStart();
+      if (footprint) {
+        openContextMenu(event, null, footprint.id);
+      } else if (isUnitSelected) {
+        openContextMenu(event);
       }
     }
+  } else if (currentLayerIndex.value === 0) {
+    if (event.button === 0) {
+       // Dans le layer virtuel des murs (index 0), on peut sélectionner la salle
+       if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
+           isWallSelected.value = true;
+       } else {
+           isWallSelected.value = false;
+           panStart();
+       }
+    }
+  } else {
+    if (event.button === 0) {
+      panStart();
+    }
+  }
 
     // Toujours autoriser le pan avec le clic milieu
     if (event.button === 1) {
@@ -553,7 +567,11 @@ const handleKeyDown = (event: KeyboardEvent) => {
     cancelDrawingWalls();
     return;
   }
-  if (!isDrawingWalls.value && currentLayerIndex.value === 0 && (event.key === 'Escape' || event.key === 'Enter')) {
+  if (currentLayerIndex.value === 2 && event.key === 'Escape') {
+    selectedUnits.value = [];
+    return;
+  }
+  if (!isDrawingWalls.value && currentLayerIndex.value === 1 && (event.key === 'Escape' || event.key === 'Enter')) {
     stopCircuitDrawing();
     return;
   }
@@ -636,6 +654,7 @@ const pasteFromClipboard = async () => {
   }
 };
 
+
 const save = async () => {
   try {
     emit('saved', {
@@ -687,12 +706,18 @@ provide<ExposedFunctions>(exposedFunctions, {
 
 <template>
   <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel" @contextmenu.prevent>
+    <polygon
+        v-if="!isDrawingWalls && (walls.length > 2 || isWallSelected)"
+        :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
+        class="room-surface selected"
+        style="pointer-events: none;"
+    />
     <BuilderToolbar
       v-model:room-name="roomName"
       :undo-disabled="undoStack.length === 0"
       :redo-disabled="redoStack.length === 0"
       :can-add-rack="walls.length > 2"
-      :show-add-rack="currentLayerIndex === 2"
+      :show-add-rack="currentLayerIndex === 3"
       :can-clear-walls="walls.length > 0"
       :is-drawing-walls="isDrawingWalls"
       :zoom-level="zoomLevel"
@@ -839,6 +864,7 @@ provide<ExposedFunctions>(exposedFunctions, {
   z-index: 100;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 0 16px;
   height: 32px;
@@ -850,7 +876,7 @@ provide<ExposedFunctions>(exposedFunctions, {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   font-weight: 600;
   font-size: 13px;
-  transition: background-color 0.2s, transform 0.1s;
+  transition: all 0.2s ease;
 }
 
 .floating-delete-btn:hover {
@@ -858,6 +884,7 @@ provide<ExposedFunctions>(exposedFunctions, {
 }
 
 .floating-delete-btn:active {
+  background-color: #a93226;
   transform: translateY(1px);
 }
 </style>

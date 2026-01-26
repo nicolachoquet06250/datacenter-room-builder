@@ -205,20 +205,25 @@ const roomName = defineModel<string>('roomName');
   padding: 0 8px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: 4px;
   color: #ecf0f1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   cursor: pointer;
   font-size: 12px;
   white-space: nowrap;
-  transition: all 0.1s;
+  transition: all 0.2s ease;
 }
 
 .toolbar-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+.toolbar-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .toolbar-btn:disabled {
@@ -238,7 +243,11 @@ const roomName = defineModel<string>('roomName');
 }
 
 .toolbar-btn.btn-primary:hover:not(:disabled) {
-  background: #2ecc71;
+  background: #219150;
+}
+
+.toolbar-btn.btn-primary:active:not(:disabled) {
+  background: #1e7e46;
 }
 
 .toolbar-btn.btn-danger {
@@ -248,6 +257,10 @@ const roomName = defineModel<string>('roomName');
 .toolbar-btn.btn-danger:hover:not(:disabled) {
   background: #e74c3c;
   color: white;
+}
+
+.toolbar-btn.btn-danger:active:not(:disabled) {
+  background: #c0392b;
 }
 
 .icon {

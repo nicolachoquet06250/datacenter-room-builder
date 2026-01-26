@@ -29,8 +29,12 @@ const cancel = () => {
           <p>{{ message }}</p>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="cancel">{{ cancelText || 'Annuler' }}</button>
-          <button class="btn btn-danger" @click="confirm">{{ confirmText || 'Confirmer' }}</button>
+          <button class="btn btn-secondary" @click="cancel">
+            {{ cancelText || 'Annuler' }}
+          </button>
+          <button class="btn btn-danger" @click="confirm">
+            {{ confirmText || 'Confirmer' }}
+          </button>
         </div>
       </div>
     </div>
@@ -76,11 +80,18 @@ const cancel = () => {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   padding: 0.5rem 1rem;
-  border: none;
+  font-size: 0.875rem;
+  font-weight: 600;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: bold;
+  transition: all 0.2s ease;
+  border: none;
+  line-height: 1.25rem;
 }
 
 .btn-secondary {
@@ -88,9 +99,17 @@ const cancel = () => {
   color: white;
 }
 
+.btn-secondary:hover {
+  background-color: #5a6268;
+}
+
 .btn-danger {
-  background-color: #dc3545;
+  background-color: #e74c3c;
   color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c0392b;
 }
 
 /* Transitions */

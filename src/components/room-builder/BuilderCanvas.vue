@@ -6,6 +6,7 @@ const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
 import {computed, inject, ref} from 'vue';
 import {exposedFunctions} from "../RoomBuilder.vue";
 import type {ExposedFunctions} from "../RoomBuilder.vue";
+import BuilderGrid from "./BuilderGrid.vue";
 
 const props = defineProps<{
   layers: Layer[];
@@ -31,7 +32,7 @@ const props = defineProps<{
   selectedCircuitSegmentKeys: string[];
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'deselect', event: MouseEvent): void;
   (e: 'mousemove-svg', event: MouseEvent): void;
   (e: 'start-drag', event: MouseEvent, index: number): void;
@@ -72,25 +73,12 @@ defineExpose({svgRef});
         interacting: isInteracting,
         'drawing-walls': isDrawingWalls
       }"
-      @mousedown="emit('deselect', $event)"
-      @mousemove="emit('mousemove-svg', $event)"
+      @mousedown="$emit('deselect', $event)"
+      @mousemove="$emit('mousemove-svg', $event)"
   >
-    <defs>
-      <pattern id="grid" :width="20 * zoomLevel" :height="20 * zoomLevel" patternUnits="userSpaceOnUse">
-        <path
-            :d="`M ${20 * zoomLevel} 0 L 0 0 0 ${20 * zoomLevel}`"
-            fill="none"
-            stroke="rgba(255,255,255,0.2)"
-            stroke-width="0.5"
-        />
-      </pattern>
-    </defs>
-    <rect
-        width="100%"
-        height="100%"
-        fill="url(#grid)"
-        class="canvas-background"
-        :transform="`translate(${(panOffset.x * zoomLevel) % (20 * zoomLevel)}, ${(panOffset.y * zoomLevel) % (20 * zoomLevel)})`"
+    <BuilderGrid
+        :zoom-level="zoomLevel"
+        :pan-offset="panOffset"
     />
 
     <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`">
@@ -100,7 +88,7 @@ defineExpose({svgRef});
           v-show="lIdx !== currentLayerIndex"
           class="layer-inactive"
       >
-        <g v-if="lIdx === 1" class="footprints-layer">
+        <g v-if="lIdx === 2" class="footprints-layer">
           <g v-for="footprint in layer.footprints" :key="footprint.id">
             <rect
                 v-for="(unit, uIdx) in footprint.units"
@@ -177,8 +165,8 @@ defineExpose({svgRef});
       </g>
 
       <g class="layer-active">
-        <g v-if="currentLayerIndex === 1" class="footprints-layer">
-          <g v-for="footprint in layers[1]?.footprints" :key="footprint.id">
+        <g v-if="currentLayerIndex === 2" class="footprints-layer">
+          <g v-for="footprint in layers[2]?.footprints" :key="footprint.id">
             <rect
                 v-for="(unit, uIdx) in footprint.units"
                 :key="uIdx"
@@ -225,48 +213,52 @@ defineExpose({svgRef});
             stroke-linecap="round"
             style="pointer-events: none;"
         />
+
         <polygon
             v-if="!isDrawingWalls && walls.length > 2"
             :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
             class="room-surface"
             :class="{
               selected: isWallSelected,
-              'layer-footprints': currentLayerIndex === 1
+              'layer-footprints': currentLayerIndex === 2
             }"
-            @mousedown="emit('select-wall', $event)"
+            @mousedown="$emit('select-wall', $event)"
             stroke="rgba(255,255,255,0.3)"
             stroke-width="1"
             stroke-linejoin="round"
         />
 
-        <circle
-            v-if="isDrawingWalls && wallPreviewPoint"
-            :cx="wallPreviewPoint.x"
-            :cy="wallPreviewPoint.y"
-            r="4"
-            fill="#333"
-        />
-        <line
-            v-if="isDrawingWalls && walls.length > 0 && wallPreviewPoint"
-            :x1="walls[walls.length - 1]?.x"
-            :y1="walls[walls.length - 1]?.y"
-            :x2="wallPreviewPoint.x"
-            :y2="wallPreviewPoint.y"
-            stroke="#333"
-            stroke-width="4"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-        />
-        <line
-            v-if="isDrawingWalls && walls.length > 2 && wallPreviewPoint"
-            :x1="wallPreviewPoint.x"
-            :y1="wallPreviewPoint.y"
-            :x2="walls[0]?.x"
-            :y2="walls[0]?.y"
-            stroke="rgba(0,0,0,0.2)"
-            stroke-width="2"
-            stroke-dasharray="2,2"
-        />
+        <template v-if="isDrawingWalls">
+          <circle
+              v-if="wallPreviewPoint"
+              :cx="wallPreviewPoint.x"
+              :cy="wallPreviewPoint.y"
+              r="4"
+              fill="#333"
+          />
+          <line
+              v-if="walls.length > 0 && wallPreviewPoint"
+              :x1="walls[walls.length - 1]?.x"
+              :y1="walls[walls.length - 1]?.y"
+              :x2="wallPreviewPoint.x"
+              :y2="wallPreviewPoint.y"
+              stroke="#333"
+              stroke-width="4"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+          />
+          <line
+              v-if="walls.length > 2 && wallPreviewPoint"
+              :x1="wallPreviewPoint.x"
+              :y1="wallPreviewPoint.y"
+              :x2="walls[0]?.x"
+              :y2="walls[0]?.y"
+              stroke="rgba(0,0,0,0.2)"
+              stroke-width="2"
+              stroke-dasharray="2,2"
+          />
+        </template>
+
         <g v-if="layers[currentLayerIndex]?.circuits?.length">
           <g v-for="(circuit, circuitIdx) in layers[currentLayerIndex]?.circuits"
              :key="`circuit-active-${circuitIdx}`">
@@ -282,29 +274,32 @@ defineExpose({svgRef});
                   selected: isSegmentSelected(circuitIdx, pointIdx)
                 }"
                 @mousedown.stop
-                @click.stop="emit('select-circuit-segment', $event, circuitIdx, pointIdx)"
-                @dblclick.stop="emit('select-circuit-path', $event, circuitIdx, pointIdx)"
+                @click.stop="$emit('select-circuit-segment', $event, circuitIdx, pointIdx)"
+                @dblclick.stop="$emit('select-circuit-path', $event, circuitIdx, pointIdx)"
             />
           </g>
         </g>
-        <circle
-            v-if="currentLayerIndex === 0 && circuitPreviewPoint"
-            :cx="circuitPreviewPoint.x"
-            :cy="circuitPreviewPoint.y"
-            r="3"
-            fill="#0d6efd"
-        />
-        <line
-            v-if="currentLayerIndex === 0 && isDrawingCircuit && lastCircuitPoint && circuitPreviewPoint"
-            :x1="lastCircuitPoint.x"
-            :y1="lastCircuitPoint.y"
-            :x2="circuitPreviewPoint.x"
-            :y2="circuitPreviewPoint.y"
-            stroke="#0d6efd"
-            stroke-width="2"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-        />
+
+        <template v-if="currentLayerIndex === 1">
+          <circle
+              v-if="circuitPreviewPoint"
+              :cx="circuitPreviewPoint.x"
+              :cy="circuitPreviewPoint.y"
+              r="3"
+              fill="#0d6efd"
+          />
+          <line
+              v-if="isDrawingCircuit && lastCircuitPoint && circuitPreviewPoint"
+              :x1="lastCircuitPoint.x"
+              :y1="lastCircuitPoint.y"
+              :x2="circuitPreviewPoint.x"
+              :y2="circuitPreviewPoint.y"
+              stroke="#0d6efd"
+              stroke-width="2"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+          />
+        </template>
 
         <rect
             v-for="pod in podBoundaries"
@@ -317,7 +312,7 @@ defineExpose({svgRef});
             :class="{
               selected: selectedRackIndices.length > 0 && (racks as Rack[])[selectedRackIndices[0]!]?.podId === pod!.id
             }"
-            @mousedown="emit('select-pod', $event, pod!.id)"
+            @mousedown="$emit('select-pod', $event, pod!.id)"
         />
 
         <g v-if="wallBoundingBox" class="coordinates-labels">
@@ -357,8 +352,8 @@ defineExpose({svgRef});
                     selected: selectedRackIndices.includes(tIdx),
                     grouped: rack.podId
                   }"
-                  @mousedown="emit('start-drag', $event, tIdx)"
-                  @contextmenu="emit('open-context-menu', $event, tIdx)"
+                  @mousedown="$emit('start-drag', $event, tIdx)"
+                  @contextmenu="$emit('open-context-menu', $event, tIdx)"
               />
 
               <image
@@ -401,7 +396,7 @@ defineExpose({svgRef});
                     :cy="pos.y"
                     r="6"
                     class="rotation-handle"
-                    @mousedown="emit('start-rotate', $event, tIdx)"
+                    @mousedown="$emit('start-rotate', $event, tIdx)"
                 />
               </template>
             </g>
