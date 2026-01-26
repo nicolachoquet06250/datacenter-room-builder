@@ -39,40 +39,82 @@ const onRotationChange = (event: Event) => {
 <template>
   <div v-if="selectedRackIndices.length === 1 && !isWallSelected" class="properties-panel">
     <div v-if="selectedRack">
-      <h3>Rack</h3>
-      <label>
-        Nom:
+      <div class="panel-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        <h3>Propriétés du Rack</h3>
+      </div>
+
+      <div class="property-group">
+        <label for="rack-name">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+          Nom du rack
+        </label>
         <input
+          id="rack-name"
           :value="selectedRack.name"
+          placeholder="Ex: Rack A01"
           @input="onNameInput"
           @keyup.delete.stop.prevent="() => {}"
         />
-      </label>
-      <label>
-        Rotation (°):
-        <input
-          type="number"
-          :value="selectedRack.rotation ?? 0"
-          step="45"
-          @change="onRotationChange"
-        />
-      </label>
-      <label v-if="selectedRack.podId">Pod ID: <span>{{ selectedRack.podId }}</span></label>
+      </div>
+
+      <div class="property-group">
+        <label for="rack-rotation">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          Rotation (° )
+        </label>
+        <div class="input-with-suffix">
+          <input
+            id="rack-rotation"
+            type="number"
+            :value="selectedRack.rotation ?? 0"
+            step="45"
+            @change="onRotationChange"
+          />
+          <span class="suffix">deg</span>
+        </div>
+      </div>
+
+      <div v-if="selectedRack.podId" class="property-info">
+        <span class="info-label">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-4-9 4 9 4 9-4z"/><path d="M21 12l-9 4-9-4"/><path d="M21 16l-9 4-9-4"/></svg>
+          Pod ID
+        </span>
+        <span class="info-value">{{ selectedRack.podId }}</span>
+      </div>
 
       <div class="actions">
-        <button @click="$emit('remove-rack', selectedRackIndices[0]!)" class="btn btn-danger">Supprimer le rack</button>
+        <button @click="$emit('remove-rack', selectedRackIndices[0]!)" class="btn btn-danger btn-full">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          Supprimer le rack
+        </button>
       </div>
     </div>
   </div>
+
   <div v-else-if="selectedRackIndices.length > 1" class="properties-panel">
     <div>
-      <h3>Sélection multiple</h3>
-      <p>{{ selectedRackIndices.length }} racks sélectionnés</p>
+      <div class="panel-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+        <h3>Sélection multiple</h3>
+      </div>
+
+      <p class="selection-count">{{ selectedRackIndices.length }} éléments sélectionnés</p>
+
       <div class="actions">
-        <button v-if="contextMenuOptions.type === 'create_pod'" @click="$emit('create-pod')" class="btn btn-secondary">Créer un pod</button>
-        <button v-if="contextMenuOptions.type === 'leave_pod'" @click="$emit('leave-pod')" class="btn btn-secondary">Sortir du pod</button>
-        <button v-if="contextMenuOptions.type === 'delete_pod'" @click="$emit('delete-pod', contextMenuOptions.podId!)" class="btn btn-danger">Supprimer le pod</button>
-        <button @click="$emit('clear-selection')" class="btn btn-outline-secondary">Désélectionner tout</button>
+        <button v-if="contextMenuOptions.type === 'create_pod'" @click="$emit('create-pod')" class="btn btn-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-4-9 4 9 4 9-4z"/><path d="M21 12l-9 4-9-4"/><path d="M21 16l-9 4-9-4"/></svg>
+          Créer un pod
+        </button>
+        <button v-if="contextMenuOptions.type === 'leave_pod'" @click="$emit('leave-pod')" class="btn btn-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-4 4 4 4"/><path d="M5 15h11a4 4 0 0 0 0-8h-1"/></svg>
+          Sortir du pod
+        </button>
+        <button v-if="contextMenuOptions.type === 'delete_pod'" @click="$emit('delete-pod', contextMenuOptions.podId!)" class="btn btn-danger">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          Supprimer le pod
+        </button>
+        <button @click="$emit('clear-selection')" class="btn btn-outline">Désélectionner tout</button>
       </div>
     </div>
   </div>

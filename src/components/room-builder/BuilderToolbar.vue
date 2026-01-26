@@ -241,8 +241,13 @@ const roomName = defineModel<string>('roomName');
   background: #2ecc71;
 }
 
+.toolbar-btn.btn-danger {
+  color: #e74c3c;
+}
+
 .toolbar-btn.btn-danger:hover:not(:disabled) {
   background: #e74c3c;
+  color: white;
 }
 
 .icon {
