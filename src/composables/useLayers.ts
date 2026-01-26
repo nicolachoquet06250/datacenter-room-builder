@@ -1,12 +1,14 @@
-import {computed, onMounted, type Ref, ref} from "vue";
+import {computed, type ComputedRef, onMounted, type Ref, ref} from "vue";
 
 const layers = ref<Layer[]>([]);
 const currentLayerIndex = ref(0);
 
 export const layerNames = ['Circuits électriques', 'Surfaces au sol', 'Baies'];
 
-export const useLayers = (walls: Ref<Point[]>, defaultLayers: Layer[]|string = []) => {
-    defaultLayers = (typeof defaultLayers === 'string' ? JSON.parse(defaultLayers) : defaultLayers) as Layer[];
+export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer[]>) => {
+    if (!defaultLayers) {
+        defaultLayers = computed<Layer[]>(() => []);
+    }
 
     const clearLayers = () => layers.value = [];
 
@@ -26,8 +28,8 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers: Layer[]|string = [
     }
 
     onMounted(() => {
-        if (defaultLayers && defaultLayers.length > 0) {
-            layers.value = defaultLayers.map((layer) => ({
+        if (defaultLayers && defaultLayers.value.length > 0) {
+            layers.value = defaultLayers.value.map((layer) => ({
                 ...layer,
                 circuits: Array.isArray(layer.circuits?.[0])
                     ? layer.circuits

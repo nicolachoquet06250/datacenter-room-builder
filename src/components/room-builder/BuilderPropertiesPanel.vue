@@ -22,7 +22,7 @@ const selectedRack = computed(() => {
   if (props.selectedRackIndices.length !== 1) return null;
   const rack = props.racks[props.selectedRackIndices[0]!];
   if (!rack || typeof rack === 'string') return null;
-  return rack as Rack;
+  return rack;
 });
 
 const onNameInput = (event: Event) => {
@@ -37,7 +37,7 @@ const onRotationChange = (event: Event) => {
 </script>
 
 <template>
-  <div v-if="props.selectedRackIndices.length === 1 && !props.isWallSelected" class="properties-panel">
+  <div v-if="selectedRackIndices.length === 1 && !isWallSelected" class="properties-panel">
     <div v-if="selectedRack">
       <h3>Rack</h3>
       <label>
@@ -60,19 +60,19 @@ const onRotationChange = (event: Event) => {
       <label v-if="selectedRack.podId">Pod ID: <span>{{ selectedRack.podId }}</span></label>
 
       <div class="actions">
-        <button @click="emit('remove-rack', props.selectedRackIndices[0]!)" class="btn btn-danger">Supprimer le rack</button>
+        <button @click="$emit('remove-rack', selectedRackIndices[0]!)" class="btn btn-danger">Supprimer le rack</button>
       </div>
     </div>
   </div>
-  <div v-else-if="props.selectedRackIndices.length > 1" class="properties-panel">
+  <div v-else-if="selectedRackIndices.length > 1" class="properties-panel">
     <div>
       <h3>Sélection multiple</h3>
-      <p>{{ props.selectedRackIndices.length }} racks sélectionnés</p>
+      <p>{{ selectedRackIndices.length }} racks sélectionnés</p>
       <div class="actions">
-        <button v-if="props.contextMenuOptions.type === 'create_pod'" @click="emit('create-pod')" class="btn btn-secondary">Créer un pod</button>
-        <button v-if="props.contextMenuOptions.type === 'leave_pod'" @click="emit('leave-pod')" class="btn btn-secondary">Sortir du pod</button>
-        <button v-if="props.contextMenuOptions.type === 'delete_pod'" @click="emit('delete-pod', props.contextMenuOptions.podId!)" class="btn btn-danger">Supprimer le pod</button>
-        <button @click="emit('clear-selection')" class="btn btn-outline-secondary">Désélectionner tout</button>
+        <button v-if="contextMenuOptions.type === 'create_pod'" @click="$emit('create-pod')" class="btn btn-secondary">Créer un pod</button>
+        <button v-if="contextMenuOptions.type === 'leave_pod'" @click="$emit('leave-pod')" class="btn btn-secondary">Sortir du pod</button>
+        <button v-if="contextMenuOptions.type === 'delete_pod'" @click="$emit('delete-pod', contextMenuOptions.podId!)" class="btn btn-danger">Supprimer le pod</button>
+        <button @click="$emit('clear-selection')" class="btn btn-outline-secondary">Désélectionner tout</button>
       </div>
     </div>
   </div>

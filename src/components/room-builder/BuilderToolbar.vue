@@ -1,6 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{
-  roomName: string;
+defineProps<{
   undoDisabled: boolean;
   redoDisabled: boolean;
   canAddRack: boolean;
@@ -12,8 +11,7 @@ const props = defineProps<{
   canZoomIn: boolean;
 }>();
 
-const emit = defineEmits<{
-  (e: 'update:roomName', value: string): void;
+defineEmits<{
   (e: 'undo'): void;
   (e: 'redo'): void;
   (e: 'addRack'): void;
@@ -24,83 +22,114 @@ const emit = defineEmits<{
   (e: 'save'): void;
 }>();
 
-const onRoomNameInput = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  emit('update:roomName', target.value);
-};
+const roomName = defineModel<string>('roomName');
 </script>
 
 <template>
   <div class="toolbar">
     <div class="toolbar-section room-info">
       <input 
-        :value="props.roomName" 
-        @input="onRoomNameInput" 
+        v-model="roomName"
         placeholder="Nom de la salle"
         title="Nom de la salle"
       />
     </div>
 
-    <div class="toolbar-divider"></div>
+    <div class="toolbar-divider"/>
 
     <div class="toolbar-section history-controls">
-      <button class="toolbar-btn" @click="emit('undo')" :disabled="props.undoDisabled" title="Annuler (Ctrl+Z)">
+      <button
+          class="toolbar-btn"
+          :disabled="undoDisabled"
+          title="Annuler (Ctrl+Z)"
+          @click="$emit('undo')"
+      >
         <span class="icon">↶</span>
       </button>
-      <button class="toolbar-btn" @click="emit('redo')" :disabled="props.redoDisabled" title="Rétablir (Ctrl+Maj+Z)">
+
+      <button
+          class="toolbar-btn"
+          :disabled="redoDisabled"
+          title="Rétablir (Ctrl+Maj+Z)"
+          @click="$emit('redo')"
+      >
         <span class="icon">↷</span>
       </button>
     </div>
 
-    <div class="toolbar-divider"></div>
+    <div class="toolbar-divider"/>
 
     <div class="toolbar-section action-controls">
       <button 
         class="toolbar-btn" 
-        :class="{ 'active': props.isDrawingWalls }" 
-        @click="emit('toggleWalls')"
-        :title="props.isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs'"
+        :class="{ 'active': isDrawingWalls }" 
+        @click="$emit('toggleWalls')"
+        :title="isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs'"
       >
         <span class="icon">✏️</span>
+
         <span class="label">Murs</span>
       </button>
 
       <button 
-        v-if="props.canClearWalls" 
+        v-if="canClearWalls" 
         class="toolbar-btn btn-danger" 
-        @click="emit('clearWalls')"
+        @click="$emit('clearWalls')"
         title="Supprimer la pièce"
       >
         <span class="icon">🗑️</span>
       </button>
     </div>
 
-    <div class="toolbar-divider"></div>
+    <div class="toolbar-divider"/>
 
     <div class="toolbar-section zoom-controls">
-      <button class="toolbar-btn" @click="emit('zoomOut')" :disabled="!props.canZoomOut" title="Zoom arrière">-</button>
-      <span class="zoom-text">{{ Math.round(props.zoomLevel * 100) }}%</span>
-      <button class="toolbar-btn" @click="emit('zoomIn')" :disabled="!props.canZoomIn" title="Zoom avant">+</button>
-    </div>
-
-    <div class="toolbar-divider" v-if="props.showAddRack"></div>
-
-    <div class="toolbar-section rack-controls" v-if="props.showAddRack">
       <button
-        class="toolbar-btn"
-        @click="emit('addRack')"
-        :disabled="!props.canAddRack"
-        :title="!props.canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : 'Ajouter un rack'"
-      >
-        <span class="icon">+</span>
-        <span class="label">Rack</span>
-      </button>
+          class="toolbar-btn"
+          :disabled="!canZoomOut"
+          title="Zoom arrière"
+          @click="$emit('zoomOut')"
+      >-</button>
+
+      <span class="zoom-text">
+        {{ Math.round(zoomLevel * 100) }}%
+      </span>
+
+      <button
+          class="toolbar-btn"
+          :disabled="!canZoomIn"
+          title="Zoom avant"
+          @click="$emit('zoomIn')"
+      >+</button>
     </div>
 
-    <div class="toolbar-spacer"></div>
+    <template v-if="showAddRack">
+      <div class="toolbar-divider"/>
+
+      <div class="toolbar-section rack-controls">
+        <button
+            class="toolbar-btn"
+            @click="$emit('addRack')"
+            :disabled="!canAddRack"
+            :title="!canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : 'Ajouter un rack'"
+        >
+          <span class="icon">+</span>
+
+          <span class="label">Rack</span>
+        </button>
+      </div>
+    </template>
+
+    <div class="toolbar-spacer"/>
 
     <div class="toolbar-section finish-controls">
-      <button @click="emit('save')" class="toolbar-btn btn-primary">
+      <span>
+        <span /> = 600 mm
+      </span>
+
+      <div class="toolbar-divider"/>
+
+      <button @click="$emit('save')" class="toolbar-btn btn-primary">
         <span class="icon">💾</span>
         <span class="label">Sauvegarder</span>
       </button>
@@ -126,6 +155,21 @@ const onRoomNameInput = (event: Event) => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.toolbar-section.finish-controls > span {
+  display: inline-flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbar-section.finish-controls > span > span {
+  display: inline-block;
+  height: 20px;
+  width: 20px;
+  border: 1px solid #1a252f;
 }
 
 .toolbar-divider {

@@ -8,8 +8,8 @@ import BuilderContextMenu from './room-builder/BuilderContextMenu.vue';
 import BuilderPropertiesPanel from './room-builder/BuilderPropertiesPanel.vue';
 import BuilderLayerPreviews from './room-builder/BuilderLayerPreviews.vue';
 import {rackHeight, rackWidth, useRoomBuilderGeometry} from '../composables/useRoomBuilderGeometry';
-import { useRoomBuilderHistory } from '../composables/useRoomBuilderHistory';
-import { useNotify } from '../composables/useNotify';
+import {useRoomBuilderHistory} from '../composables/useRoomBuilderHistory';
+import {useNotify} from '../composables/useNotify';
 import {useDrawRoomWalls} from "../composables/useDrawRoomWalls.ts";
 import {useCanvas} from "../composables/useCanvas.ts";
 import {useLayers} from "../composables/useLayers.ts";
@@ -61,7 +61,7 @@ const {
   clearLayers,
   initialize: initializeLayers,
   currentLayer
-} = useLayers(walls, props.layers);
+} = useLayers(walls, propsLayers);
 
 const {
   selectedUnits,
@@ -74,32 +74,6 @@ const {
   changeFootprintColor,
   getFootprintAt
 } = useFootprints(currentLayer, walls);
-
-const roomName = ref(props.roomName);
-const circuitPreviewPoint = ref<Point | null>(null);
-const isDrawingCircuit = ref(false);
-const currentCircuitPathIndex = ref<number | null>(null);
-const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
-const selectedCircuitSegmentKeys = computed(() =>
-  selectedCircuitSegments.value.map(segment => `${segment.pathIndex}-${segment.segmentIndex}`)
-);
-const circuitPaths = computed({
-  get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
-  set: (val) => {
-    if (layers.value[currentLayerIndex.value]) {
-      layers.value[currentLayerIndex.value]!.circuits = val;
-    }
-  }
-});
-
-watch(currentLayerIndex, () => {
-  selectedRackIndices.value = [];
-  isWallSelected.value = false;
-  circuitPreviewPoint.value = null;
-  isDrawingCircuit.value = false;
-  currentCircuitPathIndex.value = null;
-  selectedCircuitSegments.value = [];
-});
 
 const {
   canvasWidth, canvasHeight,
@@ -124,10 +98,60 @@ const {
   resetRackState
 } = useRacksCrud(props.roomId);
 
-const addRack = () => {
-  if (currentLayerIndex.value === 0) return;
-  addRackRaw();
-};
+const {
+  undoStack, redoStack,
+  takeSnapshot, undo, redo
+} = useRoomBuilderHistory({
+  layers,
+  walls,
+  currentLayerIndex
+});
+
+const {
+  contextMenuOptions,
+  contextMenu,
+  openContextMenu
+} = useContextMenu(
+    computed(() => typeof (racks.value as unknown as string) === 'string'
+        ? JSON.parse(racks.value as unknown as string)
+        : racks.value),
+    selectedRackIndices,
+    selectedUnits
+);
+
+const {pods, createPod, selectPod, leavePod, deletePod} = usePodsCrud(props.roomId);
+
+const {
+  showClearModal, clearModalConfig,
+  triggerClearWalls, cancelModal
+} = useModal(() => {
+  takeSnapshot();
+  clearLayers();
+  wallsRef.value = [];
+  currentLayerIndex.value = 0;
+  isWallSelected.value = false;
+  selectedRackIndices.value = [];
+  cancelDrawingWalls();
+});
+
+const {selectWall: selectWallInternal} = useWalls(props.roomId);
+
+const roomName = ref(props.roomName);
+const circuitPreviewPoint = ref<Point | null>(null);
+const isDrawingCircuit = ref(false);
+const currentCircuitPathIndex = ref<number | null>(null);
+const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
+const selectedCircuitSegmentKeys = computed(() =>
+  selectedCircuitSegments.value.map(segment => `${segment.pathIndex}-${segment.segmentIndex}`)
+);
+const circuitPaths = computed({
+  get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
+  set: (val) => {
+    if (layers.value[currentLayerIndex.value]) {
+      layers.value[currentLayerIndex.value]!.circuits = val;
+    }
+  }
+});
 
 const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
 
@@ -171,74 +195,32 @@ const verticalCoords = computed(() => {
   return coords;
 });
 
-const viewportRect = computed(() => {
-  return {
-    x: -panOffset.value.x,
-    y: -panOffset.value.y,
-    width: canvasWidth.value / zoomLevel.value,
-    height: canvasHeight.value / zoomLevel.value
-  };
-});
+const viewportRect = computed(() => ({
+  x: -panOffset.value.x,
+  y: -panOffset.value.y,
+  width: canvasWidth.value / zoomLevel.value,
+  height: canvasHeight.value / zoomLevel.value
+}));
 
-const {
-  undoStack, redoStack,
-  takeSnapshot, undo, redo
-} = useRoomBuilderHistory({
-  layers,
-  walls,
-  currentLayerIndex
-});
-
-
-const {
-  contextMenuOptions,
-  contextMenu,
-  openContextMenu
-} = useContextMenu(
-    computed(() => typeof (racks.value as unknown as string) === 'string'
-        ? JSON.parse(racks.value as unknown as string)
-        : racks.value),
-    selectedRackIndices,
-    selectedUnits
+const isInteracting = computed(() =>
+    draggingRack.value !== null ||
+    rotatingRack.value !== null ||
+    isPanning.value ||
+    isDrawingWalls.value ||
+    isSelecting.value ||
+    contextMenu.value.show
 );
 
-const {selectWall: selectWallInternal} = useWalls(props.roomId);
+const addRack = () => {
+  if (currentLayerIndex.value === 0) return;
+  addRackRaw();
+};
+
 const selectWall = (event: MouseEvent) => {
   if (currentLayerIndex.value === 0 || currentLayerIndex.value === 1) return;
   event.stopPropagation();
   selectWallInternal();
 };
-const {pods, createPod, selectPod, leavePod, deletePod} = usePodsCrud(props.roomId);
-
-const confirmClearWalls = () => {
-  takeSnapshot();
-  clearLayers();
-  wallsRef.value = [];
-  currentLayerIndex.value = 0;
-  isWallSelected.value = false;
-  selectedRackIndices.value = [];
-  cancelDrawingWalls();
-};
-
-const {
-  showClearModal, clearModalConfig,
-  triggerClearWalls, cancelModal
-} = useModal(confirmClearWalls);
-
-watch(() => props.roomId, async (newId) => {
-  if (newId) {
-    roomName.value = props.roomName;
-  }
-});
-
-const isInteracting = computed(() =>
-  draggingRack.value !== null ||
-  rotatingRack.value !== null ||
-  isPanning.value ||
-  isDrawingWalls.value ||
-  isSelecting.value ||
-  contextMenu.value.show
-);
 
 const stopCircuitDrawing = () => {
   isDrawingCircuit.value = false;
@@ -663,6 +645,21 @@ const save = async () => {
     });
   }
 };
+
+watch(currentLayerIndex, () => {
+  selectedRackIndices.value = [];
+  isWallSelected.value = false;
+  circuitPreviewPoint.value = null;
+  isDrawingCircuit.value = false;
+  currentCircuitPathIndex.value = null;
+  selectedCircuitSegments.value = [];
+});
+
+watch(() => props.roomId, async (newId) => {
+  if (newId) {
+    roomName.value = props.roomName;
+  }
+});
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
