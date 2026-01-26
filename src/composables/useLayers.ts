@@ -30,25 +30,35 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
 
     onMounted(() => {
         if (defaultLayers && defaultLayers.value.length > 0) {
-            layers.value = [
-                {
-                    id: 0,
-                    name: layerNames[0],
-                    racks: [],
-                    pods: [],
-                    walls: defaultLayers.value[0]!.walls,
-                    footprints: [],
-                    circuits: [],
-                    pillars: []
-                },
-                ...defaultLayers.value.map((layer) => ({
+            if (defaultLayers.value[0]!.name === layerNames[0]) {
+                layers.value = defaultLayers.value.map((layer) => ({
                     ...layer,
                     pillars: layer.pillars ?? [],
                     circuits: Array.isArray(layer.circuits?.[0])
                         ? layer.circuits
                         : (layer.circuits?.length ? [layer.circuits as unknown as Point[]] : [])
-                }))
-            ];
+                }));
+            } else {
+                layers.value = [
+                    {
+                        id: 0,
+                        name: layerNames[0],
+                        racks: [],
+                        pods: [],
+                        walls: defaultLayers.value[0]!.walls,
+                        footprints: [],
+                        circuits: [],
+                        pillars: defaultLayers.value[0]!.pillars
+                    },
+                    ...defaultLayers.value.map((layer) => ({
+                        ...layer,
+                        pillars: layer.pillars ?? [],
+                        circuits: Array.isArray(layer.circuits?.[0])
+                            ? layer.circuits
+                            : (layer.circuits?.length ? [layer.circuits as unknown as Point[]] : [])
+                    }))
+                ];
+            }
             currentLayerIndex.value = 0;
         }
     })
