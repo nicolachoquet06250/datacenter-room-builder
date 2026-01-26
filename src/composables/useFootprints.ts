@@ -164,7 +164,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
     // Flood fill pour identifier les unités "extérieures" dans le rectangle englobant
     const reachableFromOutside = new Set<string>();
-    const stack: { x: number; y: number }[] = [];
+    const stack: Point[] = [];
 
     // On commence le remplissage depuis tout le périmètre (avec une marge de 1 unité)
     for (let x = minX - 20; x <= maxX + 20; x += 20) {

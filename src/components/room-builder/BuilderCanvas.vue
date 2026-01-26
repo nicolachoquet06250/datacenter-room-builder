@@ -3,7 +3,9 @@ const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
 </script>
 
 <script setup lang="ts">
-import {computed, ref} from 'vue';
+import {computed, inject, ref} from 'vue';
+import {exposedFunctions} from "../RoomBuilder.vue";
+import type {ExposedFunctions} from "../RoomBuilder.vue";
 
 const props = defineProps<{
   layers: Layer[];
@@ -14,24 +16,17 @@ const props = defineProps<{
   isDrawingCircuit: boolean;
   wallPreviewPoint: Point | null;
   circuitPreviewPoint: Point | null;
-  podBoundaries: Array<{ id: string; x: number; y: number; width: number; height: number } | null>;
-  wallBoundingBox: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null;
-  horizontalCoords: Array<{ label: string; x: number; y: number }>;
-  verticalCoords: Array<{ label: string; x: number; y: number }>;
+  podBoundaries: Array<(Point & Size & { id: string }) | null>;
+  wallBoundingBox: (Size & MinPoint & MaxPoint) | null;
+  horizontalCoords: (Point & { label: string })[];
+  verticalCoords: (Point & { label: string })[];
   selectedRackIndices: number[];
   zoomLevel: number;
-  panOffset: { x: number; y: number };
+  panOffset: Point;
   isWallSelected: boolean;
   rackWidth: number;
   rackHeight: number;
   isInteracting: boolean;
-  getPodBoundaries: (racks: Rack[], pods: { id: string; name: string }[]) => Array<{
-    id: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number
-  } | null>;
   selectedUnits: Point[];
   selectedCircuitSegmentKeys: string[];
 }>();
@@ -62,6 +57,8 @@ const selectedSegmentKeys = computed(() => new Set(props.selectedCircuitSegmentK
 const isSegmentSelected = (pathIndex: number, segmentIndex: number) =>
   selectedSegmentKeys.value.has(`${pathIndex}-${segmentIndex}`);
 
+const {getPodBoundaries} = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions)
+
 defineExpose({svgRef});
 </script>
 
@@ -71,14 +68,21 @@ defineExpose({svgRef});
       width="100%"
       height="100%"
       class="canvas-svg"
-      :class="{ interacting: props.isInteracting, 'drawing-walls': props.isDrawingWalls }"
+      :class="{
+        interacting: isInteracting,
+        'drawing-walls': isDrawingWalls
+      }"
       @mousedown="emit('deselect', $event)"
       @mousemove="emit('mousemove-svg', $event)"
   >
     <defs>
-      <pattern id="grid" :width="20 * props.zoomLevel" :height="20 * props.zoomLevel" patternUnits="userSpaceOnUse">
-        <path :d="`M ${20 * props.zoomLevel} 0 L 0 0 0 ${20 * props.zoomLevel}`" fill="none" stroke="rgba(255,255,255,0.2)"
-              stroke-width="0.5"/>
+      <pattern id="grid" :width="20 * zoomLevel" :height="20 * zoomLevel" patternUnits="userSpaceOnUse">
+        <path
+            :d="`M ${20 * zoomLevel} 0 L 0 0 0 ${20 * zoomLevel}`"
+            fill="none"
+            stroke="rgba(255,255,255,0.2)"
+            stroke-width="0.5"
+        />
       </pattern>
     </defs>
     <rect
@@ -86,14 +90,14 @@ defineExpose({svgRef});
         height="100%"
         fill="url(#grid)"
         class="canvas-background"
-        :transform="`translate(${(props.panOffset.x * props.zoomLevel) % (20 * props.zoomLevel)}, ${(props.panOffset.y * props.zoomLevel) % (20 * props.zoomLevel)})`"
+        :transform="`translate(${(panOffset.x * zoomLevel) % (20 * zoomLevel)}, ${(panOffset.y * zoomLevel) % (20 * zoomLevel)})`"
     />
 
-    <g :transform="`scale(${props.zoomLevel}) translate(${props.panOffset.x}, ${props.panOffset.y})`">
+    <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`">
       <g
-          v-for="(layer, lIdx) in props.layers"
+          v-for="(layer, lIdx) in layers"
           :key="`layer-${layer.id}`"
-          v-show="lIdx !== props.currentLayerIndex"
+          v-show="lIdx !== currentLayerIndex"
           class="layer-inactive"
       >
         <g v-if="lIdx === 1" class="footprints-layer">
@@ -113,32 +117,12 @@ defineExpose({svgRef});
         <polygon
             v-if="layer.walls?.length > 2"
             :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-            fill="none"
-            stroke="#333"
-            stroke-width="4"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-        />
-        <polyline
-            v-else-if="layer.walls?.length > 0"
-            :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-            fill="none"
-            stroke="#333"
-            stroke-width="4"
-            stroke-linejoin="round"
-            stroke-linecap="round"
-        />
-        <polygon
-            v-if="layer.walls?.length > 2"
-            :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
             class="room-surface"
             stroke="rgba(255,255,255,0.3)"
             stroke-width="1"
             stroke-linejoin="round"
         />
-        <g
-            v-if="layer.circuits?.length"
-        >
+        <g v-if="layer.circuits?.length">
           <polyline
               v-for="(circuit, circuitIdx) in layer.circuits"
               :key="`circuit-${layer.id}-${circuitIdx}`"
@@ -153,7 +137,7 @@ defineExpose({svgRef});
         </g>
 
         <rect
-            v-for="pod in props.getPodBoundaries(layer.racks, layer.pods)"
+            v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
             :key="pod!.id"
             :x="pod!.x"
             :y="pod!.y"
@@ -163,12 +147,12 @@ defineExpose({svgRef});
         />
 
         <g v-for="(rack, tIdx) in layer.racks" :key="`rack-${tIdx}`">
-          <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + props.rackWidth / 2}, ${rack.y + props.rackHeight / 2})`">
+          <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`">
             <rect
                 :x="rack.x"
                 :y="rack.y"
-                :width="props.rackWidth"
-                :height="props.rackHeight"
+                :width="rackWidth"
+                :height="rackHeight"
                 class="rack-rect"
                 :class="{ grouped: rack.podId }"
             />
@@ -180,20 +164,21 @@ defineExpose({svgRef});
                 :href="`${itop_url}/images/icons/icons8-rack.svg`"
             />
             <text
-                :x="rack.x + props.rackWidth / 2"
-                :y="rack.y + props.rackHeight / 2"
+                :x="rack.x + rackWidth / 2"
+                :y="rack.y + rackHeight / 2"
                 text-anchor="middle"
                 dominant-baseline="middle"
                 class="rack-label"
-            >{{ rack.name }}
+            >
+              {{ rack.name }}
             </text>
           </g>
         </g>
       </g>
 
       <g class="layer-active">
-        <g v-if="props.currentLayerIndex === 1" class="footprints-layer">
-          <g v-for="footprint in props.layers[1]?.footprints" :key="footprint.id">
+        <g v-if="currentLayerIndex === 1" class="footprints-layer">
+          <g v-for="footprint in layers[1]?.footprints" :key="footprint.id">
             <rect
                 v-for="(unit, uIdx) in footprint.units"
                 :key="uIdx"
@@ -208,7 +193,7 @@ defineExpose({svgRef});
             />
           </g>
           <rect
-              v-for="(unit, uIdx) in props.selectedUnits"
+              v-for="(unit, uIdx) in selectedUnits"
               :key="`selected-${uIdx}`"
               :x="unit.x"
               :y="unit.y"
@@ -221,8 +206,8 @@ defineExpose({svgRef});
         </g>
 
         <polygon
-            v-if="props.walls.length > 2"
-            :points="props.walls.map(p => `${p.x},${p.y}`).join(' ')"
+            v-if="!isDrawingWalls && walls.length > 2"
+            :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
             fill="none"
             stroke="#333"
             stroke-width="4"
@@ -231,8 +216,8 @@ defineExpose({svgRef});
             style="pointer-events: none;"
         />
         <polyline
-            v-else-if="props.walls.length > 0"
-            :points="props.walls.map(p => `${p.x},${p.y}`).join(' ')"
+            v-else-if="walls.length > 0"
+            :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
             fill="none"
             stroke="#333"
             stroke-width="4"
@@ -241,10 +226,13 @@ defineExpose({svgRef});
             style="pointer-events: none;"
         />
         <polygon
-            v-if="!props.isDrawingWalls && props.walls.length > 2"
-            :points="props.walls.map(p => `${p.x},${p.y}`).join(' ')"
+            v-if="!isDrawingWalls && walls.length > 2"
+            :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
             class="room-surface"
-            :class="{ selected: props.isWallSelected, 'layer-footprints': props.currentLayerIndex === 1 }"
+            :class="{
+              selected: isWallSelected,
+              'layer-footprints': currentLayerIndex === 1
+            }"
             @mousedown="emit('select-wall', $event)"
             stroke="rgba(255,255,255,0.3)"
             stroke-width="1"
@@ -252,35 +240,35 @@ defineExpose({svgRef});
         />
 
         <circle
-            v-if="props.isDrawingWalls && props.wallPreviewPoint"
-            :cx="props.wallPreviewPoint.x"
-            :cy="props.wallPreviewPoint.y"
+            v-if="isDrawingWalls && wallPreviewPoint"
+            :cx="wallPreviewPoint.x"
+            :cy="wallPreviewPoint.y"
             r="4"
             fill="#333"
         />
         <line
-            v-if="props.isDrawingWalls && props.walls.length > 0 && props.wallPreviewPoint"
-            :x1="props.walls[props.walls.length - 1]?.x"
-            :y1="props.walls[props.walls.length - 1]?.y"
-            :x2="props.wallPreviewPoint.x"
-            :y2="props.wallPreviewPoint.y"
+            v-if="isDrawingWalls && walls.length > 0 && wallPreviewPoint"
+            :x1="walls[walls.length - 1]?.x"
+            :y1="walls[walls.length - 1]?.y"
+            :x2="wallPreviewPoint.x"
+            :y2="wallPreviewPoint.y"
             stroke="#333"
             stroke-width="4"
             stroke-linejoin="round"
             stroke-linecap="round"
         />
         <line
-            v-if="props.isDrawingWalls && props.walls.length > 2 && props.wallPreviewPoint"
-            :x1="props.wallPreviewPoint.x"
-            :y1="props.wallPreviewPoint.y"
-            :x2="props.walls[0]?.x"
-            :y2="props.walls[0]?.y"
+            v-if="isDrawingWalls && walls.length > 2 && wallPreviewPoint"
+            :x1="wallPreviewPoint.x"
+            :y1="wallPreviewPoint.y"
+            :x2="walls[0]?.x"
+            :y2="walls[0]?.y"
             stroke="rgba(0,0,0,0.2)"
             stroke-width="2"
             stroke-dasharray="2,2"
         />
-        <g v-if="props.layers[props.currentLayerIndex]?.circuits?.length">
-          <g v-for="(circuit, circuitIdx) in props.layers[props.currentLayerIndex]?.circuits"
+        <g v-if="layers[currentLayerIndex]?.circuits?.length">
+          <g v-for="(circuit, circuitIdx) in layers[currentLayerIndex]?.circuits"
              :key="`circuit-active-${circuitIdx}`">
             <line
                 v-for="(point, pointIdx) in circuit.slice(0, -1)"
@@ -290,7 +278,9 @@ defineExpose({svgRef});
                 :x2="circuit[pointIdx + 1]!.x"
                 :y2="circuit[pointIdx + 1]!.y"
                 class="circuit-segment"
-                :class="{ selected: isSegmentSelected(circuitIdx, pointIdx) }"
+                :class="{
+                  selected: isSegmentSelected(circuitIdx, pointIdx)
+                }"
                 @mousedown.stop
                 @click.stop="emit('select-circuit-segment', $event, circuitIdx, pointIdx)"
                 @dblclick.stop="emit('select-circuit-path', $event, circuitIdx, pointIdx)"
@@ -298,18 +288,18 @@ defineExpose({svgRef});
           </g>
         </g>
         <circle
-            v-if="props.currentLayerIndex === 0 && props.circuitPreviewPoint"
-            :cx="props.circuitPreviewPoint.x"
-            :cy="props.circuitPreviewPoint.y"
+            v-if="currentLayerIndex === 0 && circuitPreviewPoint"
+            :cx="circuitPreviewPoint.x"
+            :cy="circuitPreviewPoint.y"
             r="3"
             fill="#0d6efd"
         />
         <line
-            v-if="props.currentLayerIndex === 0 && props.isDrawingCircuit && lastCircuitPoint && props.circuitPreviewPoint"
+            v-if="currentLayerIndex === 0 && isDrawingCircuit && lastCircuitPoint && circuitPreviewPoint"
             :x1="lastCircuitPoint.x"
             :y1="lastCircuitPoint.y"
-            :x2="props.circuitPreviewPoint.x"
-            :y2="props.circuitPreviewPoint.y"
+            :x2="circuitPreviewPoint.x"
+            :y2="circuitPreviewPoint.y"
             stroke="#0d6efd"
             stroke-width="2"
             stroke-linejoin="round"
@@ -317,49 +307,56 @@ defineExpose({svgRef});
         />
 
         <rect
-            v-for="pod in props.podBoundaries"
+            v-for="pod in podBoundaries"
             :key="pod!.id"
             :x="pod!.x"
             :y="pod!.y"
             :width="pod!.width"
             :height="pod!.height"
             class="pod-rect"
-            :class="{ selected: props.selectedRackIndices.length > 0 && (props.racks as Rack[])[props.selectedRackIndices[0]!]?.podId === pod!.id }"
+            :class="{
+              selected: selectedRackIndices.length > 0 && (racks as Rack[])[selectedRackIndices[0]!]?.podId === pod!.id
+            }"
             @mousedown="emit('select-pod', $event, pod!.id)"
         />
 
-        <g v-if="props.wallBoundingBox" class="coordinates-labels">
+        <g v-if="wallBoundingBox" class="coordinates-labels">
           <text
-              v-for="(coord, idx) in props.horizontalCoords"
+              v-for="(coord, idx) in horizontalCoords"
               :key="`h-${idx}`"
               :x="coord.x"
               :y="coord.y"
               text-anchor="middle"
               class="coord-text"
-          >{{ coord.label }}
+          >
+            {{ coord.label }}
           </text>
           <text
-              v-for="(coord, idx) in props.verticalCoords"
+              v-for="(coord, idx) in verticalCoords"
               :key="`v-${idx}`"
               :x="coord.x"
               :y="coord.y"
               text-anchor="end"
               dominant-baseline="middle"
               class="coord-text"
-          >{{ coord.label }}
+          >
+            {{ coord.label }}
           </text>
         </g>
 
-        <g v-for="(rack, tIdx) in props.racks" :key="tIdx">
+        <g v-for="(rack, tIdx) in racks" :key="tIdx">
           <template v-if="typeof rack !== 'string'">
-            <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + props.rackWidth / 2}, ${rack.y + props.rackHeight / 2})`">
+            <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`">
               <rect
                   :x="rack.x"
                   :y="rack.y"
-                  :width="props.rackWidth"
-                  :height="props.rackHeight"
+                  :width="rackWidth"
+                  :height="rackHeight"
                   class="rack-rect"
-                  :class="{ selected: props.selectedRackIndices.includes(tIdx), grouped: rack.podId }"
+                  :class="{
+                    selected: selectedRackIndices.includes(tIdx),
+                    grouped: rack.podId
+                  }"
                   @mousedown="emit('start-drag', $event, tIdx)"
                   @contextmenu="emit('open-context-menu', $event, tIdx)"
               />
@@ -374,30 +371,30 @@ defineExpose({svgRef});
 
               <line
                   :x1="rack.x + 1"
-                  :y1="rack.y + (props.rackHeight / 10) * 9"
-                  :x2="rack.x + (props.rackWidth - 1)"
-                  :y2="rack.y + (props.rackHeight / 10) * 9"
+                  :y1="rack.y + (rackHeight / 10) * 9"
+                  :x2="rack.x + (rackWidth - 1)"
+                  :y2="rack.y + (rackHeight / 10) * 9"
                   class="rack-front-line"
               />
 
               <text
-                  :x="rack.x + props.rackWidth / 2"
-                  :y="rack.y + props.rackHeight / 2"
+                  :x="rack.x + rackWidth / 2"
+                  :y="rack.y + rackHeight / 2"
                   text-anchor="middle"
                   dominant-baseline="middle"
                   class="rack-label"
-                  :transform="`rotate(${- (rack?.rotation || 0)}, ${rack.x + props.rackWidth / 2}, ${rack.y + props.rackHeight / 2})`"
+                  :transform="`rotate(${- (rack?.rotation || 0)}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
               >
                 {{ rack.name }}
               </text>
 
-              <template v-if="props.selectedRackIndices.length === 1 && props.selectedRackIndices[0] === tIdx">
+              <template v-if="selectedRackIndices.length === 1 && selectedRackIndices[0] === tIdx">
                 <circle
                     v-for="(pos, pIdx) in [
                     {x: rack.x, y: rack.y},
-                    {x: rack.x + props.rackWidth, y: rack.y},
-                    {x: rack.x, y: rack.y + props.rackHeight},
-                    {x: rack.x + props.rackWidth, y: rack.y + props.rackHeight}
+                    {x: rack.x + rackWidth, y: rack.y},
+                    {x: rack.x, y: rack.y + rackHeight},
+                    {x: rack.x + rackWidth, y: rack.y + rackHeight}
                   ]"
                     :key="pIdx"
                     :cx="pos.x"

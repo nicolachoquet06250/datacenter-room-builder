@@ -1,10 +1,8 @@
 declare global {
-  export interface Rack {
+  export interface Rack extends Point {
     id: number;
     roomId: number;
     name: string;
-    x: number;
-    y: number;
     rotation: number | null;
     podId?: string | null;
   }
@@ -17,6 +15,21 @@ declare global {
   export interface Point {
     x: number;
     y: number;
+  }
+
+  export interface MinPoint {
+    minX: number;
+    minY: number;
+  }
+
+  export interface MaxPoint {
+    maxX: number;
+    maxY: number;
+  }
+
+  export interface Size {
+    width: number;
+    height: number;
   }
 
   export interface Footprint {

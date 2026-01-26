@@ -1,6 +1,6 @@
 import {computed, type ComputedRef, type Ref, ref} from "vue";
 
-const contextMenu = ref<{ x: number; y: number; show: boolean; footprintId?: string }>({ x: 0, y: 0, show: false });
+const contextMenu = ref<Point & { show: boolean; footprintId?: string }>({ x: 0, y: 0, show: false });
 
 export const useContextMenu = (racks: ComputedRef<Rack[]>, selectedRackIndices: Ref<number[]>, selectedUnits?: Ref<Point[]>) => {
     const contextMenuOptions = computed<{ type: string; podId?: string; footprintId?: string }>(() => {

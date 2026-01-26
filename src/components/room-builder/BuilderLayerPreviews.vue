@@ -1,24 +1,30 @@
 <script setup lang="ts">
-const props = defineProps<{
+import {inject} from "vue";
+import {type ExposedFunctions, exposedFunctions} from "../RoomBuilder.vue";
+
+defineProps<{
   layers: Layer[];
-  viewportRect: { x: number; y: number; width: number; height: number };
+  viewportRect: Point & Size;
   rackWidth: number;
   rackHeight: number;
   isDrawingWalls: boolean;
   wallPreviewPoint: Point | null;
   isDrawingCircuit: boolean;
   circuitPreviewPoint: Point | null;
-  getWallBoundingBox: (walls: { x: number; y: number }[]) => { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null;
-  getPodBoundaries: (racks: Rack[], pods: { id: string; name: string }[]) => Array<{ id: string; x: number; y: number; width: number; height: number } | null>;
 }>();
 
 const currentLayerIndex = defineModel<number>('currentLayerIndex');
+
+const {
+  getWallBoundingBox,
+  getPodBoundaries
+} = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions);
 </script>
 
 <template>
-  <div v-if="props.layers.length > 0" class="layer-previews">
+  <div v-if="layers.length > 0" class="layer-previews">
     <div
-      v-for="(layer, index) in props.layers"
+      v-for="(layer, index) in layers"
       :key="`preview-${layer.id}`"
       class="layer-preview-card"
       :class="{ active: currentLayerIndex === index }"
@@ -31,23 +37,15 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
       </div>
       <div class="mini-map-container">
         <svg
-          :viewBox="props.getWallBoundingBox(layer.walls)
-            ? `${props.getWallBoundingBox(layer.walls)!.minX - 40} ${props.getWallBoundingBox(layer.walls)!.minY - 40} ${props.getWallBoundingBox(layer.walls)!.width + 80} ${props.getWallBoundingBox(layer.walls)!.height + 80}`
+          :viewBox="getWallBoundingBox(layer.walls)
+            ? `${getWallBoundingBox(layer.walls)!.minX - 40} ${getWallBoundingBox(layer.walls)!.minY - 40} ${getWallBoundingBox(layer.walls)!.width + 80} ${getWallBoundingBox(layer.walls)!.height + 80}`
             : '0 0 100 100'"
           class="mini-map"
         >
-          <!-- Grille de fond pour la mini-map -->
-          <defs>
-            <pattern id="grid-mini" width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.5"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid-mini)" />
-
           <polygon
-            v-if="layer.walls?.length > 2"
+            v-if="(!isDrawingWalls || currentLayerIndex !== index) && layer.walls?.length > 2"
             :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
-            fill="rgba(255, 255, 255, 0.03)"
+            fill="none"
             stroke="rgba(255, 255, 255, 0.2)"
             stroke-width="2"
             stroke-linejoin="round"
@@ -61,14 +59,37 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
             stroke-linejoin="round"
           />
 
+          <!-- Mur d'aperçu lors du dessin -->
+          <line
+            v-if="isDrawingWalls && currentLayerIndex === index && layer.walls?.length > 0 && wallPreviewPoint"
+            :x1="layer.walls[layer.walls.length - 1]?.x"
+            :y1="layer.walls[layer.walls.length - 1]?.y"
+            :x2="wallPreviewPoint.x"
+            :y2="wallPreviewPoint.y"
+            stroke="rgba(255, 255, 255, 0.4)"
+            stroke-width="2"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+          <line
+            v-if="isDrawingWalls && currentLayerIndex === index && layer.walls?.length > 2 && wallPreviewPoint"
+            :x1="wallPreviewPoint.x"
+            :y1="wallPreviewPoint.y"
+            :x2="layer.walls[0]?.x"
+            :y2="layer.walls[0]?.y"
+            stroke="rgba(255, 255, 255, 0.1)"
+            stroke-width="1"
+            stroke-dasharray="2,2"
+          />
+
           <g v-for="footprint in layer.footprints" :key="`preview-footprint-${footprint.id}`">
             <rect
               v-for="(unit, uIdx) in footprint.units"
               :key="`preview-footprint-unit-${footprint.id}-${uIdx}`"
               :x="unit.x"
               :y="unit.y"
-              width="20"
-              height="20"
+              :width="20"
+              :height="20"
               :fill="footprint.color"
               fill-opacity="0.3"
             />
@@ -78,18 +99,18 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
             <rect
               :x="rack.x"
               :y="rack.y"
-              :width="props.rackWidth"
-              :height="props.rackHeight"
+              :width="rackWidth"
+              :height="rackHeight"
               fill="#004a99"
               fill-opacity="0.6"
               stroke="rgba(255, 255, 255, 0.4)"
               stroke-width="1"
-              :transform="`rotate(${rack?.rotation || 0}, ${rack.x + props.rackWidth / 2}, ${rack.y + props.rackHeight / 2})`"
+              :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
             />
           </g>
 
           <rect
-            v-for="pod in props.getPodBoundaries(layer.racks, layer.pods)"
+            v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
             :key="`preview-pod-${pod!.id}`"
             :x="pod!.x"
             :y="pod!.y"
@@ -117,10 +138,10 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
           </g>
 
           <rect
-            :x="props.viewportRect.x"
-            :y="props.viewportRect.y"
-            :width="props.viewportRect.width"
-            :height="props.viewportRect.height"
+            :x="viewportRect.x"
+            :y="viewportRect.y"
+            :width="viewportRect.width"
+            :height="viewportRect.height"
             class="mini-map-viewport"
           />
         </svg>

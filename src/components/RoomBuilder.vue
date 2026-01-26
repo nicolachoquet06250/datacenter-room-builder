@@ -1,6 +1,15 @@
+<script lang="ts">
+export const exposedFunctions = Symbol('exposedFunctions');
+
+export type ExposedFunctions = {
+  getWallBoundingBox(walls?: Point[] | undefined): (MinPoint & MaxPoint & Size) | null;
+  getPodBoundaries(racks: Rack[], pods: { id: string; name: string }[]): Array<(Point & Size & { id: string }) | null>;
+}
+</script>
+
 <script setup lang="ts">
 import 'simple-notify/dist/simple-notify.css';
-import {computed, onMounted, onUnmounted, ref, useTemplateRef, watch, watchEffect} from 'vue';
+import {computed, onMounted, onUnmounted, provide, ref, useTemplateRef, watch, watchEffect} from 'vue';
 import Modal from './Modal.vue';
 import BuilderToolbar from './room-builder/BuilderToolbar.vue';
 import BuilderCanvas from './room-builder/BuilderCanvas.vue';
@@ -162,7 +171,7 @@ const wallBoundingBox = computed(() => {
 
 const horizontalCoords = computed(() => {
   if (!wallBoundingBox.value) return [];
-  const coords = [] as Array<{ label: string; x: number; y: number }>;
+  const coords = [] as Array<Point & { label: string }>;
   const steps = Math.floor(wallBoundingBox.value.width / 20);
   for (let i = 0; i < steps; i++) {
     const label = (i + 1).toString();
@@ -177,7 +186,7 @@ const horizontalCoords = computed(() => {
 
 const verticalCoords = computed(() => {
   if (!wallBoundingBox.value) return [];
-  const coords = [] as Array<{ label: string; x: number; y: number }>;
+  const coords = [] as Array<Point& { label: string }>;
   const steps = Math.floor(wallBoundingBox.value.height / 20);
   for (let i = 0; i < steps; i++) {
     const label = String.fromCharCode(65 + (i % 26));
@@ -669,6 +678,11 @@ onUnmounted(() => {
   window.removeEventListener('resize', updateCanvasSize);
   window.removeEventListener('keydown', handleKeyDown);
 });
+
+provide<ExposedFunctions>(exposedFunctions, {
+  getWallBoundingBox,
+  getPodBoundaries
+})
 </script>
 
 <template>
@@ -789,8 +803,8 @@ onUnmounted(() => {
       />
 
       <BuilderLayerPreviews
-        :layers="layers"
         v-model:current-layer-index="currentLayerIndex"
+        :layers="layers"
         :viewport-rect="viewportRect"
         :rack-width="rackWidth"
         :rack-height="rackHeight"
@@ -798,8 +812,6 @@ onUnmounted(() => {
         :wall-preview-point="wallPreviewPoint"
         :is-drawing-circuit="isDrawingCircuit"
         :circuit-preview-point="circuitPreviewPoint"
-        :get-wall-bounding-box="getWallBoundingBox"
-        :get-pod-boundaries="getPodBoundaries"
       />
     </div>
   </div>

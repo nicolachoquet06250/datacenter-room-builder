@@ -12,7 +12,7 @@ const startRotationAngle = ref(0);
 const initialRackRotation = ref(0);
 
 const draggingRack = ref<number | null>(null);
-const rackPositionsBeforeDrag = ref<{ x: number; y: number }[]>([]);
+const rackPositionsBeforeDrag = ref<Point[]>([]);
 const lastMousePos = { x: 0, y: 0 };
 
 export const useRacksCrud = (roomId: number) => {
