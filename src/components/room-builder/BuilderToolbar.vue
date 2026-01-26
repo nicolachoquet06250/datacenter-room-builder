@@ -6,9 +6,11 @@ defineProps<{
   showAddRack: boolean;
   canClearWalls: boolean;
   isDrawingWalls: boolean;
+  isDrawingPillar: boolean;
   zoomLevel: number;
   canZoomOut: boolean;
   canZoomIn: boolean;
+  selectedLayoutIndex: number | null;
 }>();
 
 defineEmits<{
@@ -16,6 +18,7 @@ defineEmits<{
   (e: 'redo'): void;
   (e: 'addRack'): void;
   (e: 'toggleWalls'): void;
+  (e: 'togglePillar'): void;
   (e: 'clearWalls'): void;
   (e: 'zoomOut'): void;
   (e: 'zoomIn'): void;
@@ -59,30 +62,6 @@ const roomName = defineModel<string>('roomName');
 
     <div class="toolbar-divider"/>
 
-    <div class="toolbar-section action-controls">
-      <button 
-        class="toolbar-btn" 
-        :class="{ 'active': isDrawingWalls }" 
-        @click="$emit('toggleWalls')"
-        :title="isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs'"
-      >
-        <span class="icon">✏️</span>
-
-        <span class="label">Murs</span>
-      </button>
-
-      <button 
-        v-if="canClearWalls" 
-        class="toolbar-btn btn-danger" 
-        @click="$emit('clearWalls')"
-        title="Supprimer la pièce"
-      >
-        <span class="icon">🗑️</span>
-      </button>
-    </div>
-
-    <div class="toolbar-divider"/>
-
     <div class="toolbar-section zoom-controls">
       <button
           class="toolbar-btn"
@@ -119,6 +98,40 @@ const roomName = defineModel<string>('roomName');
         </button>
       </div>
     </template>
+
+    <div class="toolbar-section action-controls" v-if="selectedLayoutIndex === 0">
+      <div class="toolbar-divider"/>
+
+      <button
+          class="toolbar-btn"
+          :class="{ 'active': isDrawingWalls }"
+          @click="$emit('toggleWalls')"
+          :title="isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs'"
+      >
+        <span class="icon">✏️</span>
+
+        <span class="label">Murs</span>
+      </button>
+
+      <button
+          class="toolbar-btn"
+          :class="{ 'active': isDrawingPillar }"
+          @click="$emit('togglePillar')"
+          :title="isDrawingPillar ? 'Arrêter les poteaux' : 'Dessiner des poteaux'"
+      >
+        <span class="icon">⬛</span>
+        <span class="label">Poteaux</span>
+      </button>
+
+      <button
+          v-if="canClearWalls"
+          class="toolbar-btn btn-danger"
+          @click="$emit('clearWalls')"
+          title="Supprimer la pièce"
+      >
+        <span class="icon">🗑️</span>
+      </button>
+    </div>
 
     <div class="toolbar-spacer"/>
 

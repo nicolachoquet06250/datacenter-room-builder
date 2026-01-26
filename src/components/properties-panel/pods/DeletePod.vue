@@ -29,19 +29,18 @@ defineEmits<{
 
 <style scoped>
 .btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-  line-height: 1.25rem;
   width: 100%;
+  padding: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .btn:disabled {
@@ -55,10 +54,6 @@ defineEmits<{
 }
 
 .btn-danger:hover:not(:disabled) {
-  background-color: #c0392b;
-}
-
-.btn-danger:active:not(:disabled) {
-  background-color: #a93226;
+  background-color: #fee2e2;
 }
 </style>

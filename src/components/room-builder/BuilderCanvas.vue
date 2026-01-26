@@ -8,7 +8,7 @@ import {exposedFunctions} from "../RoomBuilder.vue";
 import type {ExposedFunctions} from "../RoomBuilder.vue";
 import BuilderGrid from "./BuilderGrid.vue";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   layers: Layer[];
   currentLayerIndex: number;
   walls: Point[];
@@ -25,14 +25,21 @@ const props = defineProps<{
   zoomLevel: number;
   panOffset: Point;
   isWallSelected: boolean;
+  isDrawingPillar: boolean;
+  pillarPreviewPoint: Point | null;
+  selectedPillarIndex: number | null;
   rackWidth: number;
   rackHeight: number;
   isInteracting: boolean;
   selectedUnits: Point[];
+  hoveredUnit: Point | null;
+  selectedFootprintId: string | null;
   selectedCircuitSegmentKeys: string[];
-}>();
+}>(), {
+  selectedPillarIndex: null
+});
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'deselect', event: MouseEvent): void;
   (e: 'mousemove-svg', event: MouseEvent): void;
   (e: 'start-drag', event: MouseEvent, index: number): void;
@@ -40,8 +47,13 @@ defineEmits<{
   (e: 'start-rotate', event: MouseEvent, index: number): void;
   (e: 'select-pod', event: MouseEvent, podId: string): void;
   (e: 'select-wall', event: MouseEvent): void;
+  (e: 'start-drag-wall', event: MouseEvent, index: number, isHorizontal: boolean): void;
+  (e: 'delete-pillar', index: number): void;
+  (e: 'select-pillar', event: MouseEvent, index: number): void;
+  (e: 'start-drag-pillar', event: MouseEvent, index: number): void;
   (e: 'select-circuit-segment', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
   (e: 'select-circuit-path', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
+  (e: 'select-footprint', id: string): void;
 }>();
 
 const svgRef = ref<SVGSVGElement | null>(null);
@@ -58,7 +70,14 @@ const selectedSegmentKeys = computed(() => new Set(props.selectedCircuitSegmentK
 const isSegmentSelected = (pathIndex: number, segmentIndex: number) =>
   selectedSegmentKeys.value.has(`${pathIndex}-${segmentIndex}`);
 
-const {getPodBoundaries} = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions)
+const {getPodBoundaries} = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions);
+
+const handleSelectPillar = (e: MouseEvent, pIdx: number) => {
+  if (!props.isDrawingPillar) {
+    emit('select-pillar', e, pIdx);
+    emit('start-drag-pillar', e, pIdx);
+  }
+}
 
 defineExpose({svgRef});
 </script>
@@ -110,13 +129,22 @@ defineExpose({svgRef});
             stroke-width="1"
             stroke-linejoin="round"
         />
+        <rect
+            v-for="(pillar, pIdx) in layer.pillars"
+            :key="`pillar-inactive-${layer.id}-${pIdx}`"
+            :x="pillar.x - 10"
+            :y="pillar.y - 10"
+            :width="20"
+            :height="20"
+            fill="#333"
+        />
         <g v-if="layer.circuits?.length">
           <polyline
               v-for="(circuit, circuitIdx) in layer.circuits"
               :key="`circuit-${layer.id}-${circuitIdx}`"
               :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
               fill="none"
-              stroke="#0d6efd"
+              stroke="#63b3ed"
               stroke-width="3"
               stroke-linejoin="round"
               stroke-linecap="round"
@@ -166,7 +194,11 @@ defineExpose({svgRef});
 
       <g class="layer-active">
         <g v-if="currentLayerIndex === 2" class="footprints-layer">
-          <g v-for="footprint in layers[2]?.footprints" :key="footprint.id">
+          <g v-for="footprint in layers[2]?.footprints" :key="footprint.id"
+             @mousedown.stop="$emit('select-footprint', footprint.id)"
+             class="footprint-group"
+             :class="{ 'selected': footprint.id === selectedFootprintId }"
+          >
             <rect
                 v-for="(unit, uIdx) in footprint.units"
                 :key="uIdx"
@@ -175,9 +207,9 @@ defineExpose({svgRef});
                 :width="20"
                 :height="20"
                 :fill="footprint.color"
-                fill-opacity="0.4"
+                :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
                 stroke="white"
-                stroke-width="0.5"
+                :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
             />
           </g>
           <rect
@@ -190,6 +222,18 @@ defineExpose({svgRef});
               fill="rgba(0, 123, 255, 0.4)"
               stroke="white"
               stroke-width="0.5"
+          />
+          <rect
+              v-if="hoveredUnit && !isInteracting"
+              :x="hoveredUnit.x"
+              :y="hoveredUnit.y"
+              :width="20"
+              :height="20"
+              fill="#ff4500"
+              fill-opacity="0.4"
+              stroke="white"
+              stroke-width="0.5"
+              style="pointer-events: none"
           />
         </g>
 
@@ -222,11 +266,54 @@ defineExpose({svgRef});
               selected: isWallSelected,
               'layer-footprints': currentLayerIndex === 2
             }"
-            @mousedown="$emit('select-wall', $event)"
+            @mousedown="(!isDrawingPillar && !isDrawingWalls) && $emit('select-wall', $event)"
             stroke="rgba(255,255,255,0.3)"
             stroke-width="1"
             stroke-linejoin="round"
         />
+
+        <template v-if="layers[currentLayerIndex]">
+          <rect
+              v-for="(pillar, pIdx) in layers[currentLayerIndex]!.pillars"
+              :key="`pillar-active-${pIdx}`"
+              :x="pillar.x - 10"
+              :y="pillar.y - 10"
+              :width="20"
+              :height="20"
+              :fill="selectedPillarIndex === pIdx ? '#0d6efd' : '#333'"
+              :stroke="selectedPillarIndex === pIdx ? '#fff' : 'none'"
+              :stroke-width="selectedPillarIndex === pIdx ? 2 : 0"
+              :style="{ cursor: isDrawingPillar ? 'crosshair' : 'pointer' }"
+              @mousedown.stop="handleSelectPillar($event, pIdx)"
+              @contextmenu.prevent="$emit('delete-pillar', pIdx)"
+          />
+        </template>
+
+        <rect
+            v-if="isDrawingPillar && pillarPreviewPoint"
+            :x="pillarPreviewPoint.x - 10"
+            :y="pillarPreviewPoint.y - 10"
+            :width="20"
+            :height="20"
+            fill="#333"
+            fill-opacity="0.5"
+            style="pointer-events: none;"
+        />
+
+        <g v-if="!isDrawingWalls && isWallSelected && currentLayerIndex === 0">
+          <line
+              v-for="(point, index) in walls"
+              :key="`wall-drag-handle-${index}`"
+              :x1="point.x"
+              :y1="point.y"
+              :x2="walls[(index + 1) % walls.length]!.x"
+              :y2="walls[(index + 1) % walls.length]!.y"
+              stroke="transparent"
+              stroke-width="10"
+              style="cursor: move;"
+              @mousedown.stop="$emit('start-drag-wall', $event, index, Math.abs(point.y - (walls[(index + 1) % walls.length]?.y ?? 0)) < 1)"
+          />
+        </g>
 
         <template v-if="isDrawingWalls">
           <circle
@@ -286,7 +373,7 @@ defineExpose({svgRef});
               :cx="circuitPreviewPoint.x"
               :cy="circuitPreviewPoint.y"
               r="3"
-              fill="#0d6efd"
+              fill="#f6ad55"
           />
           <line
               v-if="isDrawingCircuit && lastCircuitPoint && circuitPreviewPoint"
@@ -294,7 +381,7 @@ defineExpose({svgRef});
               :y1="lastCircuitPoint.y"
               :x2="circuitPreviewPoint.x"
               :y2="circuitPreviewPoint.y"
-              stroke="#0d6efd"
+              stroke="#f6ad55"
               stroke-width="2"
               stroke-linejoin="round"
               stroke-linecap="round"
@@ -520,12 +607,12 @@ defineExpose({svgRef});
 
 .circuit-line {
   pointer-events: none;
-  stroke: #3498db;
+  stroke: #63b3ed;
 }
 
 .circuit-segment {
   pointer-events: stroke;
-  stroke: #3498db;
+  stroke: #63b3ed;
   stroke-width: 3;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -534,5 +621,14 @@ defineExpose({svgRef});
 .circuit-segment.selected {
   stroke: #ff4500;
   stroke-width: 4;
+}
+
+.footprint-group {
+  cursor: pointer;
+}
+
+.footprint-group.selected rect {
+  stroke: #2563eb;
+  stroke-width: 1.5;
 }
 </style>

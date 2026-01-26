@@ -1,4 +1,4 @@
-import {computed, ref, unref} from "vue";
+import {computed, ref} from "vue";
 import {useLayers} from "./useLayers.ts";
 
 const isDrawingWalls = ref(false);
@@ -10,8 +10,10 @@ export const useDrawRoomWalls = () => {
     const walls = computed({
         get: () => layers.value.length > 0 ? (layers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value,
         set: (val) => {
-            if (layers.value.length > 0 && unref(layers)[currentLayerIndex.value]) {
-                layers.value[currentLayerIndex.value]!.walls = val;
+            if (layers.value.length > 0) {
+                layers.value.forEach(layer => {
+                    layer.walls = JSON.parse(JSON.stringify(val));
+                });
             } else {
                 wallsRef.value = val;
             }

@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import * as pods from '../properties-panel/pods';
-
 import { computed } from 'vue';
 import RackPanel from "../properties-panel/RackPanel.vue";
+import PillarPanel from "../properties-panel/PillarPanel.vue";
+import MultipleRackPanel from "../properties-panel/MultipleRackPanel.vue";
+import FootprintPanel from "../properties-panel/FootprintPanel.vue";
+import CircuitPanel from "../properties-panel/CircuitPanel.vue";
 
 const props = defineProps<{
   selectedRackIndices: number[];
   racks: Array<Rack | string>;
   isWallSelected: boolean;
+  selectedPillarIndex: number | null;
+  pillars: Point[];
+  selectedFootprint: Footprint | null;
+  selectedCircuitSegments: Array<{ pathIndex: number; segmentIndex: number }>;
+  circuits: Point[][];
   contextMenuOptions: { type: string; podId?: string };
 }>();
 
@@ -19,7 +26,16 @@ const emit = defineEmits<{
   (e: 'clear-selection'): void;
   (e: 'update-rack-name', value: string): void;
   (e: 'update-rack-rotation', value: number): void;
+  (e: 'delete-pillar', index: number): void;
+  (e: 'delete-footprint', id: string): void;
+  (e: 'change-footprint-color', id: string): void;
+  (e: 'delete-circuit-selection'): void;
 }>();
+
+const selectedPillar = computed(() => {
+  if (props.selectedPillarIndex === null) return null;
+  return props.pillars[props.selectedPillarIndex] ?? null;
+});
 
 const selectedRack = computed(() => {
   if (props.selectedRackIndices.length !== 1) return null;
@@ -50,31 +66,39 @@ const onRotationChange = (event: Event) => {
     />
   </div>
 
+  <div v-else-if="selectedPillarIndex !== null" class="properties-panel">
+    <PillarPanel
+      :selected-pillar="selectedPillar"
+      :selected-pillar-index="selectedPillarIndex"
+    />
+  </div>
+
+  <div v-else-if="selectedFootprint" class="properties-panel">
+    <FootprintPanel
+        :footprint="selectedFootprint"
+        @delete-footprint="$emit('delete-footprint', $event)"
+        @change-color="$emit('change-footprint-color', $event)"
+    />
+  </div>
+
+  <div v-else-if="selectedCircuitSegments.length > 0" class="properties-panel">
+    <CircuitPanel
+      :selected-segments="selectedCircuitSegments"
+      :circuits="circuits"
+      @delete-selection="$emit('delete-circuit-selection')"
+    />
+  </div>
+
   <div v-else-if="selectedRackIndices.length > 1" class="properties-panel">
-    <div>
-      <div class="panel-header">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-        <h3>Sélection multiple</h3>
-      </div>
+    <MultipleRackPanel
+        :selected-rack-indices="selectedRackIndices"
+        :context-menu-options="contextMenuOptions"
 
-      <p class="selection-count">
-        {{ selectedRackIndices.length }} éléments sélectionnés
-      </p>
-
-      <div class="actions">
-        <component
-            :is="pods[contextMenuOptions.type as keyof typeof pods]"
-
-            @create-pod="$emit('create-pod')"
-            @delete-pod="$emit('delete-pod', contextMenuOptions.podId!)"
-            @leave-pod="$emit('leave-pod')"
-        />
-        <component
-            :is="pods.ClearSelection"
-            @clear-selection="$emit('clear-selection')"
-        />
-      </div>
-    </div>
+        @create-pod="$emit('create-pod')"
+        @delete-pod="$emit('delete-pod', contextMenuOptions.podId!)"
+        @leave-pod="$emit('leave-pod')"
+        @clear-selection="$emit('clear-selection')"
+    />
   </div>
 </template>
 
@@ -92,18 +116,6 @@ const onRotationChange = (event: Event) => {
   max-height: calc(100% - 2rem);
   overflow-y: auto;
   z-index: 10;
-}
-.panel-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.header-icon {
-  color: #6b7280;
 }
 
 .properties-panel h3 {
@@ -147,20 +159,5 @@ const onRotationChange = (event: Event) => {
 
 .info-label svg {
   color: #9ca3af;
-}
-
-.selection-count {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin: 0.5rem 0 1.25rem 0;
-}
-
-.actions {
-  margin-top: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  border-top: 1px solid #f3f4f6;
-  padding-top: 1.25rem;
 }
 </style>

@@ -69,9 +69,9 @@ export const useRoomBuilderGeometry = () => {
     return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
   };
 
-  const getConstrainedPoint = (currentX: number, currentY: number, lastPoint: Point | null): Point => {
-    const snapX = Math.round(currentX / 20) * 20;
-    const snapY = Math.round(currentY / 20) * 20;
+  const getConstrainedPoint = (currentX: number, currentY: number, lastPoint: Point | null, snap: number = 20): Point => {
+    const snapX = Math.round(currentX / snap) * snap;
+    const snapY = Math.round(currentY / snap) * snap;
 
     if (!lastPoint) {
       return { x: snapX, y: snapY };
@@ -91,7 +91,7 @@ export const useRoomBuilderGeometry = () => {
       return { x: lastPoint.x, y: snapY };
     }
 
-    const dist = Math.round((absDx + absDy) / 2 / 20) * 20;
+    const dist = Math.round((absDx + absDy) / 2 / snap) * snap;
     return {
       x: lastPoint.x + (dx >= 0 ? dist : -dist),
       y: lastPoint.y + (dy >= 0 ? dist : -dist)

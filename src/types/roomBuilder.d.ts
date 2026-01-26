@@ -46,6 +46,7 @@ declare global {
     walls: Point[];
     footprints: Footprint[];
     circuits: Point[][];
+    pillars?: Point[];
   }
 }
 

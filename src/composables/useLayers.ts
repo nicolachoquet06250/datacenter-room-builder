@@ -22,7 +22,8 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
             pods: [],
             walls: JSON.parse(JSON.stringify(finalWalls)),
             footprints: [],
-            circuits: []
+            circuits: [],
+            pillars: []
         }));
         currentLayerIndex.value = 0;
     }
@@ -37,10 +38,12 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
                     pods: [],
                     walls: defaultLayers.value[0]!.walls,
                     footprints: [],
-                    circuits: []
+                    circuits: [],
+                    pillars: []
                 },
                 ...defaultLayers.value.map((layer) => ({
                     ...layer,
+                    pillars: layer.pillars ?? [],
                     circuits: Array.isArray(layer.circuits?.[0])
                         ? layer.circuits
                         : (layer.circuits?.length ? [layer.circuits as unknown as Point[]] : [])

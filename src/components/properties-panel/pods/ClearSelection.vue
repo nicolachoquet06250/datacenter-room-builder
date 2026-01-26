@@ -27,19 +27,18 @@ defineEmits<{
 
 <style scoped>
 .btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-  line-height: 1.25rem;
   width: 100%;
+  padding: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .btn:disabled {
@@ -49,17 +48,13 @@ defineEmits<{
 
 .btn-outline {
   background-color: transparent;
-  color: #4b5563;
-  border: 1px solid #d1d5db;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
 }
 
 .btn-outline:hover:not(:disabled) {
-  background-color: #f3f4f6;
-  color: #111827;
-  border-color: #9ca3af;
-}
-
-.btn-outline:active:not(:disabled) {
-  background-color: #e5e7eb;
+  background-color: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
 }
 </style>

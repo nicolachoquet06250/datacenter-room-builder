@@ -30,6 +30,8 @@ import {useWalls} from "../composables/useWalls.ts";
 import {useZoom} from "../composables/useZoom.ts";
 import {useModal} from "../composables/useModal.ts";
 import {useFootprints} from "../composables/useFootprints.ts";
+import {useWallResizer} from "../composables/useWallResizer.ts";
+import {usePillars} from "../composables/usePillars.ts";
 
 const props = withDefaults(
   defineProps<{
@@ -75,13 +77,17 @@ const {
 const {
   selectedUnits,
   isSelecting,
+  hoveredUnit,
   startSelection,
   updateSelection,
   stopSelection,
   createFootprint,
   deleteFootprint,
   changeFootprintColor,
-  getFootprintAt
+  getFootprintAt,
+  updateHoveredUnit,
+  selectedFootprintId,
+  selectFootprint
 } = useFootprints(currentLayer, walls);
 
 const {
@@ -115,6 +121,54 @@ const {
   walls,
   currentLayerIndex
 });
+
+const {
+  draggingWallSegment,
+  startDraggingWall,
+  stopDraggingWall,
+  dragWall
+} = useWallResizer(walls);
+
+const {
+  isDrawingPillar,
+  pillarPreviewPoint,
+  selectedPillarIndex,
+  draggingPillarIndex,
+  addPillar,
+  removePillar: onDeletePillar,
+  movePillar,
+  toggleIsDrawingPillar
+} = usePillars(walls);
+
+const onStartDragPillar = (event: MouseEvent, index: number) => {
+  if (event.button !== 0) return;
+  takeSnapshot();
+  draggingPillarIndex.value = index;
+};
+
+const onStartDragWall = (_event: MouseEvent, index: number, isHorizontal: boolean) => {
+  takeSnapshot();
+  startDraggingWall(index, isHorizontal);
+};
+
+const selectedFootprint = computed(() => {
+  if (!selectedFootprintId.value) return null;
+  return currentLayer.value.footprints?.find(f => f.id === selectedFootprintId.value) || null;
+});
+
+const onSelectFootprint = (id: string) => {
+  selectFootprint(id);
+  selectedRackIndices.value = [];
+  isWallSelected.value = false;
+  selectedPillarIndex.value = null;
+};
+
+const onSelectPillar = (event: MouseEvent, index: number) => {
+  event.stopPropagation();
+  selectedPillarIndex.value = index;
+  selectedRackIndices.value = [];
+  isWallSelected.value = false;
+};
 
 const {
   contextMenuOptions,
@@ -214,6 +268,7 @@ const viewportRect = computed(() => ({
 const isInteracting = computed(() =>
     draggingRack.value !== null ||
     rotatingRack.value !== null ||
+    draggingPillarIndex.value !== null ||
     isPanning.value ||
     isDrawingWalls.value ||
     isSelecting.value ||
@@ -289,30 +344,54 @@ const selectCircuitPath = (event: MouseEvent, pathIndex: number, segmentIndex: n
 };
 
 const onMouseMoveSVG = (event: MouseEvent) => {
+  const svg = event.currentTarget as SVGSVGElement;
+  const pt = svg.createSVGPoint();
+  pt.x = event.clientX;
+  pt.y = event.clientY;
+  const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+
+  const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
+  const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+
+  if (currentLayerIndex.value === 0) {
+    if (draggingWallSegment.value) {
+      dragWall(x, y);
+      return;
+    }
+  }
+
+  if (draggingPillarIndex.value !== null) {
+    const constrained = getConstrainedPoint(x, y, null, 10);
+    if (walls.value.length > 2 && !isPointInPolygon(constrained.x, constrained.y, walls.value)) {
+      return;
+    }
+    movePillar(draggingPillarIndex.value, constrained);
+    return;
+  }
+
+  if (isDrawingPillar.value) {
+    const constrained = getConstrainedPoint(x, y, null, 10);
+    if (walls.value.length > 2 && isPointInPolygon(constrained.x, constrained.y, walls.value)) {
+      pillarPreviewPoint.value = constrained;
+    } else {
+      pillarPreviewPoint.value = null;
+    }
+    return;
+  }
+
   if (isDrawingWalls.value) {
-    const svg = event.currentTarget as SVGSVGElement;
-    const pt = svg.createSVGPoint();
-    pt.x = event.clientX;
-    pt.y = event.clientY;
-    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
-
-    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
-    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
-
     const lastPoint = walls.value.length > 0
         ? walls.value[walls.value.length - 1]
         : null;
     wallPreviewPoint.value = getConstrainedPoint(x, y, lastPoint!);
+    return;
   }
 
-  if (currentLayerIndex.value === 1 && !isDrawingWalls.value) {
-    const svg = event.currentTarget as SVGSVGElement;
-    const pt = svg.createSVGPoint();
-    pt.x = event.clientX;
-    pt.y = event.clientY;
-    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
-    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
-    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+  if (currentLayerIndex.value === 1) {
+    if (draggingWallSegment.value) {
+      dragWall(x, y);
+      return;
+    }
     
     // Vérifier si on survole un segment existant (pour ne pas afficher la preview de dessin)
     if (getCircuitSegmentAtPoint(x, y)) {
@@ -330,20 +409,18 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     }
   }
 
-  if (currentLayerIndex.value === 2 && isSelecting.value) {
-    const svg = event.currentTarget as SVGSVGElement;
-    const pt = svg.createSVGPoint();
-    pt.x = event.clientX;
-    pt.y = event.clientY;
-    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
-    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
-    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
-    updateSelection(x, y);
+  if (currentLayerIndex.value === 2) {
+    if (isSelecting.value) {
+      updateSelection(x, y);
+      hoveredUnit.value = null;
+    } else {
+      updateHoveredUnit(x, y);
+    }
   }
 };
 
 const onMouseMove = (event: MouseEvent) => {
-  if (isDrawingWalls.value) return;
+  if (isDrawingWalls.value && !draggingWallSegment.value) return;
   if (isPanning.value) return panRunning(event);
   if (draggingRack.value !== null) dragRack(event);
   else if (rotatingRack.value !== null) rotateRack(event);
@@ -352,12 +429,34 @@ const onMouseMove = (event: MouseEvent) => {
 const stopDrag = () => {
   panStop();
   resetRackState();
+  stopDraggingWall();
+  draggingPillarIndex.value = null;
   if (currentLayerIndex.value === 2) {
     stopSelection();
   }
 };
 
 const deselect = (event: MouseEvent) => {
+  if (isDrawingPillar.value) {
+    if (event.button !== 0) return;
+    const svg = event.currentTarget as SVGSVGElement;
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+
+    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
+    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+
+    const constrained = getConstrainedPoint(x, y, null, 10);
+    if (walls.value.length > 2 && !isPointInPolygon(constrained.x, constrained.y, walls.value)) {
+      return;
+    }
+    takeSnapshot();
+    addPillar(constrained);
+    return;
+  }
+
   if (isDrawingWalls.value) {
     if (event.button !== 0) return;
 
@@ -393,10 +492,12 @@ const deselect = (event: MouseEvent) => {
   if ((event.target as SVGElement).classList.contains('canvas-background') ||
       (event.target as SVGElement).closest('.footprints-layer') ||
       (event.target as SVGElement).classList.contains('room-surface')) {
-    const isFootprintClick = (event.target as SVGElement).closest('.footprints-layer');
+    const isFootprintClick = (event.target as SVGElement).closest('.footprint-group');
     if (!isFootprintClick) {
       selectedRackIndices.value = [];
       isWallSelected.value = false;
+      selectedPillarIndex.value = null;
+      selectFootprint(null);
     }
 
     const svg = event.currentTarget as SVGSVGElement;
@@ -442,6 +543,11 @@ const deselect = (event: MouseEvent) => {
     }
   } else if (currentLayerIndex.value === 2) {
     if (event.button === 0) { // Left click
+      const footprint = getFootprintAt(x, y);
+      if (footprint) {
+        onSelectFootprint(footprint.id);
+        return;
+      }
       startSelection(x, y);
       // Si on a cliqué à l'intérieur de la pièce pour sélectionner, on ne pan pas au clic gauche
       if (!isPointInPolygon(x, y, walls.value)) {
@@ -569,6 +675,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
   if (currentLayerIndex.value === 2 && event.key === 'Escape') {
     selectedUnits.value = [];
+    selectFootprint(null);
     return;
   }
   if (!isDrawingWalls.value && currentLayerIndex.value === 1 && (event.key === 'Escape' || event.key === 'Enter')) {
@@ -610,6 +717,20 @@ const handleKeyDown = (event: KeyboardEvent) => {
     if (selectedCircuitSegments.value.length > 0) {
       event.preventDefault();
       deleteSelectedCircuitSegments();
+      return;
+    }
+
+    if (selectedPillarIndex.value !== null) {
+      event.preventDefault();
+      onDeletePillar(selectedPillarIndex.value);
+      return;
+    }
+
+    if (selectedFootprintId.value !== null) {
+      event.preventDefault();
+      takeSnapshot();
+      deleteFootprint(selectedFootprintId.value);
+      selectFootprint(null);
       return;
     }
   }
@@ -681,6 +802,7 @@ watch(currentLayerIndex, () => {
   isDrawingCircuit.value = false;
   currentCircuitPathIndex.value = null;
   selectedCircuitSegments.value = [];
+  hoveredUnit.value = null;
 });
 
 watch(() => props.roomId, async (newId) => {
@@ -720,14 +842,17 @@ provide<ExposedFunctions>(exposedFunctions, {
       :show-add-rack="currentLayerIndex === 3"
       :can-clear-walls="walls.length > 0"
       :is-drawing-walls="isDrawingWalls"
+      :is-drawing-pillar="isDrawingPillar"
       :zoom-level="zoomLevel"
       :can-zoom-out="zoomLevel > 0.2"
       :can-zoom-in="zoomLevel < 3"
+      :selected-layout-index="currentLayerIndex"
 
       @undo="undo"
       @redo="redo"
       @add-rack="addRack"
       @toggle-walls="toggleIsDrawingWalls"
+      @toggle-pillar="toggleIsDrawingPillar"
       @clear-walls="triggerClearWalls"
       @zoom-out="zoomOut"
       @zoom-in="zoomIn"
@@ -742,8 +867,10 @@ provide<ExposedFunctions>(exposedFunctions, {
         :walls="walls"
         :racks="racks as Rack[]"
         :is-drawing-walls="isDrawingWalls"
+        :is-drawing-pillar="isDrawingPillar"
         :is-drawing-circuit="isDrawingCircuit"
         :wall-preview-point="wallPreviewPoint"
+        :pillar-preview-point="pillarPreviewPoint"
         :circuit-preview-point="circuitPreviewPoint"
         :pod-boundaries="podBoundaries"
         :wall-bounding-box="wallBoundingBox"
@@ -758,7 +885,10 @@ provide<ExposedFunctions>(exposedFunctions, {
         :is-interacting="isInteracting"
         :get-pod-boundaries="getPodBoundaries"
         :selected-units="selectedUnits"
+        :hovered-unit="hoveredUnit"
         :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
+        :selected-pillar-index="selectedPillarIndex"
+        :selected-footprint-id="selectedFootprintId"
 
         @deselect="deselect"
         @mousemove-svg="onMouseMoveSVG"
@@ -767,26 +897,16 @@ provide<ExposedFunctions>(exposedFunctions, {
         @start-rotate="startRotateRack"
         @select-pod="selectPod"
         @select-wall="selectWall($event)"
+        @start-drag-wall="onStartDragWall"
+        @delete-pillar="onDeletePillar"
+        @select-pillar="onSelectPillar"
+        @start-drag-pillar="onStartDragPillar"
         @select-circuit-segment="selectCircuitSegment"
         @select-circuit-path="selectCircuitPath"
+        @select-footprint="onSelectFootprint"
       />
 
       <!-- Bouton de suppression flottant pour les segments de circuit -->
-      <button
-        v-if="selectedCircuitSegments.length > 0"
-        class="floating-delete-btn"
-        title="Supprimer la sélection"
-        @click="deleteSelectedCircuitSegments"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 6h18"></path>
-          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-          <line x1="10" y1="11" x2="10" y2="17"></line>
-          <line x1="14" y1="11" x2="14" y2="17"></line>
-        </svg>
-        <span>Supprimer</span>
-      </button>
 
       <BuilderContextMenu
         :show="contextMenu.show"
@@ -813,9 +933,15 @@ provide<ExposedFunctions>(exposedFunctions, {
       />
 
       <BuilderPropertiesPanel
+        v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndex !== null || selectedFootprint !== null || selectedCircuitSegments.length > 0"
         :selected-rack-indices="selectedRackIndices"
         :racks="racks as Rack[]"
         :is-wall-selected="isWallSelected"
+        :selected-pillar-index="selectedPillarIndex"
+        :pillars="layers[currentLayerIndex]?.pillars ?? []"
+        :selected-footprint="selectedFootprint"
+        :selected-circuit-segments="selectedCircuitSegments"
+        :circuits="layers[currentLayerIndex]?.circuits ?? []"
         :context-menu-options="contextMenuOptions"
 
         @remove-rack="removeRack"
@@ -825,6 +951,10 @@ provide<ExposedFunctions>(exposedFunctions, {
         @clear-selection="selectedRackIndices = []"
         @update-rack-name="updateRackName"
         @update-rack-rotation="updateRackRotation"
+        @delete-pillar="onDeletePillar"
+        @delete-footprint="deleteFootprint"
+        @change-footprint-color="changeFootprintColor"
+        @delete-circuit-selection="deleteSelectedCircuitSegments"
       />
 
       <BuilderLayerPreviews
@@ -855,36 +985,5 @@ provide<ExposedFunctions>(exposedFunctions, {
   position: relative;
   overflow: hidden;
   background: #004a99; /* Bleu iTop Designer */
-}
-
-.floating-delete-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 16px;
-  height: 32px;
-  background-color: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  font-weight: 600;
-  font-size: 13px;
-  transition: all 0.2s ease;
-}
-
-.floating-delete-btn:hover {
-  background-color: #c0392b;
-}
-
-.floating-delete-btn:active {
-  background-color: #a93226;
-  transform: translateY(1px);
 }
 </style>

@@ -9,6 +9,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   const selectionMode = ref<'add' | 'remove' | null>(null);
   const initialSelection = ref<any[] | null>(null);
   const currentBatch = ref<any[]>([]);
+  const hoveredUnit = ref<Point | null>(null);
+  const selectedFootprintId = ref<string | null>(null);
   const { isPointInPolygon } = useRoomBuilderGeometry();
 
   const colors = [
@@ -266,15 +268,47 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     );
   };
 
+  const updateHoveredUnit = (x: number, y: number) => {
+    const snapX = Math.floor(x / 20) * 20;
+    const snapY = Math.floor(y / 20) * 20;
+
+    const isAlreadyInFootprint = currentLayer.value.footprints?.some(f =>
+        f.units.some((u: any) => u.x === snapX && u.y === snapY)
+    );
+
+    if (isAlreadyInFootprint) {
+      hoveredUnit.value = null;
+      return;
+    }
+
+    if (walls.value.length > 2 && !isPointInPolygon(snapX + 10, snapY + 10, walls.value)) {
+      hoveredUnit.value = null;
+      return;
+    }
+
+    hoveredUnit.value = { x: snapX, y: snapY };
+  };
+
+  const selectFootprint = (id: string | null) => {
+    selectedFootprintId.value = id;
+    if (id) {
+        selectedUnits.value = [];
+    }
+  };
+
   return {
     selectedUnits,
     isSelecting,
+    hoveredUnit,
+    selectedFootprintId,
     startSelection,
     updateSelection,
     stopSelection,
     createFootprint,
     deleteFootprint,
     changeFootprintColor,
-    getFootprintAt
+    getFootprintAt,
+    updateHoveredUnit,
+    selectFootprint
   };
 };
