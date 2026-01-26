@@ -31,7 +31,7 @@ const {
       @click="currentLayerIndex = index"
     >
       <div class="preview-header">
-        <div class="preview-index-badge">{{ index }}</div>
+        <div class="preview-index-badge">{{ index + 1 }}</div>
         <div class="preview-title" :title="layer.name">{{ layer.name }}</div>
         <div v-if="currentLayerIndex === index" class="active-indicator"></div>
       </div>
