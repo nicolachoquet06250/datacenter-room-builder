@@ -13,5 +13,20 @@ export default defineConfig({
       customElement: true
     })
   ],
-  base: './'
+  base: './',
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    // (optionnel) certaines libs lisent aussi directement process.env
+    'process.env': JSON.stringify({ NODE_ENV: 'production' }),
+  },
+  build: {
+    lib: {
+      entry: './src/main.ts',
+      name: 'RoomBuilder',
+      formats: ['es', 'cjs', 'umd', 'iife'],
+      fileName: () => 'room-builder.webcomponent.js'
+    },
+    emptyOutDir: true,
+    outDir: './dist',
+  }
 })
