@@ -1,4 +1,8 @@
 <script lang="ts">
+const UNIT_SIZE_MM = 600;
+const UNIT_SIZE_M = UNIT_SIZE_MM / 1000;
+const UNIT_AREA_M2 = UNIT_SIZE_M * UNIT_SIZE_M;
+
 type Props = {
   wallCount: number;
   unitCount: number;
@@ -9,10 +13,6 @@ type Props = {
 import { computed } from 'vue';
 
 const props = defineProps<Props>();
-
-const UNIT_SIZE_MM = 600;
-const UNIT_SIZE_M = UNIT_SIZE_MM / 1000;
-const UNIT_AREA_M2 = UNIT_SIZE_M * UNIT_SIZE_M;
 
 const totalArea = computed(() => (props.unitCount * UNIT_AREA_M2).toFixed(2));
 </script>

@@ -21,11 +21,11 @@ type Emits = {
 import 'simple-notify/dist/simple-notify.css';
 import {computed, onMounted, onUnmounted, provide, ref, useTemplateRef, watch, watchEffect} from 'vue';
 import Modal from './Modal.vue';
-import BuilderToolbar from './room-builder/BuilderToolbar.vue';
-import BuilderCanvas from './room-builder/BuilderCanvas.vue';
-import BuilderContextMenu from './room-builder/BuilderContextMenu.vue';
-import BuilderPropertiesPanel from './room-builder/BuilderPropertiesPanel.vue';
-import BuilderLayerPreviews from './room-builder/BuilderLayerPreviews.vue';
+import {
+  BuilderToolbar, BuilderCanvas,
+  BuilderContextMenu, BuilderPropertiesPanel,
+  BuilderLayerPreviews
+} from './room-builder'
 import {rackHeight, rackWidth, useRoomBuilderGeometry} from '../composables/useRoomBuilderGeometry';
 import {useRoomBuilderHistory} from '../composables/useRoomBuilderHistory';
 import {useNotify} from '../composables/useNotify';
@@ -63,26 +63,6 @@ const {
   isPointInPolygon
 } = useRoomBuilderGeometry();
 
-const roomUnitCount = computed(() => {
-  const currentWalls = layers.value[0]?.walls || walls.value;
-  if (currentWalls.length < 3) return 0;
-  
-  const bbox = getWallBoundingBox(currentWalls);
-  if (!bbox) return 0;
-  
-  let count = 0;
-  const step = 20; // Taille de la grille
-  
-  for (let x = Math.floor(bbox.minX / step) * step; x <= bbox.maxX; x += step) {
-    for (let y = Math.floor(bbox.minY / step) * step; y <= bbox.maxY; y += step) {
-      if (isPointInPolygon(x + step / 2, y + step / 2, currentWalls)) {
-        count++;
-      }
-    }
-  }
-  return count;
-});
-
 const {error: notifyError, success: notifySuccess} = useNotify();
 
 const {
@@ -99,18 +79,12 @@ const {
 } = useLayers(walls, propsLayers);
 
 const {
-  selectedUnits,
-  isSelecting,
-  hoveredUnit,
-  startSelection,
-  updateSelection,
-  stopSelection,
-  createFootprint,
-  deleteFootprint,
-  changeFootprintColor,
-  getFootprintAt,
-  updateHoveredUnit,
-  selectedFootprintId,
+  selectedUnits, isSelecting,
+  hoveredUnit, selectedFootprintId,
+  startSelection, updateSelection,
+  stopSelection, createFootprint,
+  deleteFootprint, changeFootprintColor,
+  getFootprintAt, updateHoveredUnit,
   selectFootprint
 } = useFootprints(currentLayer, walls);
 
@@ -125,8 +99,8 @@ const {isPanning, panStart, panStop, panRunning} = usePan(props.roomId);
 
 const {
   racks, selectedRackIndices,
-  rotatingRack,
-  panOffset, draggingRack,
+  rotatingRack, panOffset,
+  draggingRack,
   createRack: addRackRaw,
   rotateRack, removeRack,
   startDragRack, dragRack,
@@ -154,138 +128,11 @@ const {
 } = useWallResizer(walls);
 
 const {
-  isDrawingPillar,
-  pillarPreviewPoint,
-  selectedPillarIndices,
-  draggingPillarIndex,
-  addPillar,
-  removePillar,
-  movePillar,
-  toggleIsDrawingPillar
+  isDrawingPillar, pillarPreviewPoint,
+  selectedPillarIndices, draggingPillarIndex,
+  addPillar, removePillar,
+  movePillar, toggleIsDrawingPillar
 } = usePillars(walls);
-
-const onRemoveRack = (index: number) => {
-  triggerConfirm({
-    title: 'Supprimer le rack',
-    message: 'Voulez-vous vraiment supprimer ce rack ?',
-    onConfirm: () => {
-      takeSnapshot();
-      removeRack(index);
-    }
-  });
-};
-
-const onConfirmDeletePillar = (index: number | number[]) => {
-  const count = Array.isArray(index) ? index.length : 1;
-  triggerConfirm({
-    title: 'Supprimer les poteaux',
-    message: `Voulez-vous vraiment supprimer ${count > 1 ? 'ces ' + count + ' poteaux' : 'ce poteau'} ?`,
-    onConfirm: () => {
-      onDeletePillar(index);
-    }
-  });
-};
-
-const onConfirmDeleteFootprint = (id: string) => {
-  triggerConfirm({
-    title: 'Supprimer la surface au sol',
-    message: 'Voulez-vous vraiment supprimer cette surface au sol ?',
-    onConfirm: () => {
-      takeSnapshot();
-      deleteFootprint(id);
-      if (selectedFootprintId.value === id) {
-        selectFootprint(null);
-      }
-    }
-  });
-};
-
-const onConfirmDeleteCircuitSelection = () => {
-  triggerConfirm({
-    title: 'Supprimer la sélection de circuit',
-    message: 'Voulez-vous vraiment supprimer les segments de circuit sélectionnés ?',
-    onConfirm: () => {
-      deleteSelectedCircuitSegments();
-    }
-  });
-};
-
-const onConfirmDeletePod = (podId: string) => {
-  triggerConfirm({
-    title: 'Supprimer le pod',
-    message: 'Voulez-vous vraiment supprimer ce pod ?',
-    onConfirm: () => {
-      takeSnapshot();
-      deletePod(podId);
-    }
-  });
-};
-
-const onDeletePillar = (index: number | number[]) => {
-  takeSnapshot();
-  const indicesToDelete = Array.isArray(index) ? [...index].sort((a, b) => b - a) : [index];
-  indicesToDelete.forEach(idx => {
-    removePillar(idx);
-  });
-};
-
-const onStartDragPillar = (event: MouseEvent, index: number) => {
-  if (event.button !== 0) return;
-  takeSnapshot();
-  draggingPillarIndex.value = index;
-};
-
-const onStartDragWall = (_event: MouseEvent, index: number, isHorizontal: boolean) => {
-  takeSnapshot();
-  startDraggingWall(index, isHorizontal);
-};
-
-const selectedFootprint = computed(() => {
-  if (!selectedFootprintId.value) return null;
-  return currentLayer.value.footprints?.find(f => f.id === selectedFootprintId.value) || null;
-});
-
-const onSelectFootprint = (id: string) => {
-  selectFootprint(id);
-  selectedRackIndices.value = [];
-  isWallSelected.value = false;
-  selectedPillarIndices.value = [];
-};
-
-const onSelectPillar = (event: MouseEvent, index: number) => {
-  event.stopPropagation();
-  
-  const visited = new Set<number>();
-  const toVisit = [index];
-  const allPillars = layers.value[currentLayerIndex.value]?.pillars ?? [];
-  
-  while (toVisit.length > 0) {
-    const currentIdx = toVisit.pop()!;
-    if (visited.has(currentIdx)) continue;
-    
-    visited.add(currentIdx);
-    const currentPillar = allPillars[currentIdx];
-    if (!currentPillar) continue;
-    
-    // Trouver les adjacents
-    allPillars.forEach((p, pIdx) => {
-      if (!visited.has(pIdx)) {
-        const dx = Math.abs(p.x - currentPillar.x);
-        const dy = Math.abs(p.y - currentPillar.y);
-        
-        // Adjacents si distance est de 20px (taille d'une unité de grille) sur un axe et 0 sur l'autre
-        if ((dx === 20 && dy === 0) || (dx === 0 && dy === 20)) {
-          toVisit.push(pIdx);
-        }
-      }
-    });
-  }
-  
-  selectedPillarIndices.value = Array.from(visited);
-  selectedRackIndices.value = [];
-  isWallSelected.value = false;
-  selectFootprint(null);
-};
 
 const {
   contextMenuOptions,
@@ -306,31 +153,41 @@ const {
   triggerConfirm, cancelModal
 } = useModal();
 
-const triggerClearWalls = () => {
-  triggerConfirm({
-    title: 'Supprimer la pièce',
-    message: 'Voulez-vous vraiment supprimer la pièce ainsi que tous les racks et pods à l\'intérieur ?',
-    confirmText: 'Supprimer',
-    onConfirm: () => {
-      takeSnapshot();
-      clearLayers();
-      wallsRef.value = [];
-      currentLayerIndex.value = 0;
-      isWallSelected.value = false;
-      selectedRackIndices.value = [];
-      cancelDrawingWalls();
-    }
-  });
-};
-
 const roomName = ref(props.roomName);
 const circuitPreviewPoint = ref<Point | null>(null);
 const isDrawingCircuit = ref(false);
 const currentCircuitPathIndex = ref<number | null>(null);
 const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
+
+const roomUnitCount = computed(() => {
+  const currentWalls = layers.value[0]?.walls || walls.value;
+  if (currentWalls.length < 3) return 0;
+
+  const bbox = getWallBoundingBox(currentWalls);
+  if (!bbox) return 0;
+
+  let count = 0;
+  const step = 20; // Taille de la grille
+
+  for (let x = Math.floor(bbox.minX / step) * step; x <= bbox.maxX; x += step) {
+    for (let y = Math.floor(bbox.minY / step) * step; y <= bbox.maxY; y += step) {
+      if (isPointInPolygon(x + step / 2, y + step / 2, currentWalls)) {
+        count++;
+      }
+    }
+  }
+  return count;
+});
+
+const selectedFootprint = computed(() => {
+  if (!selectedFootprintId.value) return null;
+  return currentLayer.value.footprints?.find(f => f.id === selectedFootprintId.value) || null;
+});
+
 const selectedCircuitSegmentKeys = computed(() =>
   selectedCircuitSegments.value.map(segment => `${segment.pathIndex}-${segment.segmentIndex}`)
 );
+
 const circuitPaths = computed({
   get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
   set: (val) => {
@@ -415,6 +272,141 @@ const isInteracting = computed(() =>
     isSelecting.value ||
     contextMenu.value.show
 );
+
+const onRemoveRack = (index: number) => {
+  triggerConfirm({
+    title: 'Supprimer le rack',
+    message: 'Voulez-vous vraiment supprimer ce rack ?',
+    onConfirm: () => {
+      takeSnapshot();
+      removeRack(index);
+    }
+  });
+};
+
+const onConfirmDeletePillar = (index: number | number[]) => {
+  const count = Array.isArray(index) ? index.length : 1;
+  triggerConfirm({
+    title: 'Supprimer les poteaux',
+    message: `Voulez-vous vraiment supprimer ${count > 1 ? 'ces ' + count + ' poteaux' : 'ce poteau'} ?`,
+    onConfirm: () => {
+      onDeletePillar(index);
+    }
+  });
+};
+
+const onConfirmDeleteFootprint = (id: string) => {
+  triggerConfirm({
+    title: 'Supprimer la surface au sol',
+    message: 'Voulez-vous vraiment supprimer cette surface au sol ?',
+    onConfirm: () => {
+      takeSnapshot();
+      deleteFootprint(id);
+      if (selectedFootprintId.value === id) {
+        selectFootprint(null);
+      }
+    }
+  });
+};
+
+const onConfirmDeleteCircuitSelection = () => {
+  triggerConfirm({
+    title: 'Supprimer la sélection de circuit',
+    message: 'Voulez-vous vraiment supprimer les segments de circuit sélectionnés ?',
+    onConfirm: () => {
+      deleteSelectedCircuitSegments();
+    }
+  });
+};
+
+const onConfirmDeletePod = (podId: string) => {
+  triggerConfirm({
+    title: 'Supprimer le pod',
+    message: 'Voulez-vous vraiment supprimer ce pod ?',
+    onConfirm: () => {
+      takeSnapshot();
+      deletePod(podId);
+    }
+  });
+};
+
+const onDeletePillar = (index: number | number[]) => {
+  takeSnapshot();
+  const indicesToDelete = Array.isArray(index) ? [...index].sort((a, b) => b - a) : [index];
+  indicesToDelete.forEach(idx => {
+    removePillar(idx);
+  });
+};
+
+const onStartDragPillar = (event: MouseEvent, index: number) => {
+  if (event.button !== 0) return;
+  takeSnapshot();
+  draggingPillarIndex.value = index;
+};
+
+const onStartDragWall = (_event: MouseEvent, index: number, isHorizontal: boolean) => {
+  takeSnapshot();
+  startDraggingWall(index, isHorizontal);
+};
+
+const onSelectFootprint = (id: string) => {
+  selectFootprint(id);
+  selectedRackIndices.value = [];
+  isWallSelected.value = false;
+  selectedPillarIndices.value = [];
+};
+
+const onSelectPillar = (event: MouseEvent, index: number) => {
+  event.stopPropagation();
+
+  const visited = new Set<number>();
+  const toVisit = [index];
+  const allPillars = layers.value[currentLayerIndex.value]?.pillars ?? [];
+
+  while (toVisit.length > 0) {
+    const currentIdx = toVisit.pop()!;
+    if (visited.has(currentIdx)) continue;
+
+    visited.add(currentIdx);
+    const currentPillar = allPillars[currentIdx];
+    if (!currentPillar) continue;
+
+    // Trouver les adjacents
+    allPillars.forEach((p, pIdx) => {
+      if (!visited.has(pIdx)) {
+        const dx = Math.abs(p.x - currentPillar.x);
+        const dy = Math.abs(p.y - currentPillar.y);
+
+        // Adjacents si distance est de 20px (taille d'une unité de grille) sur un axe et 0 sur l'autre
+        if ((dx === 20 && dy === 0) || (dx === 0 && dy === 20)) {
+          toVisit.push(pIdx);
+        }
+      }
+    });
+  }
+
+  selectedPillarIndices.value = Array.from(visited);
+  selectedRackIndices.value = [];
+  isWallSelected.value = false;
+  selectFootprint(null);
+};
+
+const triggerClearWalls = () => {
+  triggerConfirm({
+    title: 'Supprimer la pièce',
+    message: 'Voulez-vous vraiment supprimer la pièce ainsi que tous les racks et pods à l\'intérieur ?',
+    confirmText: 'Supprimer',
+    onConfirm: () => {
+      takeSnapshot();
+      clearLayers();
+      wallsRef.value = [];
+      currentLayerIndex.value = 0;
+      isWallSelected.value = false;
+      selectedRackIndices.value = [];
+      cancelDrawingWalls();
+    }
+  });
+};
 
 const addRack = () => {
   if (currentLayerIndex.value === 0) return;
@@ -958,7 +950,6 @@ const pasteFromClipboard = async () => {
     console.error('Failed to paste from clipboard: ', err);
   }
 };
-
 
 const save = async () => {
   try {
