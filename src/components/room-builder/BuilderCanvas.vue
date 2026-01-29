@@ -298,7 +298,7 @@ defineExpose({svgRef});
               :y2="walls[(index + 1) % walls.length]!.y"
               stroke="transparent"
               stroke-width="10"
-              style="cursor: move;"
+              :style="{ cursor: Math.abs(point.y - (walls[(index + 1) % walls.length]?.y ?? 0)) < 1 ? 'ns-resize' : 'ew-resize' }"
               @mousedown.stop="$emit('start-drag-wall', $event, index, Math.abs(point.y - (walls[(index + 1) % walls.length]?.y ?? 0)) < 1)"
           />
         </g>
