@@ -1,19 +1,25 @@
-<script setup lang="ts">
-defineProps<{
+<script lang="ts">
+type Props = {
   show: boolean;
   x: number;
   y: number;
   options: { type: string; podId?: string; footprintId?: string };
-}>();
+}
 
-defineEmits<{
+type Emits = {
   (e: 'create-pod'): void;
   (e: 'leave-pod'): void;
   (e: 'delete-pod', podId: string): void;
   (e: 'create-footprint'): void;
   (e: 'delete-footprint', footprintId: string): void;
   (e: 'change-footprint-color', footprintId: string): void;
-}>();
+}
+</script>
+
+<script setup lang="ts">
+defineProps<Props>();
+
+defineEmits<Emits>();
 </script>
 
 <template>

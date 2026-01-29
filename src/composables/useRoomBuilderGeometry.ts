@@ -23,9 +23,10 @@ export const useRoomBuilderGeometry = () => {
 
       podRacks.forEach(rack => {
         const corners = getRackCorners(rack);
+        const rotation = typeof rack.rotation === 'number' ? rack.rotation : 0;
 
-        if (rack.rotation) {
-          const angle = (rack.rotation * Math.PI) / 180;
+        if (rotation) {
+          const angle = (rotation * Math.PI) / 180;
           const cx = rack.x + rackWidth / 2;
           const cy = rack.y + rackHeight / 2;
 

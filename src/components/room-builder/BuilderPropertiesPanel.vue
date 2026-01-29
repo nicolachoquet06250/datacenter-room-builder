@@ -1,24 +1,19 @@
-<script setup lang="ts">
-import { computed } from 'vue';
-import RackPanel from "../properties-panel/RackPanel.vue";
-import PillarPanel from "../properties-panel/PillarPanel.vue";
-import MultipleRackPanel from "../properties-panel/MultipleRackPanel.vue";
-import FootprintPanel from "../properties-panel/FootprintPanel.vue";
-import CircuitPanel from "../properties-panel/CircuitPanel.vue";
-
-const props = defineProps<{
+<script lang="ts">
+type Props = {
   selectedRackIndices: number[];
   racks: Array<Rack | string>;
   isWallSelected: boolean;
-  selectedPillarIndex: number | null;
+  walls: Point[];
+  unitCount: number;
+  selectedPillarIndices: number[];
   pillars: Point[];
   selectedFootprint: Footprint | null;
   selectedCircuitSegments: Array<{ pathIndex: number; segmentIndex: number }>;
   circuits: Point[][];
   contextMenuOptions: { type: string; podId?: string };
-}>();
+}
 
-const emit = defineEmits<{
+type Emits = {
   (e: 'remove-rack', index: number): void;
   (e: 'create-pod'): void;
   (e: 'leave-pod'): void;
@@ -26,15 +21,32 @@ const emit = defineEmits<{
   (e: 'clear-selection'): void;
   (e: 'update-rack-name', value: string): void;
   (e: 'update-rack-rotation', value: number): void;
-  (e: 'delete-pillar', index: number): void;
+  (e: 'delete-pillar', index: number | number[]): void;
   (e: 'delete-footprint', id: string): void;
   (e: 'change-footprint-color', id: string): void;
   (e: 'delete-circuit-selection'): void;
-}>();
+}
+</script>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import RackPanel from "../properties-panel/RackPanel.vue";
+import PillarPanel from "../properties-panel/PillarPanel.vue";
+import MultipleRackPanel from "../properties-panel/MultipleRackPanel.vue";
+import FootprintPanel from "../properties-panel/FootprintPanel.vue";
+import CircuitPanel from "../properties-panel/CircuitPanel.vue";
+import RoomPropertiesPanel from "../properties-panel/RoomPropertiesPanel.vue";
+import {useLayers} from "../../composables/useLayers.ts";
+
+const props = defineProps<Props>();
+
+const emit = defineEmits<Emits>();
+
+const {currentLayerIndex} = useLayers(computed(() => props.walls));
 
 const selectedPillar = computed(() => {
-  if (props.selectedPillarIndex === null) return null;
-  return props.pillars[props.selectedPillarIndex] ?? null;
+  if (props.selectedPillarIndices.length === 0) return null;
+  return props.pillars[props.selectedPillarIndices[0]!] ?? null;
 });
 
 const selectedRack = computed(() => {
@@ -66,10 +78,18 @@ const onRotationChange = (event: Event) => {
     />
   </div>
 
-  <div v-else-if="selectedPillarIndex !== null" class="properties-panel">
+  <div v-else-if="isWallSelected && currentLayerIndex === 0" class="properties-panel">
+    <RoomPropertiesPanel
+      :wall-count="walls.length"
+      :unit-count="unitCount"
+    />
+  </div>
+
+  <div v-else-if="selectedPillarIndices.length > 0" class="properties-panel">
     <PillarPanel
       :selected-pillar="selectedPillar"
-      :selected-pillar-index="selectedPillarIndex"
+      :selected-pillar-indices="selectedPillarIndices"
+      @delete-pillar="$emit('delete-pillar', selectedPillarIndices)"
     />
   </div>
 

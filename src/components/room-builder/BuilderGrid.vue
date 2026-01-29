@@ -1,8 +1,12 @@
-<script setup lang="ts">
-defineProps<{
+<script lang="ts">
+type Props = {
   zoomLevel: number,
   panOffset: Point
-}>()
+}
+</script>
+
+<script setup lang="ts">
+defineProps<Props>()
 </script>
 
 <template>

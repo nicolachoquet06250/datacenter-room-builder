@@ -1,12 +1,18 @@
-<script setup lang="ts">
-defineProps<{
+<script lang="ts">
+type Props = {
   footprint: Footprint
-}>()
+}
 
-defineEmits<{
+type Emits = {
   (e: 'delete-footprint', id: string): void;
   (e: 'change-color', id: string): void;
-}>()
+}
+</script>
+
+<script setup lang="ts">
+defineProps<Props>()
+
+defineEmits<Emits>()
 </script>
 
 <template>

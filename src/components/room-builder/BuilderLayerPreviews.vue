@@ -1,8 +1,5 @@
-<script setup lang="ts">
-import {inject} from "vue";
-import {type ExposedFunctions, exposedFunctions} from "../RoomBuilder.vue";
-
-defineProps<{
+<script lang="ts">
+type Props = {
   layers: Layer[];
   viewportRect: Point & Size;
   rackWidth: number;
@@ -11,7 +8,14 @@ defineProps<{
   wallPreviewPoint: Point | null;
   isDrawingCircuit: boolean;
   circuitPreviewPoint: Point | null;
-}>();
+}
+</script>
+
+<script setup lang="ts">
+import {inject} from "vue";
+import {type ExposedFunctions, exposedFunctions} from "../RoomBuilder.vue";
+
+defineProps<Props>();
 
 const currentLayerIndex = defineModel<number>('currentLayerIndex');
 
@@ -133,6 +137,20 @@ const {
               stroke-width="3"
               stroke-linejoin="round"
               stroke-linecap="round"
+              opacity="0.8"
+            />
+          </g>
+          
+          <!-- Poteaux -->
+          <g v-if="layer.pillars?.length">
+            <rect
+              v-for="(pillar, pIdx) in layer.pillars"
+              :key="`preview-pillar-${layer.id}-${pIdx}`"
+              :x="pillar.x - 10"
+              :y="pillar.y - 10"
+              :width="20"
+              :height="20"
+              fill="#333"
               opacity="0.8"
             />
           </g>

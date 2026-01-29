@@ -1,7 +1,11 @@
-<script setup lang="ts">
-defineEmits<{
+<script lang="ts">
+type Emits = {
   (e: 'delete-pod'): void
-}>()
+}
+</script>
+
+<script setup lang="ts">
+defineEmits<Emits>()
 </script>
 
 <template>

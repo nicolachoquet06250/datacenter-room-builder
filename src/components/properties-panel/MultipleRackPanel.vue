@@ -1,17 +1,23 @@
-<script setup lang="ts">
-import * as pods from "./pods";
-
-defineProps<{
+<script lang="ts">
+type Props = {
   selectedRackIndices: number[];
   contextMenuOptions: {type: string, podId?: string}
-}>();
+}
 
-defineEmits<{
+type Emits = {
   (e: 'create-pod'): void;
   (e: 'leave-pod'): void;
   (e: 'delete-pod'): void;
   (e: 'clear-selection'): void;
-}>();
+}
+</script>
+
+<script setup lang="ts">
+import * as pods from "./pods";
+
+defineProps<Props>();
+
+defineEmits<Emits>();
 </script>
 
 <template>

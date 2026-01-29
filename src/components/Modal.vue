@@ -1,13 +1,22 @@
-<script setup lang="ts">
-defineProps<{
+<script lang="ts">
+type Props = {
   show: boolean;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
-}>();
+}
 
-const emit = defineEmits(['confirm', 'cancel']);
+type Emits = {
+  (e: 'confirm'): void,
+  (e: 'cancel'): void
+}
+</script>
+
+<script setup lang="ts">
+defineProps<Props>();
+
+const emit = defineEmits<Emits>();
 
 const confirm = () => {
   emit('confirm');

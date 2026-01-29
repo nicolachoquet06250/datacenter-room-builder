@@ -30,8 +30,9 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
 
     onMounted(() => {
         if (defaultLayers && defaultLayers.value.length > 0) {
+            let initialLayers: Layer[];
             if (defaultLayers.value[0]!.name === layerNames[0]) {
-                layers.value = defaultLayers.value.map((layer) => ({
+                initialLayers = defaultLayers.value.map((layer) => ({
                     ...layer,
                     pillars: layer.pillars ?? [],
                     circuits: Array.isArray(layer.circuits?.[0])
@@ -39,7 +40,7 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
                         : (layer.circuits?.length ? [layer.circuits as unknown as Point[]] : [])
                 }));
             } else {
-                layers.value = [
+                initialLayers = [
                     {
                         id: 0,
                         name: layerNames[0],
@@ -48,7 +49,7 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
                         walls: defaultLayers.value[0]!.walls,
                         footprints: [],
                         circuits: [],
-                        pillars: defaultLayers.value[0]!.pillars
+                        pillars: defaultLayers.value[0]!.pillars ?? []
                     },
                     ...defaultLayers.value.map((layer) => ({
                         ...layer,
@@ -59,6 +60,14 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
                     }))
                 ];
             }
+
+            // S'assurer que tous les calques ont les mêmes poteaux
+            const allPillars = initialLayers.find(l => l.pillars && l.pillars.length > 0)?.pillars || [];
+            layers.value = initialLayers.map(l => ({
+                ...l,
+                pillars: JSON.parse(JSON.stringify(allPillars))
+            }));
+
             currentLayerIndex.value = 0;
         }
     })

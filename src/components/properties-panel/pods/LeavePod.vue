@@ -1,11 +1,17 @@
-<script setup lang="ts">
-defineProps<{
+<script lang="ts">
+type Props = {
   podId: string;
-}>()
+}
 
-defineEmits<{
+type Emits = {
   (e: 'leave-pod'): void
-}>()
+};
+</script>
+
+<script setup lang="ts">
+defineProps<Props>()
+
+defineEmits<Emits>()
 </script>
 
 <template>

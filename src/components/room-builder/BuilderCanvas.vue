@@ -1,14 +1,7 @@
 <script lang="ts">
 const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
-</script>
 
-<script setup lang="ts">
-import {computed, inject, ref} from 'vue';
-import {exposedFunctions} from "../RoomBuilder.vue";
-import type {ExposedFunctions} from "../RoomBuilder.vue";
-import BuilderGrid from "./BuilderGrid.vue";
-
-const props = withDefaults(defineProps<{
+type Props = {
   layers: Layer[];
   currentLayerIndex: number;
   walls: Point[];
@@ -27,7 +20,7 @@ const props = withDefaults(defineProps<{
   isWallSelected: boolean;
   isDrawingPillar: boolean;
   pillarPreviewPoint: Point | null;
-  selectedPillarIndex: number | null;
+  selectedPillarIndices: number[];
   rackWidth: number;
   rackHeight: number;
   isInteracting: boolean;
@@ -35,11 +28,9 @@ const props = withDefaults(defineProps<{
   hoveredUnit: Point | null;
   selectedFootprintId: string | null;
   selectedCircuitSegmentKeys: string[];
-}>(), {
-  selectedPillarIndex: null
-});
+}
 
-const emit = defineEmits<{
+type Emits = {
   (e: 'deselect', event: MouseEvent): void;
   (e: 'mousemove-svg', event: MouseEvent): void;
   (e: 'start-drag', event: MouseEvent, index: number): void;
@@ -54,7 +45,20 @@ const emit = defineEmits<{
   (e: 'select-circuit-segment', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
   (e: 'select-circuit-path', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
   (e: 'select-footprint', id: string): void;
-}>();
+}
+</script>
+
+<script setup lang="ts">
+import {computed, inject, ref} from 'vue';
+import {exposedFunctions} from "../RoomBuilder.vue";
+import type {ExposedFunctions} from "../RoomBuilder.vue";
+import BuilderGrid from "./BuilderGrid.vue";
+
+const props = withDefaults(defineProps<Props>(), {
+  selectedPillarIndices: () => []
+});
+
+const emit = defineEmits<Emits>();
 
 const svgRef = ref<SVGSVGElement | null>(null);
 const lastCircuitPoint = computed(() => {
@@ -185,6 +189,7 @@ defineExpose({svgRef});
                 text-anchor="middle"
                 dominant-baseline="middle"
                 class="rack-label"
+                :transform="`rotate(${- (rack?.rotation || 0)}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
             >
               {{ rack.name }}
             </text>
@@ -271,23 +276,6 @@ defineExpose({svgRef});
             stroke-width="1"
             stroke-linejoin="round"
         />
-
-        <template v-if="layers[currentLayerIndex]">
-          <rect
-              v-for="(pillar, pIdx) in layers[currentLayerIndex]!.pillars"
-              :key="`pillar-active-${pIdx}`"
-              :x="pillar.x - 10"
-              :y="pillar.y - 10"
-              :width="20"
-              :height="20"
-              :fill="selectedPillarIndex === pIdx ? '#0d6efd' : '#333'"
-              :stroke="selectedPillarIndex === pIdx ? '#fff' : 'none'"
-              :stroke-width="selectedPillarIndex === pIdx ? 2 : 0"
-              :style="{ cursor: isDrawingPillar ? 'crosshair' : 'pointer' }"
-              @mousedown.stop="handleSelectPillar($event, pIdx)"
-              @contextmenu.prevent="$emit('delete-pillar', pIdx)"
-          />
-        </template>
 
         <rect
             v-if="isDrawingPillar && pillarPreviewPoint"
@@ -488,6 +476,22 @@ defineExpose({svgRef});
               </template>
             </g>
           </template>
+        </g>
+
+        <g v-if="currentLayerIndex === 0 && layers[0]?.pillars?.length" class="pillars-layer">
+          <rect
+              v-for="(pillar, pIdx) in layers[0]!.pillars"
+              :key="`pillar-global-${pIdx}`"
+              :x="pillar.x - 10"
+              :y="pillar.y - 10"
+              :width="20"
+              :height="20"
+              :fill="selectedPillarIndices.includes(pIdx) ? '#0d6efd' : '#333'"
+              :stroke="selectedPillarIndices.includes(pIdx) ? '#fff' : 'none'"
+              :stroke-width="selectedPillarIndices.includes(pIdx) ? 2 : 0"
+              :style="{ cursor: isDrawingPillar ? 'crosshair' : 'pointer' }"
+              @mousedown.stop="handleSelectPillar($event, pIdx)"
+          />
         </g>
       </g>
     </g>

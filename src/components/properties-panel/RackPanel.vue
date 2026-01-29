@@ -1,15 +1,21 @@
-<script setup lang="ts">
-defineProps<{
+<script lang="ts">
+type Props = {
   podId?: string|null,
   name: string,
   rotation?: number|null
-}>()
+}
 
-defineEmits<{
+type Emits = {
   (e: 'remove-rack'): void;
   (e: 'name-updated', evt: Event): void;
   (e: 'rotation-changed', evt: Event): void;
-}>()
+}
+</script>
+
+<script setup lang="ts">
+defineProps<Props>()
+
+defineEmits<Emits>()
 </script>
 
 <template>

@@ -5,6 +5,16 @@ export type ExposedFunctions = {
   getWallBoundingBox(walls?: Point[] | undefined): (MinPoint & MaxPoint & Size) | null;
   getPodBoundaries(racks: Rack[], pods: { id: string; name: string }[]): Array<(Point & Size & { id: string }) | null>;
 }
+
+type Props = {
+  roomId: number;
+  roomName: string;
+  layers?: Layer[] | string;
+}
+
+type Emits = {
+  (e: 'saved', payload: { layers: Layer[] }): void;
+}
 </script>
 
 <script setup lang="ts">
@@ -26,7 +36,6 @@ import {usePan} from "../composables/usePan.ts";
 import {useContextMenu} from "../composables/useContextMenu.ts";
 import {usePodsCrud} from "../composables/usePodsCrud.ts";
 import {useRacksCrud} from "../composables/useRacksCrud.ts";
-import {useWalls} from "../composables/useWalls.ts";
 import {useZoom} from "../composables/useZoom.ts";
 import {useModal} from "../composables/useModal.ts";
 import {useFootprints} from "../composables/useFootprints.ts";
@@ -34,15 +43,13 @@ import {useWallResizer} from "../composables/useWallResizer.ts";
 import {usePillars} from "../composables/usePillars.ts";
 
 const props = withDefaults(
-  defineProps<{
-    roomId: number;
-    roomName: string;
-    layers?: Layer[] | string;
-  }>(),
+  defineProps<Props>(),
   {
     layers: () => []
   }
 );
+
+const emit = defineEmits<Emits>();
 
 const propsLayers = computed<Layer[]>(() => typeof props.layers === 'string' ? JSON.parse(props.layers) : props.layers)
 
@@ -50,15 +57,32 @@ watchEffect(() => {
   console.log(propsLayers.value)
 })
 
-const emit = defineEmits<{
-  (e: 'saved', payload: { layers: Layer[] }): void;
-}>();
-
 const {
   getPodBoundaries, getWallBoundingBox,
   getConstrainedPoint,
   isPointInPolygon
 } = useRoomBuilderGeometry();
+
+const roomUnitCount = computed(() => {
+  const currentWalls = layers.value[0]?.walls || walls.value;
+  if (currentWalls.length < 3) return 0;
+  
+  const bbox = getWallBoundingBox(currentWalls);
+  if (!bbox) return 0;
+  
+  let count = 0;
+  const step = 20; // Taille de la grille
+  
+  for (let x = Math.floor(bbox.minX / step) * step; x <= bbox.maxX; x += step) {
+    for (let y = Math.floor(bbox.minY / step) * step; y <= bbox.maxY; y += step) {
+      if (isPointInPolygon(x + step / 2, y + step / 2, currentWalls)) {
+        count++;
+      }
+    }
+  }
+  return count;
+});
+
 const {error: notifyError, success: notifySuccess} = useNotify();
 
 const {
@@ -132,13 +156,78 @@ const {
 const {
   isDrawingPillar,
   pillarPreviewPoint,
-  selectedPillarIndex,
+  selectedPillarIndices,
   draggingPillarIndex,
   addPillar,
-  removePillar: onDeletePillar,
+  removePillar,
   movePillar,
   toggleIsDrawingPillar
 } = usePillars(walls);
+
+const onRemoveRack = (index: number) => {
+  triggerConfirm({
+    title: 'Supprimer le rack',
+    message: 'Voulez-vous vraiment supprimer ce rack ?',
+    onConfirm: () => {
+      takeSnapshot();
+      removeRack(index);
+    }
+  });
+};
+
+const onConfirmDeletePillar = (index: number | number[]) => {
+  const count = Array.isArray(index) ? index.length : 1;
+  triggerConfirm({
+    title: 'Supprimer les poteaux',
+    message: `Voulez-vous vraiment supprimer ${count > 1 ? 'ces ' + count + ' poteaux' : 'ce poteau'} ?`,
+    onConfirm: () => {
+      onDeletePillar(index);
+    }
+  });
+};
+
+const onConfirmDeleteFootprint = (id: string) => {
+  triggerConfirm({
+    title: 'Supprimer la surface au sol',
+    message: 'Voulez-vous vraiment supprimer cette surface au sol ?',
+    onConfirm: () => {
+      takeSnapshot();
+      deleteFootprint(id);
+      if (selectedFootprintId.value === id) {
+        selectFootprint(null);
+      }
+    }
+  });
+};
+
+const onConfirmDeleteCircuitSelection = () => {
+  triggerConfirm({
+    title: 'Supprimer la sélection de circuit',
+    message: 'Voulez-vous vraiment supprimer les segments de circuit sélectionnés ?',
+    onConfirm: () => {
+      deleteSelectedCircuitSegments();
+    }
+  });
+};
+
+const onConfirmDeletePod = (podId: string) => {
+  triggerConfirm({
+    title: 'Supprimer le pod',
+    message: 'Voulez-vous vraiment supprimer ce pod ?',
+    onConfirm: () => {
+      takeSnapshot();
+      deletePod(podId);
+    }
+  });
+};
+
+const onDeletePillar = (index: number | number[]) => {
+  takeSnapshot();
+  const indicesToDelete = Array.isArray(index) ? [...index].sort((a, b) => b - a) : [index];
+  indicesToDelete.forEach(idx => {
+    removePillar(idx);
+  });
+};
 
 const onStartDragPillar = (event: MouseEvent, index: number) => {
   if (event.button !== 0) return;
@@ -160,14 +249,42 @@ const onSelectFootprint = (id: string) => {
   selectFootprint(id);
   selectedRackIndices.value = [];
   isWallSelected.value = false;
-  selectedPillarIndex.value = null;
+  selectedPillarIndices.value = [];
 };
 
 const onSelectPillar = (event: MouseEvent, index: number) => {
   event.stopPropagation();
-  selectedPillarIndex.value = index;
+  
+  const visited = new Set<number>();
+  const toVisit = [index];
+  const allPillars = layers.value[currentLayerIndex.value]?.pillars ?? [];
+  
+  while (toVisit.length > 0) {
+    const currentIdx = toVisit.pop()!;
+    if (visited.has(currentIdx)) continue;
+    
+    visited.add(currentIdx);
+    const currentPillar = allPillars[currentIdx];
+    if (!currentPillar) continue;
+    
+    // Trouver les adjacents
+    allPillars.forEach((p, pIdx) => {
+      if (!visited.has(pIdx)) {
+        const dx = Math.abs(p.x - currentPillar.x);
+        const dy = Math.abs(p.y - currentPillar.y);
+        
+        // Adjacents si distance est de 20px (taille d'une unité de grille) sur un axe et 0 sur l'autre
+        if ((dx === 20 && dy === 0) || (dx === 0 && dy === 20)) {
+          toVisit.push(pIdx);
+        }
+      }
+    });
+  }
+  
+  selectedPillarIndices.value = Array.from(visited);
   selectedRackIndices.value = [];
   isWallSelected.value = false;
+  selectFootprint(null);
 };
 
 const {
@@ -185,19 +302,26 @@ const {
 const {pods, createPod, selectPod, leavePod, deletePod} = usePodsCrud(props.roomId);
 
 const {
-  showClearModal, clearModalConfig,
-  triggerClearWalls, cancelModal
-} = useModal(() => {
-  takeSnapshot();
-  clearLayers();
-  wallsRef.value = [];
-  currentLayerIndex.value = 0;
-  isWallSelected.value = false;
-  selectedRackIndices.value = [];
-  cancelDrawingWalls();
-});
+  showModal, modalConfig,
+  triggerConfirm, cancelModal
+} = useModal();
 
-const {selectWall: selectWallInternal} = useWalls(props.roomId);
+const triggerClearWalls = () => {
+  triggerConfirm({
+    title: 'Supprimer la pièce',
+    message: 'Voulez-vous vraiment supprimer la pièce ainsi que tous les racks et pods à l\'intérieur ?',
+    confirmText: 'Supprimer',
+    onConfirm: () => {
+      takeSnapshot();
+      clearLayers();
+      wallsRef.value = [];
+      currentLayerIndex.value = 0;
+      isWallSelected.value = false;
+      selectedRackIndices.value = [];
+      cancelDrawingWalls();
+    }
+  });
+};
 
 const roomName = ref(props.roomName);
 const circuitPreviewPoint = ref<Point | null>(null);
@@ -283,7 +407,11 @@ const addRack = () => {
 const selectWall = (event: MouseEvent) => {
   if (currentLayerIndex.value === 0) {
     event.stopPropagation();
-    selectWallInternal();
+    isWallSelected.value = true;
+    selectedRackIndices.value = [];
+    selectedPillarIndices.value = [];
+    selectedFootprintId.value = null;
+    selectedCircuitSegments.value = [];
   }
 };
 
@@ -496,8 +624,9 @@ const deselect = (event: MouseEvent) => {
     if (!isFootprintClick) {
       selectedRackIndices.value = [];
       isWallSelected.value = false;
-      selectedPillarIndex.value = null;
+      selectedPillarIndices.value = [];
       selectFootprint(null);
+      selectedCircuitSegments.value = [];
     }
 
     const svg = event.currentTarget as SVGSVGElement;
@@ -699,12 +828,18 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
     if (selectedRackIndices.value.length > 0) {
       event.preventDefault();
-      takeSnapshot();
-      const sortedIndices = [...selectedRackIndices.value].sort((a, b) => b - a);
-      sortedIndices.forEach(index => {
-        racks.value.splice(index, 1);
+      triggerConfirm({
+        title: 'Supprimer les racks',
+        message: `Voulez-vous vraiment supprimer les ${selectedRackIndices.value.length} racks sélectionnés ?`,
+        onConfirm: () => {
+          takeSnapshot();
+          const sortedIndices = [...selectedRackIndices.value].sort((a, b) => b - a);
+          sortedIndices.forEach(index => {
+            racks.value.splice(index, 1);
+          });
+          selectedRackIndices.value = [];
+        }
       });
-      selectedRackIndices.value = [];
       return;
     }
 
@@ -716,21 +851,39 @@ const handleKeyDown = (event: KeyboardEvent) => {
 
     if (selectedCircuitSegments.value.length > 0) {
       event.preventDefault();
-      deleteSelectedCircuitSegments();
+      triggerConfirm({
+        title: 'Supprimer les segments de circuit',
+        message: 'Voulez-vous vraiment supprimer les segments de circuit sélectionnés ?',
+        onConfirm: () => {
+          deleteSelectedCircuitSegments();
+        }
+      });
       return;
     }
 
-    if (selectedPillarIndex.value !== null) {
+    if (selectedPillarIndices.value.length > 0) {
       event.preventDefault();
-      onDeletePillar(selectedPillarIndex.value);
+      triggerConfirm({
+        title: 'Supprimer les poteaux',
+        message: `Voulez-vous vraiment supprimer les ${selectedPillarIndices.value.length} poteaux sélectionnés ?`,
+        onConfirm: () => {
+          onDeletePillar(selectedPillarIndices.value);
+        }
+      });
       return;
     }
 
     if (selectedFootprintId.value !== null) {
       event.preventDefault();
-      takeSnapshot();
-      deleteFootprint(selectedFootprintId.value);
-      selectFootprint(null);
+      triggerConfirm({
+        title: 'Supprimer la surface au sol',
+        message: 'Voulez-vous vraiment supprimer la surface au sol sélectionnée ?',
+        onConfirm: () => {
+          takeSnapshot();
+          deleteFootprint(selectedFootprintId.value!);
+          selectFootprint(null);
+        }
+      });
       return;
     }
   }
@@ -803,6 +956,9 @@ watch(currentLayerIndex, () => {
   currentCircuitPathIndex.value = null;
   selectedCircuitSegments.value = [];
   hoveredUnit.value = null;
+  selectedPillarIndices.value = [];
+  selectedFootprintId.value = null;
+  selectedUnits.value = [];
 });
 
 watch(() => props.roomId, async (newId) => {
@@ -835,138 +991,140 @@ provide<ExposedFunctions>(exposedFunctions, {
         style="pointer-events: none;"
     />
     <BuilderToolbar
-      v-model:room-name="roomName"
-      :undo-disabled="undoStack.length === 0"
-      :redo-disabled="redoStack.length === 0"
-      :can-add-rack="walls.length > 2"
-      :show-add-rack="currentLayerIndex === 3"
-      :can-clear-walls="walls.length > 0"
-      :is-drawing-walls="isDrawingWalls"
-      :is-drawing-pillar="isDrawingPillar"
-      :zoom-level="zoomLevel"
-      :can-zoom-out="zoomLevel > 0.2"
-      :can-zoom-in="zoomLevel < 3"
-      :selected-layout-index="currentLayerIndex"
+        v-model:room-name="roomName"
+        :undo-disabled="undoStack.length === 0"
+        :redo-disabled="redoStack.length === 0"
+        :can-add-rack="walls.length > 2"
+        :show-add-rack="currentLayerIndex === 3"
+        :can-clear-walls="walls.length > 0"
+        :is-drawing-walls="isDrawingWalls"
+        :is-drawing-pillar="isDrawingPillar"
+        :zoom-level="zoomLevel"
+        :can-zoom-out="zoomLevel > 0.2"
+        :can-zoom-in="zoomLevel < 3"
+        :selected-layout-index="currentLayerIndex"
 
-      @undo="undo"
-      @redo="redo"
-      @add-rack="addRack"
-      @toggle-walls="toggleIsDrawingWalls"
-      @toggle-pillar="toggleIsDrawingPillar"
-      @clear-walls="triggerClearWalls"
-      @zoom-out="zoomOut"
-      @zoom-in="zoomIn"
-      @save="save"
+        @undo="undo"
+        @redo="redo"
+        @add-rack="addRack"
+        @toggle-walls="toggleIsDrawingWalls"
+        @toggle-pillar="toggleIsDrawingPillar"
+        @clear-walls="triggerClearWalls"
+        @zoom-out="zoomOut"
+        @zoom-in="zoomIn"
+        @save="save"
     />
 
     <div class="canvas-area">
       <BuilderCanvas
-        ref="canvasComponent"
-        :layers="layers"
-        :current-layer-index="currentLayerIndex"
-        :walls="walls"
-        :racks="racks as Rack[]"
-        :is-drawing-walls="isDrawingWalls"
-        :is-drawing-pillar="isDrawingPillar"
-        :is-drawing-circuit="isDrawingCircuit"
-        :wall-preview-point="wallPreviewPoint"
-        :pillar-preview-point="pillarPreviewPoint"
-        :circuit-preview-point="circuitPreviewPoint"
-        :pod-boundaries="podBoundaries"
-        :wall-bounding-box="wallBoundingBox"
-        :horizontal-coords="horizontalCoords"
-        :vertical-coords="verticalCoords"
-        :selected-rack-indices="selectedRackIndices"
-        :zoom-level="zoomLevel"
-        :pan-offset="panOffset"
-        :is-wall-selected="isWallSelected"
-        :rack-width="rackWidth"
-        :rack-height="rackHeight"
-        :is-interacting="isInteracting"
-        :get-pod-boundaries="getPodBoundaries"
-        :selected-units="selectedUnits"
-        :hovered-unit="hoveredUnit"
-        :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
-        :selected-pillar-index="selectedPillarIndex"
-        :selected-footprint-id="selectedFootprintId"
+          ref="canvasComponent"
+          :layers="layers"
+          :current-layer-index="currentLayerIndex"
+          :walls="walls"
+          :racks="racks as Rack[]"
+          :is-drawing-walls="isDrawingWalls"
+          :is-drawing-pillar="isDrawingPillar"
+          :is-drawing-circuit="isDrawingCircuit"
+          :wall-preview-point="wallPreviewPoint"
+          :pillar-preview-point="pillarPreviewPoint"
+          :circuit-preview-point="circuitPreviewPoint"
+          :pod-boundaries="podBoundaries"
+          :wall-bounding-box="wallBoundingBox"
+          :horizontal-coords="horizontalCoords"
+          :vertical-coords="verticalCoords"
+          :selected-rack-indices="selectedRackIndices"
+          :zoom-level="zoomLevel"
+          :pan-offset="panOffset"
+          :is-wall-selected="isWallSelected"
+          :rack-width="rackWidth"
+          :rack-height="rackHeight"
+          :is-interacting="isInteracting"
+          :get-pod-boundaries="getPodBoundaries"
+          :selected-units="selectedUnits"
+          :hovered-unit="hoveredUnit"
+          :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
+          :selected-pillar-indices="selectedPillarIndices"
+          :selected-footprint-id="selectedFootprintId"
 
-        @deselect="deselect"
-        @mousemove-svg="onMouseMoveSVG"
-        @start-drag="startDragRack"
-        @open-context-menu="openContextMenu"
-        @start-rotate="startRotateRack"
-        @select-pod="selectPod"
-        @select-wall="selectWall($event)"
-        @start-drag-wall="onStartDragWall"
-        @delete-pillar="onDeletePillar"
-        @select-pillar="onSelectPillar"
-        @start-drag-pillar="onStartDragPillar"
-        @select-circuit-segment="selectCircuitSegment"
-        @select-circuit-path="selectCircuitPath"
-        @select-footprint="onSelectFootprint"
+          @deselect="deselect"
+          @mousemove-svg="onMouseMoveSVG"
+          @start-drag="startDragRack"
+          @open-context-menu="openContextMenu"
+          @start-rotate="startRotateRack"
+          @select-pod="selectPod"
+          @select-wall="selectWall($event)"
+          @start-drag-wall="onStartDragWall"
+          @delete-pillar="onConfirmDeletePillar"
+          @select-pillar="onSelectPillar"
+          @start-drag-pillar="onStartDragPillar"
+          @select-circuit-segment="selectCircuitSegment"
+          @select-circuit-path="selectCircuitPath"
+          @select-footprint="onSelectFootprint"
       />
 
       <!-- Bouton de suppression flottant pour les segments de circuit -->
 
       <BuilderContextMenu
-        :show="contextMenu.show"
-        :x="contextMenu.x"
-        :y="contextMenu.y"
-        :options="contextMenuOptions"
+          :show="contextMenu.show"
+          :x="contextMenu.x"
+          :y="contextMenu.y"
+          :options="contextMenuOptions"
 
-        @create-pod="createPod"
-        @leave-pod="leavePod"
-        @delete-pod="deletePod"
-        @create-footprint="createFootprint"
-        @delete-footprint="deleteFootprint"
-        @change-footprint-color="changeFootprintColor"
+          @create-pod="createPod"
+          @leave-pod="leavePod"
+          @delete-pod="onConfirmDeletePod"
+          @create-footprint="createFootprint"
+          @delete-footprint="onConfirmDeleteFootprint"
+          @change-footprint-color="changeFootprintColor"
       />
 
       <Modal
-        :show="showClearModal"
-        :title="clearModalConfig.title"
-        :message="clearModalConfig.message"
-        :confirm-text="clearModalConfig.confirmText"
+          :show="showModal"
+          :title="modalConfig.title"
+          :message="modalConfig.message"
+          :confirm-text="modalConfig.confirmText"
 
-        @confirm="clearModalConfig.onConfirm"
-        @cancel="cancelModal"
+          @confirm="modalConfig.onConfirm"
+          @cancel="cancelModal"
       />
 
       <BuilderPropertiesPanel
-        v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndex !== null || selectedFootprint !== null || selectedCircuitSegments.length > 0"
-        :selected-rack-indices="selectedRackIndices"
-        :racks="racks as Rack[]"
-        :is-wall-selected="isWallSelected"
-        :selected-pillar-index="selectedPillarIndex"
-        :pillars="layers[currentLayerIndex]?.pillars ?? []"
-        :selected-footprint="selectedFootprint"
-        :selected-circuit-segments="selectedCircuitSegments"
-        :circuits="layers[currentLayerIndex]?.circuits ?? []"
-        :context-menu-options="contextMenuOptions"
+          v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndices.length > 0 || selectedFootprint !== null || selectedCircuitSegments.length > 0"
+          :selected-rack-indices="selectedRackIndices"
+          :racks="racks as Rack[]"
+          :is-wall-selected="isWallSelected"
+          :walls="walls"
+          :unit-count="roomUnitCount"
+          :selected-pillar-indices="selectedPillarIndices"
+          :pillars="layers[currentLayerIndex]?.pillars ?? []"
+          :selected-footprint="selectedFootprint"
+          :selected-circuit-segments="selectedCircuitSegments"
+          :circuits="layers[currentLayerIndex]?.circuits ?? []"
+          :context-menu-options="contextMenuOptions"
 
-        @remove-rack="removeRack"
-        @create-pod="createPod"
-        @leave-pod="leavePod"
-        @delete-pod="deletePod"
-        @clear-selection="selectedRackIndices = []"
-        @update-rack-name="updateRackName"
-        @update-rack-rotation="updateRackRotation"
-        @delete-pillar="onDeletePillar"
-        @delete-footprint="deleteFootprint"
-        @change-footprint-color="changeFootprintColor"
-        @delete-circuit-selection="deleteSelectedCircuitSegments"
+          @remove-rack="onRemoveRack"
+          @create-pod="createPod"
+          @leave-pod="leavePod"
+          @delete-pod="onConfirmDeletePod"
+          @clear-selection="selectedRackIndices = []"
+          @update-rack-name="updateRackName"
+          @update-rack-rotation="updateRackRotation"
+          @delete-pillar="onConfirmDeletePillar"
+          @delete-footprint="onConfirmDeleteFootprint"
+          @change-footprint-color="changeFootprintColor"
+          @delete-circuit-selection="onConfirmDeleteCircuitSelection"
       />
 
       <BuilderLayerPreviews
-        v-model:current-layer-index="currentLayerIndex"
-        :layers="layers"
-        :viewport-rect="viewportRect"
-        :rack-width="rackWidth"
-        :rack-height="rackHeight"
-        :is-drawing-walls="isDrawingWalls"
-        :wall-preview-point="wallPreviewPoint"
-        :is-drawing-circuit="isDrawingCircuit"
-        :circuit-preview-point="circuitPreviewPoint"
+          v-model:current-layer-index="currentLayerIndex"
+          :layers="layers"
+          :viewport-rect="viewportRect"
+          :rack-width="rackWidth"
+          :rack-height="rackHeight"
+          :is-drawing-walls="isDrawingWalls"
+          :wall-preview-point="wallPreviewPoint"
+          :is-drawing-circuit="isDrawingCircuit"
+          :circuit-preview-point="circuitPreviewPoint"
       />
     </div>
   </div>

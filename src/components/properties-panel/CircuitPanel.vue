@@ -1,14 +1,20 @@
+<script lang="ts">
+type Props = {
+  selectedSegments: Array<{ pathIndex: number; segmentIndex: number }>;
+  circuits: Point[][];
+}
+
+type Emits = {
+  (e: 'delete-selection'): void;
+}
+</script>
+
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps<{
-  selectedSegments: Array<{ pathIndex: number; segmentIndex: number }>;
-  circuits: Point[][];
-}>();
+const props = defineProps<Props>();
 
-defineEmits<{
-  (e: 'delete-selection'): void;
-}>();
+defineEmits<Emits>();
 
 const sectionCount = computed(() => {
   if (props.selectedSegments.length === 0) return 0;

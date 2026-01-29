@@ -1,5 +1,5 @@
-<script setup lang="ts">
-defineProps<{
+<script lang="ts">
+type Props = {
   undoDisabled: boolean;
   redoDisabled: boolean;
   canAddRack: boolean;
@@ -11,9 +11,9 @@ defineProps<{
   canZoomOut: boolean;
   canZoomIn: boolean;
   selectedLayoutIndex: number | null;
-}>();
+}
 
-defineEmits<{
+type Emits = {
   (e: 'undo'): void;
   (e: 'redo'): void;
   (e: 'addRack'): void;
@@ -23,7 +23,13 @@ defineEmits<{
   (e: 'zoomOut'): void;
   (e: 'zoomIn'): void;
   (e: 'save'): void;
-}>();
+}
+</script>
+
+<script setup lang="ts">
+defineProps<Props>();
+
+defineEmits<Emits>();
 
 const roomName = defineModel<string>('roomName');
 </script>

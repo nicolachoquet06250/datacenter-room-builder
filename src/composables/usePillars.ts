@@ -5,24 +5,24 @@ export const usePillars = (walls: Ref<Point[]>) => {
   const isDrawingPillar = ref(false);
   const pillarPreviewPoint = ref<Point | null>(null);
 
-  const selectedPillarIndex = ref<number | null>(null);
+  const selectedPillarIndices = ref<number[]>([]);
   const draggingPillarIndex = ref<number | null>(null);
 
-  const { layers, currentLayerIndex } = useLayers(walls);
+  const { layers } = useLayers(walls);
 
   const pillars = computed({
-    get: () => layers.value[currentLayerIndex.value]?.pillars ?? [],
+    get: () => layers.value[0]?.pillars ?? [],
     set: (val) => {
-      if (layers.value[currentLayerIndex.value]) {
-        layers.value[currentLayerIndex.value]!.pillars = val;
-      }
+      layers.value.forEach(layer => {
+        layer.pillars = JSON.parse(JSON.stringify(val));
+      });
     }
   });
 
   const toggleIsDrawingPillar = () => {
     isDrawingPillar.value = !isDrawingPillar.value;
     if (isDrawingPillar.value) {
-      selectedPillarIndex.value = null;
+      selectedPillarIndices.value = [];
     } else {
       pillarPreviewPoint.value = null;
     }
@@ -41,9 +41,9 @@ export const usePillars = (walls: Ref<Point[]>) => {
     const newPillars = [...pillars.value];
     newPillars.splice(index, 1);
     pillars.value = newPillars;
-    if (selectedPillarIndex.value === index) {
-      selectedPillarIndex.value = null;
-    }
+    selectedPillarIndices.value = selectedPillarIndices.value
+      .filter(i => i !== index)
+      .map(i => i > index ? i - 1 : i);
   };
 
   const movePillar = (index: number, point: Point) => {
@@ -57,7 +57,7 @@ export const usePillars = (walls: Ref<Point[]>) => {
   return {
     isDrawingPillar,
     pillarPreviewPoint,
-    selectedPillarIndex,
+    selectedPillarIndices,
     draggingPillarIndex,
     pillars,
     toggleIsDrawingPillar,
