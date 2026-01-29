@@ -272,15 +272,6 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     const snapX = Math.floor(x / 20) * 20;
     const snapY = Math.floor(y / 20) * 20;
 
-    const isAlreadyInFootprint = currentLayer.value.footprints?.some(f =>
-        f.units.some((u: any) => u.x === snapX && u.y === snapY)
-    );
-
-    if (isAlreadyInFootprint) {
-      hoveredUnit.value = null;
-      return;
-    }
-
     if (walls.value.length > 2 && !isPointInPolygon(snapX + 10, snapY + 10, walls.value)) {
       hoveredUnit.value = null;
       return;

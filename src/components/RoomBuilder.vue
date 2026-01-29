@@ -382,6 +382,23 @@ const verticalCoords = computed(() => {
   return coords;
 });
 
+const gridLabel = computed(() => {
+  if (!hoveredUnit.value || !wallBoundingBox.value) return '';
+  
+  const iH = Math.floor((hoveredUnit.value.x - wallBoundingBox.value.minX) / 20);
+  const hLabel = (iH + 1).toString();
+  
+  const iV = Math.floor((wallBoundingBox.value.maxY - hoveredUnit.value.y - 1) / 20);
+  const label = String.fromCharCode(65 + (iV % 26));
+  let vLabel = label;
+  if (iV >= 26) {
+    const prefix = String.fromCharCode(65 + Math.floor(iV / 26) - 1);
+    vLabel = prefix + label;
+  }
+  
+  return `${vLabel}${hLabel}`;
+});
+
 const viewportRect = computed(() => ({
   x: -panOffset.value.x,
   y: -panOffset.value.y,
@@ -543,6 +560,20 @@ const onMouseMoveSVG = (event: MouseEvent) => {
       hoveredUnit.value = null;
     } else {
       updateHoveredUnit(x, y);
+    }
+  } else {
+    // Pour les autres layers, on met à jour hoveredUnit si on est dans les murs
+    // pour afficher le tooltip de coordonnées
+    const snapX = Math.floor(x / 20) * 20;
+    const snapY = Math.floor(y / 20) * 20;
+
+    // On vérifie d'abord si on survole un élément qui doit quand même afficher le tooltip
+    const isOverBlockingElement = (event.target as HTMLElement)?.closest('.rack-rect, .pillars-layer rect, .footprint-group');
+
+    if (isOverBlockingElement || (walls.value.length > 2 && isPointInPolygon(snapX + 10, snapY + 10, walls.value))) {
+      hoveredUnit.value = { x: snapX, y: snapY };
+    } else {
+      hoveredUnit.value = null;
     }
   }
 };
@@ -1042,6 +1073,7 @@ provide<ExposedFunctions>(exposedFunctions, {
           :get-pod-boundaries="getPodBoundaries"
           :selected-units="selectedUnits"
           :hovered-unit="hoveredUnit"
+          :grid-label="gridLabel"
           :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
           :selected-pillar-indices="selectedPillarIndices"
           :selected-footprint-id="selectedFootprintId"

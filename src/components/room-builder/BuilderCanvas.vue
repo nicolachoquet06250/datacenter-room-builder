@@ -26,6 +26,7 @@ type Props = {
   isInteracting: boolean;
   selectedUnits: Point[];
   hoveredUnit: Point | null;
+  gridLabel: string;
   selectedFootprintId: string | null;
   selectedCircuitSegmentKeys: string[];
 }
@@ -492,6 +493,26 @@ defineExpose({svgRef});
               :style="{ cursor: isDrawingPillar ? 'crosshair' : 'pointer' }"
               @mousedown.stop="handleSelectPillar($event, pIdx)"
           />
+        </g>
+
+        <g v-if="hoveredUnit && gridLabel" class="grid-tooltip" style="pointer-events: none;">
+          <rect
+              :x="hoveredUnit.x + 2"
+              :y="hoveredUnit.y - 22"
+              :width="gridLabel.length > 2 ? 32 : 24"
+              height="18"
+              rx="3"
+              fill="rgba(0, 0, 0, 0.75)"
+          />
+          <text
+              :x="hoveredUnit.x + (gridLabel.length > 2 ? 18 : 14)"
+              :y="hoveredUnit.y - 10"
+              text-anchor="middle"
+              fill="white"
+              style="font-size: 10px; font-weight: bold; font-family: sans-serif;"
+          >
+            {{ gridLabel }}
+          </text>
         </g>
       </g>
     </g>
