@@ -10,6 +10,7 @@ type Props = {
   roomId: number;
   roomName: string;
   layers?: Layer[] | string;
+  radius?: number
 }
 
 type Emits = {
@@ -45,7 +46,8 @@ import {usePillars} from "../composables/usePillars.ts";
 const props = withDefaults(
   defineProps<Props>(),
   {
-    layers: () => []
+    layers: () => [],
+    radius: 0
   }
 );
 
@@ -1006,12 +1008,6 @@ provide<ExposedFunctions>(exposedFunctions, {
 
 <template>
   <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel" @contextmenu.prevent>
-    <polygon
-        v-if="!isDrawingWalls && (walls.length > 2 || isWallSelected)"
-        :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
-        class="room-surface selected"
-        style="pointer-events: none;"
-    />
     <BuilderToolbar
         v-model:room-name="roomName"
         :undo-disabled="undoStack.length === 0"
@@ -1025,6 +1021,7 @@ provide<ExposedFunctions>(exposedFunctions, {
         :can-zoom-out="zoomLevel > 0.2"
         :can-zoom-in="zoomLevel < 3"
         :selected-layout-index="currentLayerIndex"
+        :radius="radius"
 
         @undo="undo"
         @redo="redo"
@@ -1035,6 +1032,13 @@ provide<ExposedFunctions>(exposedFunctions, {
         @zoom-out="zoomOut"
         @zoom-in="zoomIn"
         @save="save"
+    />
+
+    <polygon
+        v-if="!isDrawingWalls && (walls.length > 2 || isWallSelected)"
+        :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
+        class="room-surface selected"
+        style="pointer-events: none;"
     />
 
     <div class="canvas-area">
@@ -1166,5 +1170,7 @@ provide<ExposedFunctions>(exposedFunctions, {
   position: relative;
   overflow: hidden;
   background: #004a99; /* Bleu iTop Designer */
+  border-bottom-right-radius: v-bind(radius);
+  border-bottom-left-radius: v-bind(radius);
 }
 </style>

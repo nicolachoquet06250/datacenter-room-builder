@@ -11,6 +11,7 @@ type Props = {
   canZoomOut: boolean;
   canZoomIn: boolean;
   selectedLayoutIndex: number | null;
+  radius: number;
 }
 
 type Emits = {
@@ -168,6 +169,8 @@ const roomName = defineModel<string>('roomName');
   color: white;
   font-size: 13px;
   user-select: none;
+  border-top-right-radius: v-bind(radius);
+  border-top-left-radius: v-bind(radius);
 }
 
 .toolbar-section {

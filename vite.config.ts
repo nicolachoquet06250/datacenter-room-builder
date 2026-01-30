@@ -24,7 +24,8 @@ export default defineConfig({
       entry: './src/main.ts',
       name: 'RoomBuilder',
       formats: ['es', 'cjs', 'umd', 'iife'],
-      fileName: () => 'room-builder.webcomponent.js'
+      fileName: () => 'room-builder.webcomponent.js',
+      cssFileName: 'room-builder.webcomponent'
     },
     emptyOutDir: true,
     outDir: './dist',
