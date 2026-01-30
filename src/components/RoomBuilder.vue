@@ -161,6 +161,8 @@ const isDrawingCircuit = ref(false);
 const currentCircuitPathIndex = ref<number | null>(null);
 const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
 
+const radius = computed(() => `${props.radius}px`);
+
 const roomUnitCount = computed(() => {
   const currentWalls = layers.value[0]?.walls || walls.value;
   if (currentWalls.length < 3) return 0;
@@ -1021,7 +1023,7 @@ provide<ExposedFunctions>(exposedFunctions, {
         :can-zoom-out="zoomLevel > 0.2"
         :can-zoom-in="zoomLevel < 3"
         :selected-layout-index="currentLayerIndex"
-        :radius="radius"
+        :radius="props.radius"
 
         @undo="undo"
         @redo="redo"

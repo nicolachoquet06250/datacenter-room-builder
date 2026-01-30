@@ -28,11 +28,15 @@ type Emits = {
 </script>
 
 <script setup lang="ts">
-defineProps<Props>();
+import {computed} from "vue";
+
+const props = defineProps<Props>();
 
 defineEmits<Emits>();
 
 const roomName = defineModel<string>('roomName');
+
+const radius = computed(() => `${props.radius}px`);
 </script>
 
 <template>
