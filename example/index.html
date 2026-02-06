@@ -313,9 +313,15 @@
         // @ts-ignore
         document.body.appendChild(roomBuilder);
 
-        document.querySelector('room-builder')?.addEventListener('saved', event => {
-            console.log('Room saved:', event.detail[0])
-        })
+        document.querySelector('room-builder')?.addEventListener(
+            'saved',
+            /**
+             * @param {CustomEvent<[{layers: Layer[]}]>} event
+             */
+            event => {
+                console.log('Room saved:', event.detail[0])
+            }
+        )
     })
 </script>
 </body>
