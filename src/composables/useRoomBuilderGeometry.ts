@@ -142,7 +142,7 @@ export const useRoomBuilderGeometry = () => {
       }
 
       // On réduit légèrement la taille de l'élément pour la vérification des collisions
-      // afin d'éviter les problèmes de précision aux bords des murs (unité de grille)
+      // afin d'éviter les problèmes de précision aux bords des murs (unité de grille.)
       const margin = 0.1;
       const testX = finalX + (finalX > cx ? -margin : margin);
       const testY = finalY + (finalY > cy ? -margin : margin);

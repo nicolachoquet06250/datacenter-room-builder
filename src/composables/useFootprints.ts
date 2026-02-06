@@ -351,7 +351,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
       y: u.y + snapDeltaY
     }));
 
-    // Optionnel: vérifier si toutes les nouvelles unités sont dans les murs
+    // Optionnel : vérifier si toutes les nouvelles unités sont dans les murs
     if (walls.value.length > 2) {
       const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
       if (!allInside) return;

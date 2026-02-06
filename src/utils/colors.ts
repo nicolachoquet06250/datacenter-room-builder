@@ -1,6 +1,6 @@
 /**
  * Calcule la luminosité d'une couleur hexadécimale et retourne une couleur de contraste (noir ou blanc).
- * @param hexColor La couleur au format hexadécimal (ex: #FFFFFF ou #FFF)
+ * @param hexColor La couleur au format hexadécimal (ex : #FFFFFF ou #FFF)
  * @returns 'white' ou 'black'
  */
 export const getContrastColor = (hexColor: string): 'white' | 'black' => {
