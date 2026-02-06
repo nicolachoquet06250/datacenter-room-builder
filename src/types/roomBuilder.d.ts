@@ -1,9 +1,11 @@
 declare global {
-  export interface Rack extends Point {
+  export interface Rack {
     id: number;
     roomId: number;
     name: string;
-    rotation: number | null;
+    x?: number | null;
+    y?: number | null;
+    rotation?: number | null;
     podId?: string | null;
   }
 
@@ -36,6 +38,17 @@ declare global {
     id: string;
     units: Point[]; // Coordonnées de la grille (multiples de 20)
     color: string;
+    width?: number;
+    height?: number;
+    name?: string;
+  }
+
+  export interface Circuit {
+    id: string;
+    x?: number | null;
+    y?: number | null;
+    rotation?: number | null;
+    name: string;
   }
 
   export interface Layer {
@@ -45,7 +58,7 @@ declare global {
     pods: Pod[];
     walls: Point[];
     footprints: Footprint[];
-    circuits: Point[][];
+    circuits: Circuit[];
     pillars?: Point[];
   }
 }

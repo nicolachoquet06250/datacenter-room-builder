@@ -11,6 +11,9 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   const currentBatch = ref<any[]>([]);
   const hoveredUnit = ref<Point | null>(null);
   const selectedFootprintId = ref<string | null>(null);
+  const draggingFootprintId = ref<string | null>(null);
+  const footprintUnitsBeforeDrag = ref<Point[]>([]);
+  const startMouseSVGPos = { x: 0, y: 0 };
   const { isPointInPolygon } = useRoomBuilderGeometry();
 
   const colors = [
@@ -67,7 +70,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
       currentBatch.value = [];
     }
     
-    // On enregistre l'état APRES avoir éventuellement vidé la sélection si non adjacent
+    // On enregistre l'état APRES avoir éventuellement vidé la sélection si non adjacente
     initialSelection.value = [...selectedUnits.value];
   };
 
@@ -109,7 +112,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         // Pour "obligatoirement former un rectangle complet",
         // on remplace la sélection par le rectangle courant si on drag.
         // Mais on veut peut-être garder ce qui était sélectionné avant le début du drag ?
-        // L'instruction dit "les unitées selectionnées doivent former un rectangle complet".
+        // L'instruction dit "les unites selectionnées doivent former un rectangle complet".
         // On va faire en sorte que pendant le drag, on ajoute le rectangle complet.
         
         // On garde une copie de la sélection initiale au mousedown pour y ajouter le rectangle
@@ -123,7 +126,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         currentBatch.value = rectUnits;
       }
     } else if (selectionMode.value === 'remove') {
-      // Pour le remove, on enlève simplement les unités du rectangle (si elles y sont)
+      // Pour le remove, on enlève simplement les unités du rectangle (si elles y sont.)
       selectedUnits.value = (initialSelection.value ? [...initialSelection.value] : [...selectedUnits.value]).filter(u =>
           !(u.x >= minX && u.x <= maxX && u.y >= minY && u.y <= maxY)
       );
@@ -132,7 +135,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
   const stopSelection = () => {
     if (selectionMode.value === 'add' && currentBatch.value.length > 0) {
-      // S'assurer que toute la sélection est connectée (nettoyage final au cas où le drag aurait créé des déconnexions)
+      // S'assurer que toute la sélection est connectée (nettoyage final au cas où le drag aurait créé des déconnexions.)
       const connected = new Set<string>();
       const stack = [...currentBatch.value];
       const selectedSet = new Set(selectedUnits.value.map(u => `${u.x},${u.y}`));
@@ -160,9 +163,9 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     } else if (selectionMode.value === 'remove' && selectedUnits.value.length > 0) {
         // Si on a supprimé des unités, la sélection restante peut être fragmentée
         // On ne garde que le plus grand bloc ou on laisse tel quel ? 
-        // L'exigence précédente disait "on ne doit garder que les unitées adjacentes selectionnées"
+        // L'exigence précédente disait "on ne doit garder que les unites adjacentes selectionnées"
         // Si on supprime une unité au milieu, on devrait probablement ne garder qu'un seul morceau.
-        // Mais pour l'instant on va rester sur le comportement de "nettoyage" par rapport au dernier point d'interaction
+        // Mais pour l'instant, on va rester sur le comportement de "nettoyage" par rapport au dernier point d'interaction
         // ou simplement laisser tel quel pour la suppression.
     }
 
@@ -188,7 +191,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     const reachableFromOutside = new Set<string>();
     const stack: Point[] = [];
 
-    // On commence le remplissage depuis tout le périmètre (avec une marge de 1 unité)
+    // On commence le remplissage depuis tout le périmètre (avec une marge d'une unité.)
     for (let x = minX - 20; x <= maxX + 20; x += 20) {
       stack.push({ x, y: minY - 20 });
       stack.push({ x, y: maxY + 20 });
@@ -232,8 +235,9 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
       index === self.findIndex((u) => u.x === unit.x && u.y === unit.y)
     );
 
-    const newFootprint: any = {
+    const newFootprint: Footprint = {
       id: nanoid(),
+      name: `Footprint ${currentLayer.value.footprints?.length ? currentLayer.value.footprints.length + 1 : 1}`,
       units: [...uniqueUnits],
       color: getRandomColor()
     };
@@ -287,11 +291,140 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     }
   };
 
+  const startDragFootprint = (event: MouseEvent, id: string) => {
+    if (event.button !== 0) return;
+    draggingFootprintId.value = id;
+    selectedFootprintId.value = id;
+    selectedUnits.value = [];
+
+    const footprint = currentLayer.value.footprints?.find(f => f.id === id);
+    if (footprint) {
+      footprintUnitsBeforeDrag.value = footprint.units.map(u => ({ ...u }));
+    }
+
+    const svg = (event.target as any).ownerSVGElement || (event.currentTarget as any).ownerSVGElement || (event.currentTarget as any);
+    if (svg && svg.createSVGPoint) {
+      const pt = svg.createSVGPoint();
+      pt.x = event.clientX;
+      pt.y = event.clientY;
+      const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+      startMouseSVGPos.x = svgP.x;
+      startMouseSVGPos.y = svgP.y;
+    }
+  };
+
+  const dragFootprint = (event: MouseEvent, zoomLevel: number, panOffset: { x: number, y: number }) => {
+    if (!draggingFootprintId.value) return;
+
+    const svg = (event.target as any).ownerSVGElement || (event.currentTarget as any).ownerSVGElement || (event.currentTarget as any);
+    if (!svg || !svg.createSVGPoint) return;
+
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+
+    const currentX = (svgP.x / zoomLevel) - panOffset.x;
+    const currentY = (svgP.y / zoomLevel) - panOffset.y;
+
+    const footprint = currentLayer.value.footprints?.find(f => f.id === draggingFootprintId.value);
+    if (!footprint || footprintUnitsBeforeDrag.value.length === 0) return;
+
+    // Calculer le delta par rapport au point de départ du drag
+    const startX = (startMouseSVGPos.x / zoomLevel) - panOffset.x;
+    const startY = (startMouseSVGPos.y / zoomLevel) - panOffset.y;
+
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+
+    const snapDeltaX = Math.round(deltaX / 20) * 20;
+    const snapDeltaY = Math.round(deltaY / 20) * 20;
+
+    if (snapDeltaX === 0 && snapDeltaY === 0) {
+      // Si on est revenu à la position de départ (ou proche), on remet les unités d'origine
+      footprint.units = footprintUnitsBeforeDrag.value.map(u => ({ ...u }));
+      return;
+    }
+
+    const newUnits = footprintUnitsBeforeDrag.value.map(u => ({
+      x: u.x + snapDeltaX,
+      y: u.y + snapDeltaY
+    }));
+
+    // Optionnel: vérifier si toutes les nouvelles unités sont dans les murs
+    if (walls.value.length > 2) {
+      const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
+      if (!allInside) return;
+    }
+
+    footprint.units = newUnits;
+  };
+
+  const resetFootprintState = () => {
+    draggingFootprintId.value = null;
+    footprintUnitsBeforeDrag.value = [];
+  };
+
+  const updateFootprintX = (footprintId: string, newX: number) => {
+    if (!currentLayer.value.footprints) return;
+    const footprint = currentLayer.value.footprints.find(f => f.id === footprintId);
+    if (!footprint || footprint.units.length === 0) return;
+
+    const minX = Math.min(...footprint.units.map(u => u.x));
+    const deltaX = newX - minX;
+
+    if (deltaX === 0) return;
+
+    const newUnits = footprint.units.map(u => ({
+      ...u,
+      x: u.x + deltaX
+    }));
+
+    if (walls.value.length > 2) {
+      const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
+      if (!allInside) return;
+    }
+
+    footprint.units = newUnits;
+  };
+
+  const updateFootprintY = (footprintId: string, newY: number) => {
+    if (!currentLayer.value.footprints) return;
+    const footprint = currentLayer.value.footprints.find(f => f.id === footprintId);
+    if (!footprint || footprint.units.length === 0) return;
+
+    const minY = Math.min(...footprint.units.map(u => u.y));
+    const deltaY = newY - minY;
+
+    if (deltaY === 0) return;
+
+    const newUnits = footprint.units.map(u => ({
+      ...u,
+      y: u.y + deltaY
+    }));
+
+    if (walls.value.length > 2) {
+      const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
+      if (!allInside) return;
+    }
+
+    footprint.units = newUnits;
+  };
+
+  const updateFootprintName = (footprintId: string, newName: string) => {
+    if (!currentLayer.value.footprints) return;
+    const footprint = currentLayer.value.footprints.find(f => f.id === footprintId);
+    if (footprint) {
+      footprint.name = newName;
+    }
+  };
+
   return {
     selectedUnits,
     isSelecting,
     hoveredUnit,
     selectedFootprintId,
+    draggingFootprintId,
     startSelection,
     updateSelection,
     stopSelection,
@@ -300,6 +433,12 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     changeFootprintColor,
     getFootprintAt,
     updateHoveredUnit,
-    selectFootprint
+    selectFootprint,
+    startDragFootprint,
+    dragFootprint,
+    resetFootprintState,
+    updateFootprintX,
+    updateFootprintY,
+    updateFootprintName,
   };
 };

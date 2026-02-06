@@ -7,13 +7,13 @@ type Props = {
   isDrawingWalls: boolean;
   wallPreviewPoint: Point | null;
   isDrawingCircuit: boolean;
-  circuitPreviewPoint: Point | null;
 }
 </script>
 
 <script setup lang="ts">
 import {inject} from "vue";
 import {type ExposedFunctions, exposedFunctions} from "../RoomBuilder.vue";
+import {getContrastColor} from "../../utils/colors";
 
 defineProps<Props>();
 
@@ -23,10 +23,22 @@ const {
   getWallBoundingBox,
   getPodBoundaries
 } = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions);
+
+const getFootprintCenter = (footprint: Footprint) => {
+  if (!footprint.units || footprint.units.length === 0) return { x: 0, y: 0 };
+  const minX = Math.min(...footprint.units.map(u => u.x));
+  const maxX = Math.max(...footprint.units.map(u => u.x));
+  const minY = Math.min(...footprint.units.map(u => u.y));
+  const maxY = Math.max(...footprint.units.map(u => u.y));
+  return {
+    x: (minX + maxX + 20) / 2,
+    y: (minY + maxY + 20) / 2
+  };
+};
 </script>
 
 <template>
-  <div v-if="layers.length > 0" class="layer-previews">
+  <div class="layer-previews">
     <div
       v-for="(layer, index) in layers"
       :key="`preview-${layer.id}`"
@@ -86,73 +98,109 @@ const {
             stroke-dasharray="2,2"
           />
 
-          <g v-for="footprint in layer.footprints" :key="`preview-footprint-${footprint.id}`">
+          <g v-if="layer.walls?.length > 2 || index === 3">
+            <g v-for="footprint in layer.footprints" :key="`preview-footprint-${footprint.id}`">
+              <rect
+                v-for="(unit, uIdx) in footprint.units"
+                :key="`preview-footprint-unit-${footprint.id}-${uIdx}`"
+                :x="unit.x"
+                :y="unit.y"
+                :width="20"
+                :height="20"
+                :fill="footprint.color"
+                fill-opacity="0.3"
+              />
+              <text
+                  v-if="footprint.name"
+                  :x="getFootprintCenter(footprint).x"
+                  :y="getFootprintCenter(footprint).y"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  :style="{
+                    fontSize: '8px',
+                    fontWeight: 'bold',
+                    fill: getContrastColor(footprint.color),
+                    opacity: 0.6,
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    textShadow: '1px 1px 1px rgba(0, 0, 0, 0.2)'
+                  }"
+              >
+                {{ footprint.name }}
+              </text>
+            </g>
+
+            <template v-for="(rack, tIdx) in layer.racks" :key="`preview-rack-${tIdx}`">
+              <rect
+                v-if="rack.x !== null && rack.x !== undefined && rack.y !== null && rack.y !== undefined"
+                :x="rack.x"
+                :y="rack.y"
+                :width="rackWidth"
+                :height="rackHeight"
+                fill="#004a99"
+                fill-opacity="0.6"
+                stroke="rgba(255, 255, 255, 0.4)"
+                stroke-width="1"
+                :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
+              />
+            </template>
+
             <rect
-              v-for="(unit, uIdx) in footprint.units"
-              :key="`preview-footprint-unit-${footprint.id}-${uIdx}`"
-              :x="unit.x"
-              :y="unit.y"
-              :width="20"
-              :height="20"
-              :fill="footprint.color"
-              fill-opacity="0.3"
-            />
-          </g>
-
-          <g v-for="(rack, tIdx) in layer.racks" :key="`preview-rack-${tIdx}`">
-            <rect
-              :x="rack.x"
-              :y="rack.y"
-              :width="rackWidth"
-              :height="rackHeight"
-              fill="#004a99"
-              fill-opacity="0.6"
-              stroke="rgba(255, 255, 255, 0.4)"
-              stroke-width="1"
-              :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
-            />
-          </g>
-
-          <rect
-            v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
-            :key="`preview-pod-${pod!.id}`"
-            :x="pod!.x"
-            :y="pod!.y"
-            :width="pod!.width"
-            :height="pod!.height"
-            fill="none"
-            stroke="#ff4d4f"
-            stroke-width="1.5"
-            stroke-dasharray="3, 3"
-          />
-
-          <!-- Circuits Électriques -->
-          <g v-if="layer.circuits?.length">
-            <polyline
-              v-for="(circuit, circuitIdx) in layer.circuits"
-              :key="`preview-circuit-${layer.id}-${circuitIdx}`"
-              :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
+              v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
+              :key="`preview-pod-${pod!.id}`"
+              :x="pod!.x"
+              :y="pod!.y"
+              :width="pod!.width"
+              :height="pod!.height"
               fill="none"
-              stroke="#3498db"
-              stroke-width="3"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-              opacity="0.8"
+              stroke="#ff4d4f"
+              stroke-width="1.5"
+              stroke-dasharray="3, 3"
             />
-          </g>
-          
-          <!-- Poteaux -->
-          <g v-if="layer.pillars?.length">
-            <rect
-              v-for="(pillar, pIdx) in layer.pillars"
-              :key="`preview-pillar-${layer.id}-${pIdx}`"
-              :x="pillar.x - 10"
-              :y="pillar.y - 10"
-              :width="20"
-              :height="20"
-              fill="#333"
-              opacity="0.8"
-            />
+
+            <!-- Circuits Électriques -->
+            <g v-if="layer.circuits?.length">
+              <template v-for="(circuit, circuitIdx) in layer.circuits"
+                 :key="`preview-circuit-${layer.id}-${circuitIdx}`"
+              >
+                <g v-if="circuit.x !== null && circuit.x !== undefined && circuit.y !== null && circuit.y !== undefined"
+                   :transform="`rotate(${circuit.rotation || 0}, ${circuit.x + 20}, ${circuit.y + 20})`"
+                >
+                  <rect
+                    :x="circuit.x"
+                    :y="circuit.y"
+                    :width="40"
+                    :height="40"
+                    fill="none"
+                    stroke="#3498db"
+                    stroke-width="2"
+                    opacity="0.8"
+                  />
+                  <image
+                    :x="circuit.x"
+                    :y="circuit.y"
+                    :width="40"
+                    :height="40"
+                    href="http://itop.localhost:8009/env-production/Electricite/images/circuitelec.jpg"
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                </g>
+              </template>
+            </g>
+            
+            <!-- Poteaux -->
+            <g v-if="layer.pillars?.length">
+              <rect
+                v-for="(pillar, pIdx) in layer.pillars"
+                :key="`preview-pillar-${layer.id}-${pIdx}`"
+                :x="pillar.x - 10"
+                :y="pillar.y - 10"
+                :width="20"
+                :height="20"
+                fill="#333"
+                opacity="0.8"
+              />
+            </g>
           </g>
 
           <rect

@@ -9,7 +9,7 @@ export type ExposedFunctions = {
 type Props = {
   roomId: number;
   roomName: string;
-  layers?: Layer[] | string;
+  layers?: string;
   radius?: number
 }
 
@@ -25,7 +25,8 @@ import Modal from './Modal.vue';
 import {
   BuilderToolbar, BuilderCanvas,
   BuilderContextMenu, BuilderPropertiesPanel,
-  BuilderLayerPreviews
+  BuilderLayerPreviews, UnplacedRacksSidebar,
+  UnplacedCircuitsSidebar, UnplacedFootprintsSidebar
 } from './room-builder'
 import {rackHeight, rackWidth, useRoomBuilderGeometry} from '../composables/useRoomBuilderGeometry';
 import {useRoomBuilderHistory} from '../composables/useRoomBuilderHistory';
@@ -46,23 +47,24 @@ import {usePillars} from "../composables/usePillars.ts";
 const props = withDefaults(
   defineProps<Props>(),
   {
-    layers: () => [],
+    layers: '[]',
     radius: 0
   }
 );
 
 const emit = defineEmits<Emits>();
 
-const propsLayers = computed<Layer[]>(() => typeof props.layers === 'string' ? JSON.parse(props.layers) : props.layers)
+const propsLayers = computed<Layer[]>(() => JSON.parse(props.layers))
 
 watchEffect(() => {
-  console.log(propsLayers.value)
+  console.log('propsLayers', propsLayers.value)
 })
 
 const {
   getPodBoundaries, getWallBoundingBox,
   getConstrainedPoint,
-  isPointInPolygon
+  isPointInPolygon,
+  isElementInWalls
 } = useRoomBuilderGeometry();
 
 const {error: notifyError, success: notifySuccess} = useNotify();
@@ -80,22 +82,252 @@ const {
   currentLayer
 } = useLayers(walls, propsLayers);
 
+const shouldShowLayers = computed(() => {
+  if (layers.value.length === 0) return false;
+  if (isDrawingWalls.value) return false;
+  const firstLayer = layers.value[0];
+  if (!firstLayer) return false;
+  return (firstLayer.walls && firstLayer.walls.length > 2) || (firstLayer.pillars && firstLayer.pillars.length > 0);
+});
+
+const incompleteRacks = computed(() => {
+  const baiesLayer = layers.value.find(l => l.name === 'Baies');
+  if (!baiesLayer) return [];
+  return baiesLayer.racks.filter(r => r.x === undefined || r.x === null || r.y === undefined || r.y === null || r.rotation === undefined || r.rotation === null);
+});
+
+const incompleteCircuits = computed(() => {
+  const circuitsLayer = layers.value.find(l => l.name === 'Circuits électriques');
+  if (!circuitsLayer) return [];
+  return circuitsLayer.circuits.filter(c => c.x === undefined || c.x === null || c.y === undefined || c.y === null);
+});
+
+const incompleteFootprints = computed(() => {
+  const surfacesLayer = layers.value.find(l => l.name === 'Surfaces au sol');
+  if (!surfacesLayer) return [];
+  return surfacesLayer.footprints.filter(f => (!f.units || f.units.length === 0) && f.width && f.height);
+});
+
+const onSelectUnplacedRack = (id: number) => {
+  const rackIndex = racks.value.findIndex(r => r.id === id);
+  if (rackIndex !== -1) {
+    selectedRackIndices.value = [rackIndex];
+  }
+};
+
+const onSelectUnplacedCircuit = (id: string) => {
+  const circuitIndex = circuitPaths.value.findIndex(c => String(c.id) === id);
+  if (circuitIndex !== -1) {
+    selectedCircuitIndices.value = [circuitIndex];
+  }
+};
+
+const onSelectUnplacedFootprint = (id: string) => {
+  selectedFootprintId.value = id;
+  const surfacesLayer = layers.value.find(l => l.name === 'Surfaces au sol');
+  const footprint = surfacesLayer?.footprints.find(f => f.id === id);
+  if (footprint && !footprint.name) {
+    footprint.name = `Footprint ${surfacesLayer?.footprints.indexOf(footprint)! + 1}`;
+  }
+};
+
+const onDragOverRack = (event: DragEvent) => {
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+};
+
+const onDropRack = (event: DragEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
+  const rackIdStr = event.dataTransfer?.getData('rackId');
+  const circuitIdStr = event.dataTransfer?.getData('circuitId');
+  const footprintId = event.dataTransfer?.getData('footprintId');
+
+  if (rackIdStr) {
+    const rackId = parseInt(rackIdStr);
+    const rackIndex = racks.value.findIndex(r => r.id === rackId);
+    if (rackIndex === -1) return;
+
+    const rack = racks.value[rackIndex];
+    if (!rack) return;
+
+    const svg = (event.target as HTMLElement).closest('svg');
+    if (!svg) return;
+
+    const CTM = svg.getScreenCTM();
+    if (!CTM) return;
+
+    const x = (event.clientX - CTM.e) / CTM.a;
+    const y = (event.clientY - CTM.f) / CTM.d;
+
+    const worldX = x / zoomLevel.value - panOffset.value.x;
+    const worldY = y / zoomLevel.value - panOffset.value.y;
+
+    const rawX = worldX - rackWidth / 2;
+    const rawY = worldY - rackHeight / 2;
+
+    const snapX = Math.round(rawX / 20) * 20;
+    const snapY = Math.round(rawY / 20) * 20;
+
+    takeSnapshot();
+    rack.x = snapX;
+    rack.y = snapY;
+    rack.rotation = 0;
+    selectedRackIndices.value = [rackIndex];
+  } else if (circuitIdStr) {
+    const circuitIndex = circuitPaths.value.findIndex(c => String(c.id) === circuitIdStr);
+    if (circuitIndex === -1) return;
+
+    const circuit = circuitPaths.value[circuitIndex];
+    if (!circuit) return;
+
+    const svg = (event.target as HTMLElement).closest('svg');
+    if (!svg) return;
+
+    const CTM = svg.getScreenCTM();
+    if (!CTM) return;
+
+    const x = (event.clientX - CTM.e) / CTM.a;
+    const y = (event.clientY - CTM.f) / CTM.d;
+
+    const worldX = x / zoomLevel.value - panOffset.value.x;
+    const worldY = y / zoomLevel.value - panOffset.value.y;
+
+    const rawX = worldX - 20; // circuitWidth / 2
+    const rawY = worldY - 20; // circuitHeight / 2
+
+    const snapX = Math.round(rawX / 20) * 20;
+    const snapY = Math.round(rawY / 20) * 20;
+
+    if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, 0, walls.value)) {
+      return;
+    }
+
+    takeSnapshot();
+    circuit.x = snapX;
+    circuit.y = snapY;
+    circuit.rotation = 0;
+    selectedCircuitIndices.value = [circuitIndex];
+  } else if (footprintId) {
+    const footprint = currentLayer.value.footprints?.find(f => f.id === footprintId);
+    if (!footprint) return;
+
+    const svg = (event.target as HTMLElement).closest('svg');
+    if (!svg) return;
+
+    const CTM = svg.getScreenCTM();
+    if (!CTM) return;
+
+    const x = (event.clientX - CTM.e) / CTM.a;
+    const y = (event.clientY - CTM.f) / CTM.d;
+
+    const worldX = x / zoomLevel.value - panOffset.value.x;
+    const worldY = y / zoomLevel.value - panOffset.value.y;
+
+    const widthPx = (footprint.width || 1200) / 600 * 20;
+    const heightPx = (footprint.height || 1200) / 600 * 20;
+
+    const rawX = worldX - widthPx / 2;
+    const rawY = worldY - heightPx / 2;
+
+    const snapX = Math.round(rawX / 20) * 20;
+    const snapY = Math.round(rawY / 20) * 20;
+
+    const newUnits: Point[] = [];
+    for (let curX = 0; curX < widthPx; curX += 20) {
+      for (let curY = 0; curY < heightPx; curY += 20) {
+        newUnits.push({ x: snapX + curX, y: snapY + curY });
+      }
+    }
+
+    takeSnapshot();
+    footprint.units = newUnits;
+    if (!footprint.name) {
+      footprint.name = `Footprint ${currentLayer.value.footprints?.length || 1}`;
+    }
+    selectedFootprintId.value = footprint.id;
+  }
+};
+
+watch(shouldShowLayers, (val) => {
+  if (!val) {
+    currentLayerIndex.value = 0;
+  }
+}, { immediate: true });
+
 const {
   selectedUnits, isSelecting,
   hoveredUnit, selectedFootprintId,
+  draggingFootprintId,
   startSelection, updateSelection,
   stopSelection, createFootprint,
   deleteFootprint, changeFootprintColor,
   getFootprintAt, updateHoveredUnit,
-  selectFootprint
+  selectFootprint, startDragFootprint,
+  dragFootprint, resetFootprintState,
+  updateFootprintX, updateFootprintY,
+  updateFootprintName,
 } = useFootprints(currentLayer, walls);
+
+const canvasComponent = useTemplateRef<InstanceType<typeof BuilderCanvas>>('canvasComponent');
 
 const {
   canvasWidth, canvasHeight,
   updateCanvasSize
-} = useCanvas(useTemplateRef<InstanceType<typeof BuilderCanvas>>('canvasComponent'));
+} = useCanvas(canvasComponent);
+
+const onStartDragFootprint = (event: MouseEvent, id: string) => {
+  takeSnapshot();
+  startDragFootprint(event, id);
+};
+
+const onStartDragUnplacedFootprint = () => {
+  takeSnapshot();
+};
+
+const onUpdateFootprintX = (id: string, value: number) => {
+  takeSnapshot();
+  updateFootprintX(id, value);
+};
+
+const onUpdateFootprintY = (id: string, value: number) => {
+  takeSnapshot();
+  updateFootprintY(id, value);
+};
+
+const onUpdateFootprintName = (id: string, value: string) => {
+  takeSnapshot();
+  updateFootprintName(id, value);
+};
 
 const {zoomLevel, zoomIn, zoomOut, onWheel} = useZoom();
+
+const resetPan = () => {
+  const startX = panOffset.value.x;
+  const startY = panOffset.value.y;
+  const duration = 300; // ms
+  const startTime = performance.now();
+
+  const animate = (currentTime: number) => {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Easing function: easeOutCubic
+    const ease = 1 - Math.pow(1 - progress, 3);
+
+    panOffset.value = {
+      x: startX * (1 - ease),
+      y: startY * (1 - ease)
+    };
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    }
+  };
+
+  requestAnimationFrame(animate);
+};
 
 const {isPanning, panStart, panStop, panRunning} = usePan(props.roomId);
 
@@ -110,6 +342,8 @@ const {
   duplicateRack, copyRack,
   pastRack, updateRackName,
   updateRackRotation,
+  updateRackX,
+  updateRackY,
   resetRackState
 } = useRacksCrud(props.roomId);
 
@@ -156,10 +390,13 @@ const {
 } = useModal();
 
 const roomName = ref(props.roomName);
-const circuitPreviewPoint = ref<Point | null>(null);
 const isDrawingCircuit = ref(false);
-const currentCircuitPathIndex = ref<number | null>(null);
-const selectedCircuitSegments = ref<Array<{ pathIndex: number; segmentIndex: number }>>([]);
+const selectedCircuitIndices = ref<number[]>([]);
+const draggingCircuitIndex = ref<number | null>(null);
+const draggingCircuitStart = ref<Point>({x: 0, y: 0});
+const rotatingCircuitIndex = ref<number | null>(null);
+const startRotationAngle = ref(0);
+const initialCircuitRotation = ref(0);
 
 const radius = computed(() => `${props.radius}px`);
 
@@ -189,7 +426,7 @@ const selectedFootprint = computed(() => {
 });
 
 const selectedCircuitSegmentKeys = computed(() =>
-  selectedCircuitSegments.value.map(segment => `${segment.pathIndex}-${segment.segmentIndex}`)
+  selectedCircuitIndices.value.map(idx => `${idx}`)
 );
 
 const circuitPaths = computed({
@@ -271,6 +508,7 @@ const isInteracting = computed(() =>
     draggingRack.value !== null ||
     rotatingRack.value !== null ||
     draggingPillarIndex.value !== null ||
+    draggingCircuitIndex.value !== null ||
     isPanning.value ||
     isDrawingWalls.value ||
     isSelecting.value ||
@@ -286,6 +524,50 @@ const onRemoveRack = (index: number) => {
       removeRack(index);
     }
   });
+};
+
+const onUpdateCircuitName = (index: number, value: string) => {
+  takeSnapshot();
+  const nextCircuits = [...circuitPaths.value];
+  if (nextCircuits[index]) {
+    nextCircuits[index] = { ...nextCircuits[index]!, name: value };
+    circuitPaths.value = nextCircuits;
+  }
+};
+
+const onUpdateCircuitRotation = (index: number, value: number) => {
+  takeSnapshot();
+  const nextCircuits = [...circuitPaths.value];
+  if (nextCircuits[index]) {
+    nextCircuits[index] = { ...nextCircuits[index]!, rotation: value };
+    circuitPaths.value = nextCircuits;
+  }
+};
+
+const onUpdateCircuitX = (index: number, value: number) => {
+  const nextCircuits = [...circuitPaths.value];
+  if (nextCircuits[index]) {
+    const circuit = nextCircuits[index]!;
+    if (walls.value.length > 2 && !isElementInWalls(value, circuit.y ?? 0, circuit.rotation || 0, walls.value)) {
+      return;
+    }
+    takeSnapshot();
+    nextCircuits[index] = { ...circuit, x: value };
+    circuitPaths.value = nextCircuits;
+  }
+};
+
+const onUpdateCircuitY = (index: number, value: number) => {
+  const nextCircuits = [...circuitPaths.value];
+  if (nextCircuits[index]) {
+    const circuit = nextCircuits[index]!;
+    if (walls.value.length > 2 && !isElementInWalls(circuit.x ?? 0, value, circuit.rotation || 0, walls.value)) {
+      return;
+    }
+    takeSnapshot();
+    nextCircuits[index] = { ...circuit, y: value };
+    circuitPaths.value = nextCircuits;
+  }
 };
 
 const onConfirmDeletePillar = (index: number | number[]) => {
@@ -316,9 +598,9 @@ const onConfirmDeleteFootprint = (id: string) => {
 const onConfirmDeleteCircuitSelection = () => {
   triggerConfirm({
     title: 'Supprimer la sélection de circuit',
-    message: 'Voulez-vous vraiment supprimer les segments de circuit sélectionnés ?',
+    message: 'Voulez-vous vraiment supprimer les circuits sélectionnés ?',
     onConfirm: () => {
-      deleteSelectedCircuitSegments();
+      deleteSelectedCircuits();
     }
   });
 };
@@ -346,6 +628,60 @@ const onStartDragPillar = (event: MouseEvent, index: number) => {
   if (event.button !== 0) return;
   takeSnapshot();
   draggingPillarIndex.value = index;
+};
+
+const onStartDragCircuit = (event: MouseEvent, index: number) => {
+  if (event.button !== 0) return;
+  takeSnapshot();
+  draggingCircuitIndex.value = index;
+  selectedCircuitIndices.value = [index];
+
+  const svg = canvasComponent.value?.svgRef;
+  if (!svg) return;
+  const pt = svg.createSVGPoint();
+  pt.x = event.clientX;
+  pt.y = event.clientY;
+  const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+
+  const worldX = (svgP.x / zoomLevel.value) - panOffset.value.x;
+  const worldY = (svgP.y / zoomLevel.value) - panOffset.value.y;
+
+  const circuit = circuitPaths.value[index];
+  if (circuit && circuit.x !== null && circuit.x !== undefined && circuit.y !== null && circuit.y !== undefined) {
+    draggingCircuitStart.value = {
+      x: worldX - circuit.x,
+      y: worldY - circuit.y
+    };
+  }
+};
+
+const onStartRotateCircuit = (event: MouseEvent, index: number) => {
+  takeSnapshot();
+  event.stopPropagation();
+  rotatingCircuitIndex.value = index;
+  selectedCircuitIndices.value = [index];
+
+  const circuit = circuitPaths.value[index];
+  const centerX = (circuit?.x ?? 0) + 40 / 2 + panOffset.value.x;
+  const centerY = (circuit?.y ?? 0) + 40 / 2 + panOffset.value.y;
+
+  startRotationAngle.value = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
+  initialCircuitRotation.value = circuit?.rotation || 0;
+};
+
+const rotateCircuit = (event: MouseEvent) => {
+  if (rotatingCircuitIndex.value === null) return;
+  const circuit = circuitPaths.value[rotatingCircuitIndex.value];
+  if (!circuit) return;
+  
+  const centerX = (circuit?.x ?? 0) + 40 / 2 + panOffset.value.x;
+  const centerY = (circuit?.y ?? 0) + 40 / 2 + panOffset.value.y;
+
+  const currentAngle = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
+  const deltaAngle = (currentAngle - startRotationAngle.value) * (180 / Math.PI);
+
+  const rawRotation = (initialCircuitRotation.value + deltaAngle) % 360;
+  circuit.rotation = Math.round(rawRotation / 45) * 45;
 };
 
 const onStartDragWall = (_event: MouseEvent, index: number, isHorizontal: boolean) => {
@@ -417,6 +753,19 @@ const addRack = () => {
   addRackRaw();
 };
 
+const addCircuit = () => {
+  if (currentLayerIndex.value !== 1) return;
+  takeSnapshot();
+  const newCircuit = {
+    id: `circuit-${Date.now()}`,
+    x: null,
+    y: null,
+    rotation: null,
+    name: `Circuit ${circuitPaths.value.length + 1}`
+  };
+  circuitPaths.value = [...circuitPaths.value, newCircuit];
+};
+
 const selectWall = (event: MouseEvent) => {
   if (currentLayerIndex.value === 0) {
     event.stopPropagation();
@@ -424,68 +773,35 @@ const selectWall = (event: MouseEvent) => {
     selectedRackIndices.value = [];
     selectedPillarIndices.value = [];
     selectedFootprintId.value = null;
-    selectedCircuitSegments.value = [];
+    selectedCircuitIndices.value = [];
   }
 };
 
 const stopCircuitDrawing = () => {
   isDrawingCircuit.value = false;
-  circuitPreviewPoint.value = null;
-  currentCircuitPathIndex.value = null;
 };
 
-const getDistanceToSegment = (point: Point, start: Point, end: Point) => {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  if (dx === 0 && dy === 0) {
-    return Math.hypot(point.x - start.x, point.y - start.y);
-  }
-  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy);
-  const clampedT = Math.max(0, Math.min(1, t));
-  const projX = start.x + clampedT * dx;
-  const projY = start.y + clampedT * dy;
-  return Math.hypot(point.x - projX, point.y - projY);
-};
-
-const getCircuitSegmentAtPoint = (x: number, y: number, tolerance = 6) => {
-  const point = {x, y};
-  for (let pathIndex = 0; pathIndex < circuitPaths.value.length; pathIndex += 1) {
-    const circuit = circuitPaths.value[pathIndex];
-    if (!circuit || circuit.length < 2) continue;
-    for (let segmentIndex = 0; segmentIndex < circuit.length - 1; segmentIndex += 1) {
-      const start = circuit[segmentIndex]!;
-      const end = circuit[segmentIndex + 1]!;
-      if (getDistanceToSegment(point, start, end) <= tolerance) {
-        return {pathIndex, segmentIndex};
-      }
-    }
-  }
-  return null;
-};
-
-const selectCircuitSegment = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
+const selectCircuit = (event: MouseEvent, index: number) => {
   if (event.detail > 1) return;
   event.stopPropagation();
   stopCircuitDrawing();
-  selectedCircuitSegments.value = [{pathIndex, segmentIndex}];
-};
-
-const selectCircuitPath = (event: MouseEvent, pathIndex: number, segmentIndex: number) => {
-  event.stopPropagation();
-  stopCircuitDrawing();
-  const circuit = circuitPaths.value[pathIndex];
-  if (!circuit || circuit.length < 2) {
-    selectedCircuitSegments.value = [{pathIndex, segmentIndex}];
-    return;
+  
+  const isMultiSelect = event.ctrlKey || event.metaKey;
+  if (isMultiSelect) {
+    if (selectedCircuitIndices.value.includes(index)) {
+      selectedCircuitIndices.value = selectedCircuitIndices.value.filter(i => i !== index);
+    } else {
+      selectedCircuitIndices.value.push(index);
+    }
+  } else {
+    selectedCircuitIndices.value = [index];
   }
-  selectedCircuitSegments.value = circuit.slice(0, -1).map((_, idx) => ({
-    pathIndex,
-    segmentIndex: idx
-  }));
 };
 
 const onMouseMoveSVG = (event: MouseEvent) => {
-  const svg = event.currentTarget as SVGSVGElement;
+  const svg = canvasComponent.value?.svgRef;
+  if (!svg) return;
+  if (selectedUnits.value.length > 0) console.log(svg);
   const pt = svg.createSVGPoint();
   pt.x = event.clientX;
   pt.y = event.clientY;
@@ -507,6 +823,24 @@ const onMouseMoveSVG = (event: MouseEvent) => {
       return;
     }
     movePillar(draggingPillarIndex.value, constrained);
+    return;
+  }
+
+  if (draggingCircuitIndex.value !== null) {
+    const circuit = circuitPaths.value[draggingCircuitIndex.value];
+    if (circuit) {
+      const rawX = x - draggingCircuitStart.value.x;
+      const rawY = y - draggingCircuitStart.value.y;
+      const snapX = Math.round(rawX / 20) * 20;
+      const snapY = Math.round(rawY / 20) * 20;
+
+      if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, circuit.rotation || 0, walls.value)) {
+        return;
+      }
+
+      circuit.x = snapX;
+      circuit.y = snapY;
+    }
     return;
   }
 
@@ -533,24 +867,13 @@ const onMouseMoveSVG = (event: MouseEvent) => {
       dragWall(x, y);
       return;
     }
-    
-    // Vérifier si on survole un segment existant (pour ne pas afficher la preview de dessin)
-    if (getCircuitSegmentAtPoint(x, y)) {
-      circuitPreviewPoint.value = null;
-      return;
-    }
-
-    if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
-      const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
-        ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
-        : null;
-      circuitPreviewPoint.value = getConstrainedPoint(x, y, lastPoint ?? null);
-    } else {
-      circuitPreviewPoint.value = null;
-    }
   }
 
   if (currentLayerIndex.value === 2) {
+    if (draggingFootprintId.value) {
+      // dragFootprint(event, zoomLevel.value, panOffset.value);
+      return;
+    }
     if (isSelecting.value) {
       updateSelection(x, y);
       hoveredUnit.value = null;
@@ -559,7 +882,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     }
   } else {
     // Pour les autres layers, on met à jour hoveredUnit si on est dans les murs
-    // pour afficher le tooltip de coordonnées
+    // pour afficher le tooltip de coordonnées.
     const snapX = Math.floor(x / 20) * 20;
     const snapY = Math.floor(y / 20) * 20;
 
@@ -579,13 +902,22 @@ const onMouseMove = (event: MouseEvent) => {
   if (isPanning.value) return panRunning(event);
   if (draggingRack.value !== null) dragRack(event);
   else if (rotatingRack.value !== null) rotateRack(event);
+  else if (rotatingCircuitIndex.value !== null) rotateCircuit(event);
+  else if (draggingFootprintId.value !== null) {
+    dragFootprint(event, zoomLevel.value, panOffset.value);
+  } else if (draggingCircuitIndex.value !== null || draggingPillarIndex.value !== null) {
+    onMouseMoveSVG(event);
+  }
 };
 
 const stopDrag = () => {
   panStop();
   resetRackState();
+  resetFootprintState();
   stopDraggingWall();
   draggingPillarIndex.value = null;
+  draggingCircuitIndex.value = null;
+  rotatingCircuitIndex.value = null;
   if (currentLayerIndex.value === 2) {
     stopSelection();
   }
@@ -594,7 +926,8 @@ const stopDrag = () => {
 const deselect = (event: MouseEvent) => {
   if (isDrawingPillar.value) {
     if (event.button !== 0) return;
-    const svg = event.currentTarget as SVGSVGElement;
+    const svg = canvasComponent.value?.svgRef;
+    if (!svg) return;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
     pt.y = event.clientY;
@@ -615,7 +948,8 @@ const deselect = (event: MouseEvent) => {
   if (isDrawingWalls.value) {
     if (event.button !== 0) return;
 
-    const svg = event.currentTarget as SVGSVGElement;
+    const svg = canvasComponent.value?.svgRef;
+    if (!svg) return;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
     pt.y = event.clientY;
@@ -653,10 +987,11 @@ const deselect = (event: MouseEvent) => {
       isWallSelected.value = false;
       selectedPillarIndices.value = [];
       selectFootprint(null);
-      selectedCircuitSegments.value = [];
+      selectedCircuitIndices.value = [];
     }
 
-    const svg = event.currentTarget as SVGSVGElement;
+    const svg = canvasComponent.value?.svgRef;
+    if (!svg) return;
     const pt = svg.createSVGPoint();
     pt.x = event.clientX;
     pt.y = event.clientY;
@@ -666,50 +1001,21 @@ const deselect = (event: MouseEvent) => {
 
   if (currentLayerIndex.value === 1) {
     if (event.button === 0) {
-      if (event.detail > 1) {
-        stopCircuitDrawing();
-        return;
-      }
-      const hadSelection = selectedCircuitSegments.value.length > 0;
-      selectedCircuitSegments.value = [];
-      if (walls.value.length > 2 && isPointInPolygon(x, y, walls.value)) {
-        if (hadSelection) {
-          return;
-        }
-        const lastPoint = isDrawingCircuit.value && currentCircuitPathIndex.value !== null
-          ? circuitPaths.value[currentCircuitPathIndex.value]?.[circuitPaths.value[currentCircuitPathIndex.value]!.length - 1]
-          : null;
-        const constrained = getConstrainedPoint(x, y, lastPoint ?? null);
-        takeSnapshot();
-        if (!isDrawingCircuit.value || currentCircuitPathIndex.value === null) {
-          const nextPaths = [...circuitPaths.value, [constrained]];
-          circuitPaths.value = nextPaths;
-          currentCircuitPathIndex.value = nextPaths.length - 1;
-          isDrawingCircuit.value = true;
-        } else {
-          const nextPaths = [...circuitPaths.value];
-          const activePath = [...(nextPaths[currentCircuitPathIndex.value] ?? [])];
-          nextPaths[currentCircuitPathIndex.value] = [...activePath, constrained];
-          circuitPaths.value = nextPaths;
-        }
-        circuitPreviewPoint.value = constrained;
-        return;
-      }
       panStart();
     }
   } else if (currentLayerIndex.value === 2) {
-    if (event.button === 0) { // Left click
-      const footprint = getFootprintAt(x, y);
-      if (footprint) {
-        onSelectFootprint(footprint.id);
-        return;
-      }
+    const footprint = getFootprintAt(x, y);
+    if (footprint) {
+      onSelectFootprint(footprint.id);
+      return;
+    }
+    if (event.button === 0) { // Left-click
       startSelection(x, y);
       // Si on a cliqué à l'intérieur de la pièce pour sélectionner, on ne pan pas au clic gauche
       if (!isPointInPolygon(x, y, walls.value)) {
          panStart();
       }
-    } else if (event.button === 2) { // Right click
+    } else if (event.button === 2) { // Right-click
       const footprint = getFootprintAt(x, y);
       const clickedUnitX = Math.floor(x / 20) * 20;
       const clickedUnitY = Math.floor(y / 20) * 20;
@@ -744,84 +1050,12 @@ const deselect = (event: MouseEvent) => {
   }
 };
 
-const deleteSelectedCircuitSegments = () => {
-  if (selectedCircuitSegments.value.length === 0) return;
+const deleteSelectedCircuits = () => {
+  if (selectedCircuitIndices.value.length === 0) return;
 
   takeSnapshot();
-  const nextPaths = [...circuitPaths.value.map(p => [...p])];
-
-  // Regrouper les segments par chemin pour les supprimer plus facilement
-  const segmentsByPath: Record<number, number[]> = {};
-  selectedCircuitSegments.value.forEach(({ pathIndex, segmentIndex }) => {
-    if (!segmentsByPath[pathIndex]) {
-      segmentsByPath[pathIndex] = [];
-    }
-    segmentsByPath[pathIndex].push(segmentIndex);
-  });
-
-  // Pour chaque chemin, supprimer les segments du plus grand index au plus petit
-  Object.keys(segmentsByPath).forEach(pIdxStr => {
-    const pathIndex = parseInt(pIdxStr);
-    const indicesToDelete = segmentsByPath[pathIndex]!.sort((a, b) => b - a);
-    
-    indicesToDelete.forEach(() => {
-      // Un segment relie le point segmentIndex au point segmentIndex + 1
-      // Si on supprime un segment, on doit décider si on supprime un point ou si on coupe le chemin.
-      // Dans le contexte d'un outil de dessin simple, si on sélectionne un segment, 
-      // on veut généralement le faire disparaître.
-      
-      const path = nextPaths[pathIndex];
-      if (path) {
-        // Pour supprimer un segment, on peut soit supprimer l'un des points, 
-        // soit diviser le chemin en deux.
-        // Ici, si on supprime le segment entre i et i+1 :
-        // Si c'est un segment au milieu, on peut éventuellement scinder le chemin.
-        // Mais si l'utilisateur veut juste "effacer" des segments, on peut simplifier.
-        
-        // Approche : on retire le point de fin du segment. 
-        // Si c'est le dernier segment, on retire le dernier point.
-        // Si c'est au milieu, on risque de relier i à i+2, ce qui n'est pas "supprimer le segment".
-        
-        // Correction de l'approche : On va reconstruire les chemins.
-        // Un chemin de N points a N-1 segments.
-        // Marquer les segments à supprimer.
-      }
-    });
-  });
-
-  // Nouvelle approche plus robuste : recréer les chemins en filtrant les segments supprimés
-  const finalPaths: Point[][] = [];
-  
-  circuitPaths.value.forEach((path, pathIndex) => {
-    let currentNewPath: Point[] = [];
-    const pathSegmentsToDelete = segmentsByPath[pathIndex] || [];
-    
-    for (let i = 0; i < path.length - 1; i++) {
-      if (pathSegmentsToDelete.includes(i)) {
-        // Segment supprimé : on termine le chemin actuel s'il existe
-        if (currentNewPath.length > 1) {
-          finalPaths.push(currentNewPath);
-        }
-        currentNewPath = [];
-      } else {
-        // Segment conservé
-        if (currentNewPath.length === 0) {
-          currentNewPath.push(path[i]!);
-        }
-        currentNewPath.push(path[i+1]!);
-      }
-    }
-    
-    if (currentNewPath.length > 1) {
-      finalPaths.push(currentNewPath);
-    }
-  });
-
-  circuitPaths.value = finalPaths;
-  selectedCircuitSegments.value = [];
-  if (currentCircuitPathIndex.value !== null) {
-    stopCircuitDrawing();
-  }
+  circuitPaths.value = circuitPaths.value.filter((_, idx) => !selectedCircuitIndices.value.includes(idx));
+  selectedCircuitIndices.value = [];
 };
 
 const handleKeyDown = (event: KeyboardEvent) => {
@@ -876,13 +1110,13 @@ const handleKeyDown = (event: KeyboardEvent) => {
       return;
     }
 
-    if (selectedCircuitSegments.value.length > 0) {
+    if (selectedCircuitIndices.value.length > 0) {
       event.preventDefault();
       triggerConfirm({
-        title: 'Supprimer les segments de circuit',
-        message: 'Voulez-vous vraiment supprimer les segments de circuit sélectionnés ?',
+        title: 'Supprimer les circuits',
+        message: 'Voulez-vous vraiment supprimer les circuits sélectionnés ?',
         onConfirm: () => {
-          deleteSelectedCircuitSegments();
+          deleteSelectedCircuits();
         }
       });
       return;
@@ -977,10 +1211,8 @@ const save = async () => {
 watch(currentLayerIndex, () => {
   selectedRackIndices.value = [];
   isWallSelected.value = false;
-  circuitPreviewPoint.value = null;
   isDrawingCircuit.value = false;
-  currentCircuitPathIndex.value = null;
-  selectedCircuitSegments.value = [];
+  selectedCircuitIndices.value = [];
   hoveredUnit.value = null;
   selectedPillarIndices.value = [];
   selectedFootprintId.value = null;
@@ -1016,6 +1248,8 @@ provide<ExposedFunctions>(exposedFunctions, {
         :redo-disabled="redoStack.length === 0"
         :can-add-rack="walls.length > 2"
         :show-add-rack="currentLayerIndex === 3"
+        :can-add-circuit="walls.length > 2"
+        :show-add-circuit="currentLayerIndex === 1"
         :can-clear-walls="walls.length > 0"
         :is-drawing-walls="isDrawingWalls"
         :is-drawing-pillar="isDrawingPillar"
@@ -1028,11 +1262,13 @@ provide<ExposedFunctions>(exposedFunctions, {
         @undo="undo"
         @redo="redo"
         @add-rack="addRack"
+        @add-circuit="addCircuit"
         @toggle-walls="toggleIsDrawingWalls"
         @toggle-pillar="toggleIsDrawingPillar"
         @clear-walls="triggerClearWalls"
         @zoom-out="zoomOut"
         @zoom-in="zoomIn"
+        @reset-pan="resetPan"
         @save="save"
     />
 
@@ -1046,7 +1282,8 @@ provide<ExposedFunctions>(exposedFunctions, {
     <div class="canvas-area">
       <BuilderCanvas
           ref="canvasComponent"
-          :layers="layers"
+
+          :layers="shouldShowLayers ? layers : (layers.length > 0 ? [layers[0]!] : [])"
           :current-layer-index="currentLayerIndex"
           :walls="walls"
           :racks="racks as Rack[]"
@@ -1054,8 +1291,6 @@ provide<ExposedFunctions>(exposedFunctions, {
           :is-drawing-pillar="isDrawingPillar"
           :is-drawing-circuit="isDrawingCircuit"
           :wall-preview-point="wallPreviewPoint"
-          :pillar-preview-point="pillarPreviewPoint"
-          :circuit-preview-point="circuitPreviewPoint"
           :pod-boundaries="podBoundaries"
           :wall-bounding-box="wallBoundingBox"
           :horizontal-coords="horizontalCoords"
@@ -1074,7 +1309,10 @@ provide<ExposedFunctions>(exposedFunctions, {
           :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
           :selected-pillar-indices="selectedPillarIndices"
           :selected-footprint-id="selectedFootprintId"
+          :selected-circuit-indices="selectedCircuitIndices"
+          :pillar-preview-point="pillarPreviewPoint"
 
+          @mouseup="stopDrag"
           @deselect="deselect"
           @mousemove-svg="onMouseMoveSVG"
           @start-drag="startDragRack"
@@ -1086,12 +1324,14 @@ provide<ExposedFunctions>(exposedFunctions, {
           @delete-pillar="onConfirmDeletePillar"
           @select-pillar="onSelectPillar"
           @start-drag-pillar="onStartDragPillar"
-          @select-circuit-segment="selectCircuitSegment"
-          @select-circuit-path="selectCircuitPath"
+          @select-circuit="selectCircuit"
+          @start-drag-circuit="onStartDragCircuit"
+          @start-rotate-circuit="onStartRotateCircuit"
           @select-footprint="onSelectFootprint"
+          @start-drag-footprint="onStartDragFootprint"
+          @dragover-rack="onDragOverRack"
+          @drop-rack="onDropRack"
       />
-
-      <!-- Bouton de suppression flottant pour les segments de circuit -->
 
       <BuilderContextMenu
           :show="contextMenu.show"
@@ -1118,7 +1358,7 @@ provide<ExposedFunctions>(exposedFunctions, {
       />
 
       <BuilderPropertiesPanel
-          v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndices.length > 0 || selectedFootprint !== null || selectedCircuitSegments.length > 0"
+          v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndices.length > 0 || selectedFootprint !== null || selectedCircuitIndices.length > 0"
           :selected-rack-indices="selectedRackIndices"
           :racks="racks as Rack[]"
           :is-wall-selected="isWallSelected"
@@ -1127,7 +1367,7 @@ provide<ExposedFunctions>(exposedFunctions, {
           :selected-pillar-indices="selectedPillarIndices"
           :pillars="layers[currentLayerIndex]?.pillars ?? []"
           :selected-footprint="selectedFootprint"
-          :selected-circuit-segments="selectedCircuitSegments"
+          :selected-circuit-indices="selectedCircuitIndices"
           :circuits="layers[currentLayerIndex]?.circuits ?? []"
           :context-menu-options="contextMenuOptions"
 
@@ -1138,13 +1378,23 @@ provide<ExposedFunctions>(exposedFunctions, {
           @clear-selection="selectedRackIndices = []"
           @update-rack-name="updateRackName"
           @update-rack-rotation="updateRackRotation"
+          @update-rack-x="updateRackX"
+          @update-rack-y="updateRackY"
+          @update-circuit-name="onUpdateCircuitName"
+          @update-circuit-rotation="onUpdateCircuitRotation"
+          @update-circuit-x="onUpdateCircuitX"
+          @update-circuit-y="onUpdateCircuitY"
           @delete-pillar="onConfirmDeletePillar"
           @delete-footprint="onConfirmDeleteFootprint"
           @change-footprint-color="changeFootprintColor"
+          @update-footprint-x="onUpdateFootprintX"
+          @update-footprint-y="onUpdateFootprintY"
+          @update-footprint-name="onUpdateFootprintName"
           @delete-circuit-selection="onConfirmDeleteCircuitSelection"
       />
 
       <BuilderLayerPreviews
+          v-if="shouldShowLayers"
           v-model:current-layer-index="currentLayerIndex"
           :layers="layers"
           :viewport-rect="viewportRect"
@@ -1153,7 +1403,30 @@ provide<ExposedFunctions>(exposedFunctions, {
           :is-drawing-walls="isDrawingWalls"
           :wall-preview-point="wallPreviewPoint"
           :is-drawing-circuit="isDrawingCircuit"
-          :circuit-preview-point="circuitPreviewPoint"
+      />
+
+      <UnplacedRacksSidebar
+          v-if="incompleteRacks.length > 0 && shouldShowLayers && currentLayerIndex === 3"
+          :racks="incompleteRacks"
+          :selected-rack-id="selectedRackIndices.length === 1 && selectedRackIndices[0] !== undefined ? racks[selectedRackIndices[0]]?.id! : null"
+          @select-rack="onSelectUnplacedRack"
+          @drag-start="takeSnapshot"
+      />
+
+      <UnplacedCircuitsSidebar
+          v-if="incompleteCircuits.length > 0 && shouldShowLayers && currentLayerIndex === 1"
+          :circuits="incompleteCircuits"
+          :selected-circuit-id="selectedCircuitIndices.length === 1 && selectedCircuitIndices[0] !== undefined ? String(circuitPaths[selectedCircuitIndices[0]]?.id!) : null"
+          @select-circuit="onSelectUnplacedCircuit"
+          @drag-start="takeSnapshot"
+      />
+
+      <UnplacedFootprintsSidebar
+          v-if="incompleteFootprints.length > 0 && shouldShowLayers && currentLayerIndex === 2"
+          :footprints="incompleteFootprints"
+          :selected-footprint-id="selectedFootprintId"
+          @select-footprint="onSelectUnplacedFootprint"
+          @drag-start="onStartDragUnplacedFootprint"
       />
     </div>
   </div>

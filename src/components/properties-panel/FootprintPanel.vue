@@ -6,13 +6,28 @@ type Props = {
 type Emits = {
   (e: 'delete-footprint', id: string): void;
   (e: 'change-color', id: string): void;
+  (e: 'update-x', id: string, value: number): void;
+  (e: 'update-y', id: string, value: number): void;
+  (e: 'update-name', id: string, value: string): void;
 }
 </script>
 
 <script setup lang="ts">
-defineProps<Props>()
+import { computed } from 'vue';
+
+const props = defineProps<Props>()
 
 defineEmits<Emits>()
+
+const minX = computed(() => {
+  if (!props.footprint.units?.length) return 0;
+  return Math.min(...props.footprint.units.map(u => u.x));
+});
+
+const minY = computed(() => {
+  if (!props.footprint.units?.length) return 0;
+  return Math.min(...props.footprint.units.map(u => u.y));
+});
 </script>
 
 <template>
@@ -30,12 +45,46 @@ defineEmits<Emits>()
       <span class="info-value">{{ footprint.id }}</span>
     </div>
 
+    <div class="property-group">
+      <label for="footprint-name">Nom</label>
+      <input
+          id="footprint-name"
+          type="text"
+          :value="footprint.name"
+          @input="(e) => $emit('update-name', footprint.id, (e.target as HTMLInputElement).value)"
+          placeholder="Nom du footprint"
+      />
+    </div>
+
     <div class="property-info">
       <span class="info-label">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12l-1.41-1.41L13 17.17V3h-2v14.17l-6.59-6.58L3 12l9 9 9-9z"/></svg>
         Unités
       </span>
-      <span class="info-value">{{ footprint.units.length }}</span>
+      <span class="info-value">{{ footprint.units?.length }}</span>
+    </div>
+
+    <div class="property-row">
+      <div class="property-group">
+        <label for="footprint-x">X</label>
+        <input
+            id="footprint-x"
+            type="number"
+            :value="minX"
+            step="20"
+            @input="(e) => $emit('update-x', footprint.id, Number((e.target as HTMLInputElement).value))"
+        />
+      </div>
+      <div class="property-group">
+        <label for="footprint-y">Y</label>
+        <input
+            id="footprint-y"
+            type="number"
+            :value="minY"
+            step="20"
+            @input="(e) => $emit('update-y', footprint.id, Number((e.target as HTMLInputElement).value))"
+        />
+      </div>
     </div>
 
     <div class="property-group">
@@ -62,6 +111,15 @@ defineEmits<Emits>()
 </template>
 
 <style scoped>
+.property-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.property-row .property-group {
+  flex: 1;
+}
+
 h3 {
   margin: 0;
   font-size: 1rem;
@@ -90,6 +148,28 @@ h3 {
   font-size: 0.875rem;
   font-weight: 500;
   color: #374151;
+}
+
+.properties-panel input,
+.properties-panel select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #111827;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+.properties-panel input:focus,
+.properties-panel select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.property-group label svg {
+  color: #9ca3af;
 }
 
 .property-info {

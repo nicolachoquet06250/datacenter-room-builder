@@ -8,8 +8,8 @@ type Props = {
   selectedPillarIndices: number[];
   pillars: Point[];
   selectedFootprint: Footprint | null;
-  selectedCircuitSegments: Array<{ pathIndex: number; segmentIndex: number }>;
-  circuits: Point[][];
+  selectedCircuitIndices: number[];
+  circuits: Circuit[];
   contextMenuOptions: { type: string; podId?: string };
 }
 
@@ -21,9 +21,18 @@ type Emits = {
   (e: 'clear-selection'): void;
   (e: 'update-rack-name', value: string): void;
   (e: 'update-rack-rotation', value: number): void;
+  (e: 'update-rack-x', value: number): void;
+  (e: 'update-rack-y', value: number): void;
   (e: 'delete-pillar', index: number | number[]): void;
   (e: 'delete-footprint', id: string): void;
   (e: 'change-footprint-color', id: string): void;
+  (e: 'update-footprint-x', id: string, value: number): void;
+  (e: 'update-footprint-y', id: string, value: number): void;
+  (e: 'update-footprint-name', id: string, value: string): void;
+  (e: 'update-circuit-name', index: number, value: string): void;
+  (e: 'update-circuit-rotation', index: number, value: number): void;
+  (e: 'update-circuit-x', index: number, value: number): void;
+  (e: 'update-circuit-y', index: number, value: number): void;
   (e: 'delete-circuit-selection'): void;
 }
 </script>
@@ -44,13 +53,18 @@ const emit = defineEmits<Emits>();
 
 const {currentLayerIndex} = useLayers(computed(() => props.walls));
 
+const showPanel = computed(() => {
+  if (props.walls.length > 0) return true;
+  return currentLayerIndex.value === 3; // Index du layer "Baies"
+});
+
 const selectedPillar = computed(() => {
-  if (props.selectedPillarIndices.length === 0) return null;
+  if (!props.pillars || props.selectedPillarIndices.length === 0) return null;
   return props.pillars[props.selectedPillarIndices[0]!] ?? null;
 });
 
 const selectedRack = computed(() => {
-  if (props.selectedRackIndices.length !== 1) return null;
+  if (!props.racks || props.selectedRackIndices.length !== 1) return null;
   const rack = props.racks[props.selectedRackIndices[0]!];
   if (!rack || typeof rack === 'string') return null;
   return rack;
@@ -65,61 +79,82 @@ const onRotationChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   emit('update-rack-rotation', Number(target.value));
 };
+
+const onXChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('update-rack-x', Number(target.value));
+};
+
+const onYChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('update-rack-y', Number(target.value));
+};
 </script>
 
 <template>
-  <div v-if="selectedRackIndices.length === 1 && !isWallSelected" class="properties-panel">
-    <RackPanel
-        v-if="selectedRack"
-        v-bind="selectedRack"
-        @name-updated="onNameInput"
-        @rotation-changed="onRotationChange"
-        @remove-rack="$emit('remove-rack', selectedRackIndices[0]!)"
-    />
-  </div>
+  <template v-if="showPanel">
+    <div v-if="selectedRackIndices.length === 1 && !isWallSelected" class="properties-panel">
+      <RackPanel
+          v-if="selectedRack"
+          v-bind="selectedRack"
+          @name-updated="onNameInput"
+          @rotation-changed="onRotationChange"
+          @x-updated="onXChange"
+          @y-updated="onYChange"
+          @remove-rack="$emit('remove-rack', selectedRackIndices[0]!)"
+      />
+    </div>
 
-  <div v-else-if="isWallSelected && currentLayerIndex === 0" class="properties-panel">
-    <RoomPropertiesPanel
-      :wall-count="walls.length"
-      :unit-count="unitCount"
-    />
-  </div>
+    <div v-else-if="isWallSelected && currentLayerIndex === 0" class="properties-panel">
+      <RoomPropertiesPanel
+        :wall-count="walls.length"
+        :unit-count="unitCount"
+      />
+    </div>
 
-  <div v-else-if="selectedPillarIndices.length > 0" class="properties-panel">
-    <PillarPanel
-      :selected-pillar="selectedPillar"
-      :selected-pillar-indices="selectedPillarIndices"
-      @delete-pillar="$emit('delete-pillar', selectedPillarIndices)"
-    />
-  </div>
+    <div v-else-if="selectedPillarIndices.length > 0" class="properties-panel">
+      <PillarPanel
+        :selected-pillar="selectedPillar"
+        :selected-pillar-indices="selectedPillarIndices"
+        @delete-pillar="$emit('delete-pillar', selectedPillarIndices)"
+      />
+    </div>
 
-  <div v-else-if="selectedFootprint" class="properties-panel">
-    <FootprintPanel
-        :footprint="selectedFootprint"
-        @delete-footprint="$emit('delete-footprint', $event)"
-        @change-color="$emit('change-footprint-color', $event)"
-    />
-  </div>
+    <div v-else-if="selectedFootprint" class="properties-panel">
+      <FootprintPanel
+          :footprint="selectedFootprint"
+          @delete-footprint="$emit('delete-footprint', $event)"
+          @change-color="$emit('change-footprint-color', $event)"
+          @update-x="(id, val) => $emit('update-footprint-x', id, val)"
+          @update-y="(id, val) => $emit('update-footprint-y', id, val)"
+          @update-name="(id, val) => $emit('update-footprint-name', id, val)"
+      />
+    </div>
 
-  <div v-else-if="selectedCircuitSegments.length > 0" class="properties-panel">
-    <CircuitPanel
-      :selected-segments="selectedCircuitSegments"
-      :circuits="circuits"
-      @delete-selection="$emit('delete-circuit-selection')"
-    />
-  </div>
+    <div v-else-if="selectedCircuitIndices.length > 0" class="properties-panel">
+      <CircuitPanel
+        :selected-circuit-indices="selectedCircuitIndices"
+        :circuits="circuits"
+        @delete-selection="$emit('delete-circuit-selection')"
+        @update-name="(idx, val) => $emit('update-circuit-name', idx, val)"
+        @update-rotation="(idx, val) => $emit('update-circuit-rotation', idx, val)"
+        @update-x="(idx, val) => $emit('update-circuit-x', idx, val)"
+        @update-y="(idx, val) => $emit('update-circuit-y', idx, val)"
+      />
+    </div>
 
-  <div v-else-if="selectedRackIndices.length > 1" class="properties-panel">
-    <MultipleRackPanel
-        :selected-rack-indices="selectedRackIndices"
-        :context-menu-options="contextMenuOptions"
+    <div v-else-if="selectedRackIndices.length > 1" class="properties-panel">
+      <MultipleRackPanel
+          :selected-rack-indices="selectedRackIndices"
+          :context-menu-options="contextMenuOptions"
 
-        @create-pod="$emit('create-pod')"
-        @delete-pod="$emit('delete-pod', contextMenuOptions.podId!)"
-        @leave-pod="$emit('leave-pod')"
-        @clear-selection="$emit('clear-selection')"
-    />
-  </div>
+          @create-pod="$emit('create-pod')"
+          @delete-pod="$emit('delete-pod', contextMenuOptions.podId!)"
+          @leave-pod="$emit('leave-pod')"
+          @clear-selection="$emit('clear-selection')"
+      />
+    </div>
+  </template>
 </template>
 
 <style scoped>
@@ -133,9 +168,9 @@ const onRotationChange = (event: Event) => {
   padding: 1.25rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   border-radius: 8px;
-  max-height: calc(100% - 2rem);
+  max-height: calc(100% - 18rem);
   overflow-y: auto;
-  z-index: 10;
+  z-index: 9;
 }
 
 .properties-panel h3 {

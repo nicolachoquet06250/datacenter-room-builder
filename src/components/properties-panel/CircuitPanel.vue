@@ -1,11 +1,15 @@
 <script lang="ts">
 type Props = {
-  selectedSegments: Array<{ pathIndex: number; segmentIndex: number }>;
-  circuits: Point[][];
+  selectedCircuitIndices: number[];
+  circuits: Circuit[];
 }
 
 type Emits = {
   (e: 'delete-selection'): void;
+  (e: 'update-name', index: number, value: string): void;
+  (e: 'update-rotation', index: number, value: number): void;
+  (e: 'update-x', index: number, value: number): void;
+  (e: 'update-y', index: number, value: number): void;
 }
 </script>
 
@@ -13,29 +17,29 @@ type Emits = {
 import { computed } from 'vue';
 
 const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
-defineEmits<Emits>();
+const isMultiple = computed(() => props.selectedCircuitIndices.length > 1);
 
-const sectionCount = computed(() => {
-  if (props.selectedSegments.length === 0) return 0;
-  
-  // Si on a sélectionné un chemin entier, on compte ses segments
-  // Dans RoomBuilder.vue, selectCircuitPath sélectionne tous les segments d'un chemin.
-  // Si on a sélectionné plusieurs segments éparpillés (pas encore possible via l'UI mais prévu par le type),
-  // on affiche simplement le nombre de segments sélectionnés.
-  return props.selectedSegments.length;
+const firstCircuit = computed(() => {
+  if (props.selectedCircuitIndices.length === 0) return null;
+  return props.circuits[props.selectedCircuitIndices[0]!] || null;
 });
 
-const isWholePath = computed(() => {
-  if (props.selectedSegments.length === 0) return false;
-  const pathIndex = props.selectedSegments[0]!.pathIndex;
-  const circuit = props.circuits[pathIndex];
-  if (!circuit) return false;
-  
-  // Vérifier si tous les segments du chemin sont sélectionnés
-  const pathSegments = props.selectedSegments.filter(s => s.pathIndex === pathIndex);
-  return pathSegments.length === circuit.length - 1;
-});
+const onNameInput = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('update-name', props.selectedCircuitIndices[0]!, target.value);
+};
+
+const onXChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('update-x', props.selectedCircuitIndices[0]!, Number(target.value));
+};
+
+const onYChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  emit('update-y', props.selectedCircuitIndices[0]!, Number(target.value));
+};
 </script>
 
 <template>
@@ -51,23 +55,27 @@ const isWholePath = computed(() => {
       <h3>Propriétés du Circuit</h3>
     </div>
 
-    <div class="property-info">
-      <span class="info-label">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
-        Nombre de sections
-      </span>
-      <span class="info-value">{{ sectionCount }}</span>
+    <div v-if="!isMultiple && firstCircuit" class="property-form">
+      <div class="form-group">
+        <label>Nom</label>
+        <input type="text" :value="firstCircuit.name" @input="onNameInput" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Position X</label>
+          <input type="number" :value="firstCircuit.x" @input="onXChange" />
+        </div>
+        <div class="form-group">
+          <label>Position Y</label>
+          <input type="number" :value="firstCircuit.y" @input="onYChange" />
+        </div>
+      </div>
     </div>
 
-    <div v-if="isWholePath" class="property-info">
-      <span class="info-label">Type</span>
-      <span class="info-value">Chemin complet</span>
-    </div>
-    <div v-else class="property-info">
-      <span class="info-label">Type</span>
-      <span class="info-value">Segment(s) individuel(s)</span>
+    <div v-else-if="isMultiple" class="property-info">
+      <span class="info-label">Circuits sélectionnés</span>
+      <span class="info-value">{{ selectedCircuitIndices.length }}</span>
     </div>
 
     <div class="actions">
@@ -96,6 +104,47 @@ h3 {
   margin-bottom: 1.25rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid #f3f4f6;
+}
+
+.property-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  > .form-group {
+    width: 100%;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  width: calc(50% - 10px);
+}
+
+.form-row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  gap: 1rem;
+}
+
+label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+input {
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #1e293b;
 }
 
 .property-info {
@@ -149,6 +198,6 @@ h3 {
 }
 
 .btn-danger:hover {
-  background-color: #fee2e2;
+  background-color: #c0392b;
 }
 </style>

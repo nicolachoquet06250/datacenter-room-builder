@@ -2,18 +2,20 @@ export const rackWidth = 40;
 export const rackHeight = 40;
 
 const getRackCorners = (rack: Rack) => {
+  const x = rack.x || 0;
+  const y = rack.y || 0;
   return [
-    { x: rack.x, y: rack.y },
-    { x: rack.x + rackWidth, y: rack.y },
-    { x: rack.x, y: rack.y + rackHeight },
-    { x: rack.x + rackWidth, y: rack.y + rackHeight }
+    { x, y },
+    { x: x + rackWidth, y },
+    { x, y: y + rackHeight },
+    { x: x + rackWidth, y: y + rackHeight }
   ];
 };
 
 export const useRoomBuilderGeometry = () => {
   const getPodBoundaries = (layerRacks: Rack[], layerPods: Pod[] = []) => {
     return layerPods.map(pod => {
-      const podRacks = layerRacks.filter(r => r.podId === pod.id);
+      const podRacks = layerRacks.filter(r => r.podId === pod.id && r.x !== null && r.x !== undefined && r.y !== null && r.y !== undefined);
       if (podRacks.length === 0) return null;
 
       let minX = Infinity;
@@ -26,9 +28,11 @@ export const useRoomBuilderGeometry = () => {
         const rotation = typeof rack.rotation === 'number' ? rack.rotation : 0;
 
         if (rotation) {
+          const x = rack.x || 0;
+          const y = rack.y || 0;
           const angle = (rotation * Math.PI) / 180;
-          const cx = rack.x + rackWidth / 2;
-          const cy = rack.y + rackHeight / 2;
+          const cx = x + rackWidth / 2;
+          const cy = y + rackHeight / 2;
 
           corners.forEach(corner => {
             const x = cx + (corner.x - cx) * Math.cos(angle) - (corner.y - cy) * Math.sin(angle);
@@ -114,10 +118,44 @@ export const useRoomBuilderGeometry = () => {
     return inside;
   };
 
+  const isElementInWalls = (x: number, y: number, rotation: number | null, polygon: Point[], width: number = 40, height: number = 40) => {
+    if (polygon.length < 3) return true;
+
+    const corners = [
+      { x, y },
+      { x: x + width, y },
+      { x, y: y + height },
+      { x: x + width, y: y + height }
+    ];
+
+    const angle = ((rotation || 0) * Math.PI) / 180;
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+
+    return corners.every(corner => {
+      let finalX = corner.x;
+      let finalY = corner.y;
+
+      if (rotation) {
+        finalX = cx + (corner.x - cx) * Math.cos(angle) - (corner.y - cy) * Math.sin(angle);
+        finalY = cy + (corner.x - cx) * Math.sin(angle) + (corner.y - cy) * Math.cos(angle);
+      }
+
+      // On réduit légèrement la taille de l'élément pour la vérification des collisions
+      // afin d'éviter les problèmes de précision aux bords des murs (unité de grille)
+      const margin = 0.1;
+      const testX = finalX + (finalX > cx ? -margin : margin);
+      const testY = finalY + (finalY > cy ? -margin : margin);
+
+      return isPointInPolygon(testX, testY, polygon);
+    });
+  };
+
   return {
     getPodBoundaries,
     getWallBoundingBox,
     getConstrainedPoint,
-    isPointInPolygon
+    isPointInPolygon,
+    isElementInWalls
   };
 };

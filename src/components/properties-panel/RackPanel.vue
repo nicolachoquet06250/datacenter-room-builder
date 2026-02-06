@@ -2,18 +2,26 @@
 type Props = {
   podId?: string|null,
   name: string,
-  rotation?: number|null
+  rotation?: number|null,
+  x?: number | null,
+  y?: number | null
 }
 
 type Emits = {
   (e: 'remove-rack'): void;
   (e: 'name-updated', evt: Event): void;
   (e: 'rotation-changed', evt: Event): void;
+  (e: 'x-updated', evt: Event): void;
+  (e: 'y-updated', evt: Event): void;
 }
 </script>
 
 <script setup lang="ts">
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  rotation: 0,
+  x: 0,
+  y: 0
+})
 
 defineEmits<Emits>()
 </script>
@@ -37,6 +45,27 @@ defineEmits<Emits>()
           @input="$emit('name-updated', $event)"
           @keyup.delete.stop.prevent="() => {}"
       />
+    </div>
+
+    <div class="property-row">
+      <div class="property-group">
+        <label for="rack-x">X</label>
+        <input
+            id="rack-x"
+            type="number"
+            :value="x"
+            @input="$emit('x-updated', $event)"
+        />
+      </div>
+      <div class="property-group">
+        <label for="rack-y">Y</label>
+        <input
+            id="rack-y"
+            type="number"
+            :value="y"
+            @input="$emit('y-updated', $event)"
+        />
+      </div>
     </div>
 
     <div class="property-group">
@@ -74,6 +103,15 @@ defineEmits<Emits>()
 </template>
 
 <style scoped>
+.property-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.property-row .property-group {
+  flex: 1;
+}
+
 h3 {
   margin: 0;
   font-size: 1rem;

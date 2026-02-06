@@ -1,4 +1,6 @@
 <script lang="ts">
+const circuitWidth = 40;
+const circuitHeight = 40;
 const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
 
 type Props = {
@@ -9,7 +11,6 @@ type Props = {
   isDrawingWalls: boolean;
   isDrawingCircuit: boolean;
   wallPreviewPoint: Point | null;
-  circuitPreviewPoint: Point | null;
   podBoundaries: Array<(Point & Size & { id: string }) | null>;
   wallBoundingBox: (Size & MinPoint & MaxPoint) | null;
   horizontalCoords: (Point & { label: string })[];
@@ -28,7 +29,7 @@ type Props = {
   hoveredUnit: Point | null;
   gridLabel: string;
   selectedFootprintId: string | null;
-  selectedCircuitSegmentKeys: string[];
+  selectedCircuitIndices: number[];
 }
 
 type Emits = {
@@ -43,17 +44,21 @@ type Emits = {
   (e: 'delete-pillar', index: number): void;
   (e: 'select-pillar', event: MouseEvent, index: number): void;
   (e: 'start-drag-pillar', event: MouseEvent, index: number): void;
-  (e: 'select-circuit-segment', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
-  (e: 'select-circuit-path', event: MouseEvent, pathIndex: number, segmentIndex: number): void;
+  (e: 'select-circuit', event: MouseEvent, index: number): void;
+  (e: 'start-drag-circuit', event: MouseEvent, index: number): void;
   (e: 'select-footprint', id: string): void;
+  (e: 'start-drag-footprint', event: MouseEvent, id: string): void;
+  (e: 'drop-rack', event: DragEvent): void;
+  (e: 'dragover-rack', event: DragEvent): void;
 }
 </script>
 
 <script setup lang="ts">
-import {computed, inject, ref} from 'vue';
+import {inject, ref} from 'vue';
 import {exposedFunctions} from "../RoomBuilder.vue";
 import type {ExposedFunctions} from "../RoomBuilder.vue";
 import BuilderGrid from "./BuilderGrid.vue";
+import {getContrastColor} from "../../utils/colors";
 
 const props = withDefaults(defineProps<Props>(), {
   selectedPillarIndices: () => []
@@ -62,18 +67,6 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const svgRef = ref<SVGSVGElement | null>(null);
-const lastCircuitPoint = computed(() => {
-  const circuits = props.layers[props.currentLayerIndex]?.circuits;
-  if (!circuits?.length) return null;
-  const lastPath = circuits[circuits.length - 1];
-  if (!lastPath?.length) return null;
-  return lastPath[lastPath.length - 1];
-});
-
-const selectedSegmentKeys = computed(() => new Set(props.selectedCircuitSegmentKeys));
-
-const isSegmentSelected = (pathIndex: number, segmentIndex: number) =>
-  selectedSegmentKeys.value.has(`${pathIndex}-${segmentIndex}`);
 
 const {getPodBoundaries} = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions);
 
@@ -83,6 +76,24 @@ const handleSelectPillar = (e: MouseEvent, pIdx: number) => {
     emit('start-drag-pillar', e, pIdx);
   }
 }
+
+const handleSelectCircuit = (e: MouseEvent, cIdx: number) => {
+  emit('select-circuit', e, cIdx);
+  emit('start-drag-circuit', e, cIdx);
+}
+
+const getFootprintCenter = (footprint: Footprint) => {
+  if (!footprint.units || footprint.units.length === 0) return { x: 0, y: 0 };
+  const minX = Math.min(...footprint.units.map(u => u.x));
+  const maxX = Math.max(...footprint.units.map(u => u.x));
+  const minY = Math.min(...footprint.units.map(u => u.y));
+  const maxY = Math.max(...footprint.units.map(u => u.y));
+  return {
+    x: (minX + maxX + 20) / 2,
+    y: (minY + maxY + 20) / 2
+  };
+};
+
 
 defineExpose({svgRef});
 </script>
@@ -99,23 +110,25 @@ defineExpose({svgRef});
       }"
       @mousedown="$emit('deselect', $event)"
       @mousemove="$emit('mousemove-svg', $event)"
+      @dragover.prevent="$emit('dragover-rack', $event)"
+      @drop="$emit('drop-rack', $event)"
   >
     <BuilderGrid
         :zoom-level="zoomLevel"
         :pan-offset="panOffset"
     />
 
-    <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`">
+    <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`" v-if="layers && layers.length > 0">
       <g
           v-for="(layer, lIdx) in layers"
-          :key="`layer-${layer.id}`"
-          v-show="lIdx !== currentLayerIndex"
+          :key="`layer-${layer?.id || lIdx}`"
+          v-show="lIdx !== currentLayerIndex && layer?.walls?.length > 2"
           class="layer-inactive"
       >
-        <g v-if="lIdx === 2" class="footprints-layer">
+        <g v-if="lIdx === 2 && layer?.footprints" class="footprints-layer">
           <g v-for="footprint in layer.footprints" :key="footprint.id">
             <rect
-                v-for="(unit, uIdx) in footprint.units"
+                v-for="(unit, uIdx) in footprint.units || []"
                 :key="uIdx"
                 :x="unit.x"
                 :y="unit.y"
@@ -124,10 +137,23 @@ defineExpose({svgRef});
                 :fill="footprint.color"
                 fill-opacity="0.2"
             />
+            <text
+                v-if="footprint.name"
+                :x="getFootprintCenter(footprint).x"
+                :y="getFootprintCenter(footprint).y"
+                text-anchor="middle"
+                dominant-baseline="middle"
+                class="footprint-label"
+                :fill="getContrastColor(footprint.color)"
+                fill-opacity="0.5"
+                pointer-events="none"
+            >
+              {{ footprint.name }}
+            </text>
           </g>
         </g>
         <polygon
-            v-if="layer.walls?.length > 2"
+            v-if="layer?.walls?.length > 2"
             :points="layer.walls.map(p => `${p.x},${p.y}`).join(' ')"
             class="room-surface"
             stroke="rgba(255,255,255,0.3)"
@@ -135,30 +161,42 @@ defineExpose({svgRef});
             stroke-linejoin="round"
         />
         <rect
-            v-for="(pillar, pIdx) in layer.pillars"
-            :key="`pillar-inactive-${layer.id}-${pIdx}`"
+            v-for="(pillar, pIdx) in layer?.pillars || []"
+            :key="`pillar-inactive-${layer?.id || lIdx}-${pIdx}`"
             :x="pillar.x - 10"
             :y="pillar.y - 10"
             :width="20"
             :height="20"
             fill="#333"
         />
-        <g v-if="layer.circuits?.length">
-          <polyline
-              v-for="(circuit, circuitIdx) in layer.circuits"
-              :key="`circuit-${layer.id}-${circuitIdx}`"
-              :points="circuit.map(p => `${p.x},${p.y}`).join(' ')"
-              fill="none"
-              stroke="#63b3ed"
-              stroke-width="3"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-              class="circuit-line"
-          />
+        <g v-if="layer?.circuits?.length">
+          <template v-for="(circuit, circuitIdx) in layer.circuits" :key="`circuit-${layer?.id || lIdx}-${circuitIdx}`">
+            <g v-if="circuit && circuit.x !== null && circuit.x !== undefined && circuit.y !== null && circuit.y !== undefined"
+               :transform="`rotate(${circuit.rotation || 0}, ${circuit.x + circuitWidth / 2}, ${circuit.y + circuitHeight / 2})`"
+            >
+              <rect
+                  :x="circuit.x"
+                  :y="circuit.y"
+                  :width="circuitWidth"
+                  :height="circuitHeight"
+                  fill="none"
+                  stroke="#63b3ed"
+                  stroke-width="2"
+              />
+              <image
+                  :x="circuit.x"
+                  :y="circuit.y"
+                  :width="circuitWidth"
+                  :height="circuitHeight"
+                  :href="`${itop_url}/env-production/Electricite/images/circuitelec.jpg`"
+                  preserveAspectRatio="xMidYMid slice"
+              />
+            </g>
+          </template>
         </g>
 
         <rect
-            v-for="pod in getPodBoundaries(layer.racks, layer.pods)"
+            v-for="pod in (layer?.racks && layer?.pods ? getPodBoundaries(layer.racks, layer.pods).filter(Boolean) : [])"
             :key="pod!.id"
             :x="pod!.x"
             :y="pod!.y"
@@ -167,8 +205,8 @@ defineExpose({svgRef});
             class="pod-rect"
         />
 
-        <g v-for="(rack, tIdx) in layer.racks" :key="`rack-${tIdx}`">
-          <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`">
+        <g v-for="(rack, tIdx) in layer?.racks || []" :key="`rack-${tIdx}`">
+          <g v-if="rack && rack.x !== undefined && rack.x !== null && rack.y !== undefined && rack.y !== null" :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`">
             <rect
                 :x="rack.x"
                 :y="rack.y"
@@ -198,51 +236,7 @@ defineExpose({svgRef});
         </g>
       </g>
 
-      <g class="layer-active">
-        <g v-if="currentLayerIndex === 2" class="footprints-layer">
-          <g v-for="footprint in layers[2]?.footprints" :key="footprint.id"
-             @mousedown.stop="$emit('select-footprint', footprint.id)"
-             class="footprint-group"
-             :class="{ 'selected': footprint.id === selectedFootprintId }"
-          >
-            <rect
-                v-for="(unit, uIdx) in footprint.units"
-                :key="uIdx"
-                :x="unit.x"
-                :y="unit.y"
-                :width="20"
-                :height="20"
-                :fill="footprint.color"
-                :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
-                stroke="white"
-                :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
-            />
-          </g>
-          <rect
-              v-for="(unit, uIdx) in selectedUnits"
-              :key="`selected-${uIdx}`"
-              :x="unit.x"
-              :y="unit.y"
-              :width="20"
-              :height="20"
-              fill="rgba(0, 123, 255, 0.4)"
-              stroke="white"
-              stroke-width="0.5"
-          />
-          <rect
-              v-if="hoveredUnit && !isInteracting"
-              :x="hoveredUnit.x"
-              :y="hoveredUnit.y"
-              :width="20"
-              :height="20"
-              fill="#ff4500"
-              fill-opacity="0.4"
-              stroke="white"
-              stroke-width="0.5"
-              style="pointer-events: none"
-          />
-        </g>
-
+      <g v-if="walls.length > 0 || currentLayerIndex === 3" class="layer-active">
         <polygon
             v-if="!isDrawingWalls && walls.length > 2"
             :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
@@ -277,6 +271,62 @@ defineExpose({svgRef});
             stroke-width="1"
             stroke-linejoin="round"
         />
+
+        <g v-if="currentLayerIndex === 2 && layers[2]?.footprints" class="footprints-layer">
+          <g v-for="footprint in layers[2].footprints" :key="footprint.id"
+             @mousedown.stop="$emit('start-drag-footprint', $event, footprint.id)"
+             class="footprint-group"
+             :class="{ 'selected': footprint.id === selectedFootprintId }"
+          >
+            <rect
+                v-for="(unit, uIdx) in footprint.units || []"
+                :key="uIdx"
+                :x="unit.x"
+                :y="unit.y"
+                :width="20"
+                :height="20"
+                :fill="footprint.color"
+                :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
+                stroke="white"
+                :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
+            />
+            <text
+                v-if="footprint.name"
+                :x="getFootprintCenter(footprint).x"
+                :y="getFootprintCenter(footprint).y"
+                text-anchor="middle"
+                dominant-baseline="middle"
+                class="footprint-label"
+                :fill="getContrastColor(footprint.color)"
+                pointer-events="none"
+            >
+              {{ footprint.name }}
+            </text>
+          </g>
+          <rect
+              v-for="(unit, uIdx) in selectedUnits"
+              :key="`selected-${uIdx}`"
+              :x="unit.x"
+              :y="unit.y"
+              :width="20"
+              :height="20"
+              fill="rgba(0, 123, 255, 0.4)"
+              stroke="white"
+              stroke-width="0.5"
+          />
+          <rect
+              v-if="hoveredUnit && !isInteracting"
+              :x="hoveredUnit.x"
+              :y="hoveredUnit.y"
+              :width="20"
+              :height="20"
+              fill="#ff4500"
+              fill-opacity="0.4"
+              stroke="white"
+              stroke-width="0.5"
+              style="pointer-events: none"
+          />
+        </g>
 
         <rect
             v-if="isDrawingPillar && pillarPreviewPoint"
@@ -322,6 +372,8 @@ defineExpose({svgRef});
               stroke-width="4"
               stroke-linejoin="round"
               stroke-linecap="round"
+              stroke-dasharray="8,4"
+              opacity="0.6"
           />
           <line
               v-if="walls.length > 2 && wallPreviewPoint"
@@ -329,53 +381,61 @@ defineExpose({svgRef});
               :y1="wallPreviewPoint.y"
               :x2="walls[0]?.x"
               :y2="walls[0]?.y"
-              stroke="rgba(0,0,0,0.2)"
-              stroke-width="2"
-              stroke-dasharray="2,2"
+              stroke="#333"
+              stroke-width="4"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              stroke-dasharray="8,4"
+              opacity="0.6"
           />
         </template>
 
         <g v-if="layers[currentLayerIndex]?.circuits?.length">
-          <g v-for="(circuit, circuitIdx) in layers[currentLayerIndex]?.circuits"
-             :key="`circuit-active-${circuitIdx}`">
-            <line
-                v-for="(point, pointIdx) in circuit.slice(0, -1)"
-                :key="`circuit-segment-${circuitIdx}-${pointIdx}`"
-                :x1="point.x"
-                :y1="point.y"
-                :x2="circuit[pointIdx + 1]!.x"
-                :y2="circuit[pointIdx + 1]!.y"
-                class="circuit-segment"
-                :class="{
-                  selected: isSegmentSelected(circuitIdx, pointIdx)
-                }"
-                @mousedown.stop
-                @click.stop="$emit('select-circuit-segment', $event, circuitIdx, pointIdx)"
-                @dblclick.stop="$emit('select-circuit-path', $event, circuitIdx, pointIdx)"
-            />
-          </g>
+          <template v-for="(circuit, circuitIdx) in layers[currentLayerIndex]?.circuits" :key="`circuit-active-${circuitIdx}`">
+            <g v-if="circuit.x !== null && circuit.x !== undefined && circuit.y !== null && circuit.y !== undefined"
+               :transform="`rotate(${circuit.rotation || 0}, ${circuit.x + circuitWidth / 2}, ${circuit.y + circuitHeight / 2})`"
+               @mousedown.stop="handleSelectCircuit($event, circuitIdx)"
+            >
+              <rect
+                  :x="circuit.x"
+                  :y="circuit.y"
+                  :width="circuitWidth"
+                  :height="circuitHeight"
+                  class="circuit-rect"
+                  :class="{
+                    selected: selectedCircuitIndices.includes(circuitIdx)
+                  }"
+              />
+              <image
+                  :x="circuit.x"
+                  :y="circuit.y"
+                  :width="circuitWidth"
+                  :height="circuitHeight"
+                  :href="`${itop_url}/env-production/Electricite/images/circuitelec.jpg`"
+                  preserveAspectRatio="xMidYMid slice"
+                  style="pointer-events: none"
+              />
+
+              <template v-if="selectedCircuitIndices.length === 1 && selectedCircuitIndices[0] === circuitIdx">
+                <circle
+                    v-for="(pos, pIdx) in [
+                    {x: circuit.x, y: circuit.y},
+                    {x: circuit.x + circuitWidth, y: circuit.y},
+                    {x: circuit.x, y: circuit.y + circuitHeight},
+                    {x: circuit.x + circuitWidth, y: circuit.y + circuitHeight}
+                  ]"
+                    :key="pIdx"
+                    :cx="pos.x"
+                    :cy="pos.y"
+                    r="6"
+                    class="rotation-handle"
+                    @mousedown="$emit('start-drag-circuit', $event, circuitIdx)"
+                />
+              </template>
+            </g>
+          </template>
         </g>
 
-        <template v-if="currentLayerIndex === 1">
-          <circle
-              v-if="circuitPreviewPoint"
-              :cx="circuitPreviewPoint.x"
-              :cy="circuitPreviewPoint.y"
-              r="3"
-              fill="#f6ad55"
-          />
-          <line
-              v-if="isDrawingCircuit && lastCircuitPoint && circuitPreviewPoint"
-              :x1="lastCircuitPoint.x"
-              :y1="lastCircuitPoint.y"
-              :x2="circuitPreviewPoint.x"
-              :y2="circuitPreviewPoint.y"
-              stroke="#f6ad55"
-              stroke-width="2"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-          />
-        </template>
 
         <rect
             v-for="pod in podBoundaries"
@@ -416,7 +476,7 @@ defineExpose({svgRef});
         </g>
 
         <g v-for="(rack, tIdx) in racks" :key="tIdx">
-          <template v-if="typeof rack !== 'string'">
+          <template v-if="typeof rack !== 'string' && rack.x !== undefined && rack.x !== null && rack.y !== undefined && rack.y !== null">
             <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`">
               <rect
                   :x="rack.x"
@@ -625,6 +685,14 @@ defineExpose({svgRef});
   user-select: none;
 }
 
+.footprint-label {
+  font-size: 10px;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  user-select: none;
+}
+
 .layer-inactive {
   opacity: 0.3;
   pointer-events: none;
@@ -643,17 +711,20 @@ defineExpose({svgRef});
   stroke-linecap: round;
 }
 
-.circuit-segment.selected {
+.circuit-rect.selected {
   stroke: #ff4500;
-  stroke-width: 4;
+  stroke-width: 2;
 }
 
 .footprint-group {
-  cursor: pointer;
+  cursor: move;
 }
 
 .footprint-group.selected rect {
   stroke: #2563eb;
   stroke-width: 1.5;
+}
+.footprint-group.draggable {
+  cursor: move;
 }
 </style>

@@ -1,4 +1,4 @@
-import {computed, ref} from "vue";
+import {computed, ref, watch} from "vue";
 import {useLayers} from "./useLayers.ts";
 
 const isDrawingWalls = ref(false);
@@ -7,6 +7,7 @@ const wallsRef = ref<Point[]>([]);
 const isWallSelected = ref(false);
 
 export const useDrawRoomWalls = () => {
+    const layers = ref<Layer[]>([]);
     const walls = computed({
         get: () => layers.value.length > 0 ? (layers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value,
         set: (val) => {
@@ -14,11 +15,17 @@ export const useDrawRoomWalls = () => {
                 layers.value.forEach(layer => {
                     layer.walls = JSON.parse(JSON.stringify(val));
                 });
-            } else {
-                wallsRef.value = val;
             }
+            wallsRef.value = JSON.parse(JSON.stringify(val));
         }
     });
+
+    const {layers: _layers, currentLayerIndex} = useLayers(walls);
+
+    watch(_layers, () => {
+        layers.value = _layers.value;
+    }, {immediate: true, once: true})
+
     const cancelDrawingWalls = () => {
         isDrawingWalls.value = false;
         wallPreviewPoint.value = null;
@@ -30,7 +37,6 @@ export const useDrawRoomWalls = () => {
         walls.value.push(point);
     }
 
-    const {layers, currentLayerIndex} = useLayers(walls);
 
     return {
         isDrawingWalls,

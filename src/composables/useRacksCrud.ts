@@ -141,6 +141,20 @@ export const useRacksCrud = (roomId: number) => {
         rack.rotation = Math.round((value ?? 0) / 45) * 45;
     };
 
+    const updateRackX = (value: number) => {
+        if (selectedRackIndices.value.length !== 1) return;
+        const rack = racks.value[selectedRackIndices.value[0]!];
+        if (!rack) return;
+        rack.x = value;
+    };
+
+    const updateRackY = (value: number) => {
+        if (selectedRackIndices.value.length !== 1) return;
+        const rack = racks.value[selectedRackIndices.value[0]!];
+        if (!rack) return;
+        rack.y = value;
+    };
+
     const startRotateRack = (event: MouseEvent, index: number) => {
         if (isDrawingWalls.value || currentLayerIndex.value === 1) return;
         isWallSelected.value = false;
@@ -176,7 +190,7 @@ export const useRacksCrud = (roomId: number) => {
             }
         }
 
-        rackPositionsBeforeDrag.value = racks.value.map(r => ({ x: r.x, y: r.y }));
+        rackPositionsBeforeDrag.value = racks.value.map(r => ({ x: r.x || 0, y: r.y || 0 }));
 
         lastMousePos.x = event.clientX;
         lastMousePos.y = event.clientY;
@@ -198,8 +212,8 @@ export const useRacksCrud = (roomId: number) => {
             const snapY = Math.round(rawY / 20) * 20;
 
             if (walls.value.length > 2) {
-                const { isPointInPolygon } = useRoomBuilderGeometry();
-                if (isPointInPolygon(snapX + rackWidth / 2, snapY + rackHeight / 2, walls.value)) {
+                const { isElementInWalls } = useRoomBuilderGeometry();
+                if (isElementInWalls(snapX, snapY, rack.rotation || 0, walls.value)) {
                     rack.x = snapX;
                     rack.y = snapY;
                 }
@@ -247,6 +261,8 @@ export const useRacksCrud = (roomId: number) => {
         pastRack,
         updateRackName,
         updateRackRotation,
+        updateRackX,
+        updateRackY,
         startRotateRack,
         rotateRack,
         removeRack,

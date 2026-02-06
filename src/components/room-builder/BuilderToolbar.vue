@@ -4,6 +4,8 @@ type Props = {
   redoDisabled: boolean;
   canAddRack: boolean;
   showAddRack: boolean;
+  canAddCircuit: boolean;
+  showAddCircuit: boolean;
   canClearWalls: boolean;
   isDrawingWalls: boolean;
   isDrawingPillar: boolean;
@@ -18,11 +20,13 @@ type Emits = {
   (e: 'undo'): void;
   (e: 'redo'): void;
   (e: 'addRack'): void;
+  (e: 'addCircuit'): void;
   (e: 'toggleWalls'): void;
   (e: 'togglePillar'): void;
   (e: 'clearWalls'): void;
   (e: 'zoomOut'): void;
   (e: 'zoomIn'): void;
+  (e: 'resetPan'): void;
   (e: 'save'): void;
 }
 </script>
@@ -76,6 +80,16 @@ const radius = computed(() => `${props.radius}px`);
     <div class="toolbar-section zoom-controls">
       <button
           class="toolbar-btn"
+          title="Recentrer"
+          @click="$emit('resetPan')"
+      >
+        <span class="icon">🎯</span>
+      </button>
+
+      <div class="toolbar-divider"/>
+
+      <button
+          class="toolbar-btn"
           :disabled="!canZoomOut"
           title="Zoom arrière"
           @click="$emit('zoomOut')"
@@ -106,6 +120,23 @@ const radius = computed(() => `${props.radius}px`);
           <span class="icon">+</span>
 
           <span class="label">Rack</span>
+        </button>
+      </div>
+    </template>
+
+    <template v-if="showAddCircuit">
+      <div class="toolbar-divider"/>
+
+      <div class="toolbar-section circuit-controls">
+        <button
+            class="toolbar-btn"
+            @click="$emit('addCircuit')"
+            :disabled="!canAddCircuit"
+            :title="!canAddCircuit ? 'Dessinez d\'abord les murs pour ajouter des circuits' : 'Ajouter un circuit électrique'"
+        >
+          <span class="icon">+</span>
+
+          <span class="label">Circuit</span>
         </button>
       </div>
     </template>
