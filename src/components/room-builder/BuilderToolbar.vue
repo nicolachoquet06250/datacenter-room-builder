@@ -14,6 +14,7 @@ type Props = {
   canZoomIn: boolean;
   selectedLayoutIndex: number | null;
   radius: number;
+  disableAddRacks: boolean
 }
 
 type Emits = {
@@ -107,7 +108,7 @@ const radius = computed(() => `${props.radius}px`);
       >+</button>
     </div>
 
-    <template v-if="showAddRack">
+    <template v-if="showAddRack && !disableAddRacks">
       <div class="toolbar-divider"/>
 
       <div class="toolbar-section rack-controls">

@@ -11,6 +11,7 @@ type Props = {
   roomName: string;
   layers?: string;
   radius?: number
+  disableAddRacks?: boolean
 }
 
 type Emits = {
@@ -48,7 +49,8 @@ const props = withDefaults(
   defineProps<Props>(),
   {
     layers: '[]',
-    radius: 0
+    radius: 0,
+    disableAddRacks: false,
   }
 );
 
@@ -1258,6 +1260,7 @@ provide<ExposedFunctions>(exposedFunctions, {
         :can-zoom-in="zoomLevel < 3"
         :selected-layout-index="currentLayerIndex"
         :radius="props.radius"
+        :disable-add-racks="disableAddRacks"
 
         @undo="undo"
         @redo="redo"
