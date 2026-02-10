@@ -1,5 +1,10 @@
 {
-  "name": "map-reservation-restaurent-webcomponents",
+  "name": "datacenter-room-builder",
+  "author": {
+    "email": "contact@nicolas-choquet.fr",
+    "name": "Nicolas Choquet",
+    "url": "https://nicolaschoquet.fr"
+  },
   "private": true,
   "version": "0.0.0",
   "type": "module",
