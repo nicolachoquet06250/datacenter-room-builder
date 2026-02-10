@@ -12,10 +12,16 @@ type Props = {
   layers?: string;
   radius?: number
   disableAddRacks?: boolean
+  useItopForm?: boolean
+  itopCreateRackUrl?: string
 }
 
 type Emits = {
-  (e: 'saved', payload: { layers: Layer[] }): void;
+  (e: 'saved', payload: {
+    roomName: string,
+    layers: Layer[]
+  }): void;
+  (e: 'refresh'): void;
 }
 </script>
 
@@ -51,6 +57,8 @@ const props = withDefaults(
     layers: '[]',
     radius: 0,
     disableAddRacks: false,
+    useItopForm: false,
+    itopCreateRackUrl: '/pages/UI.php?route=linkset.create_linked_object',
   }
 );
 
@@ -110,8 +118,8 @@ const incompleteFootprints = computed(() => {
   return surfacesLayer.footprints.filter(f => (!f.units || f.units.length === 0) && f.width && f.height);
 });
 
-const onSelectUnplacedRack = (id: number) => {
-  const rackIndex = racks.value.findIndex(r => r.id === id);
+const onSelectUnplacedRack = (id: number | string) => {
+  const rackIndex = racks.value.findIndex(r => String(r.id) === String(id));
   if (rackIndex !== -1) {
     selectedRackIndices.value = [rackIndex];
   }
@@ -147,18 +155,29 @@ const onDropRack = (event: DragEvent) => {
   const footprintId = event.dataTransfer?.getData('footprintId');
 
   if (rackIdStr) {
-    const rackId = parseInt(rackIdStr);
-    const rackIndex = racks.value.findIndex(r => r.id === rackId);
+    const rackIndex = racks.value.findIndex(r => String(r.id) === rackIdStr);
     if (rackIndex === -1) return;
 
     const rack = racks.value[rackIndex];
     if (!rack) return;
 
-    const svg = (event.target as HTMLElement).closest('svg');
-    if (!svg) return;
+    const svg = canvasComponent.value?.svgRef;
+    if (!svg) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Impossible de calculer la position du drop (SVG non disponible).'
+      });
+      return;
+    }
 
     const CTM = svg.getScreenCTM();
-    if (!CTM) return;
+    if (!CTM) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Impossible de calculer la position du drop (CTM indisponible).'
+      });
+      return;
+    }
 
     const x = (event.clientX - CTM.e) / CTM.a;
     const y = (event.clientY - CTM.f) / CTM.d;
@@ -166,11 +185,22 @@ const onDropRack = (event: DragEvent) => {
     const worldX = x / zoomLevel.value - panOffset.value.x;
     const worldY = y / zoomLevel.value - panOffset.value.y;
 
-    const rawX = worldX - rackWidth / 2;
-    const rawY = worldY - rackHeight / 2;
+    const w = (rack.width && rack.width > 0) ? Math.round(rack.width / 600 * 20) : rackWidth;
+    const h = (rack.height && rack.height > 0) ? Math.round(rack.height / 600 * 20) : rackHeight;
+
+    const rawX = worldX - w / 2;
+    const rawY = worldY - h / 2;
 
     const snapX = Math.round(rawX / 20) * 20;
     const snapY = Math.round(rawY / 20) * 20;
+
+    if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, 0, walls.value, w, h)) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Le rack doit être positionné à l\'intérieur des murs.'
+      });
+      return;
+    }
 
     takeSnapshot();
     rack.x = snapX;
@@ -184,11 +214,23 @@ const onDropRack = (event: DragEvent) => {
     const circuit = circuitPaths.value[circuitIndex];
     if (!circuit) return;
 
-    const svg = (event.target as HTMLElement).closest('svg');
-    if (!svg) return;
+    const svg = canvasComponent.value?.svgRef;
+    if (!svg) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Impossible de calculer la position du drop (SVG non disponible).'
+      });
+      return;
+    }
 
     const CTM = svg.getScreenCTM();
-    if (!CTM) return;
+    if (!CTM) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Impossible de calculer la position du drop (CTM indisponible).'
+      });
+      return;
+    }
 
     const x = (event.clientX - CTM.e) / CTM.a;
     const y = (event.clientY - CTM.f) / CTM.d;
@@ -203,6 +245,10 @@ const onDropRack = (event: DragEvent) => {
     const snapY = Math.round(rawY / 20) * 20;
 
     if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, 0, walls.value)) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Le circuit doit être positionné à l\'intérieur des murs.'
+      });
       return;
     }
 
@@ -215,11 +261,23 @@ const onDropRack = (event: DragEvent) => {
     const footprint = currentLayer.value.footprints?.find(f => f.id === footprintId);
     if (!footprint) return;
 
-    const svg = (event.target as HTMLElement).closest('svg');
-    if (!svg) return;
+    const svg = canvasComponent.value?.svgRef;
+    if (!svg) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Impossible de calculer la position du drop (SVG non disponible).'
+      });
+      return;
+    }
 
     const CTM = svg.getScreenCTM();
-    if (!CTM) return;
+    if (!CTM) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Impossible de calculer la position du drop (CTM indisponible).'
+      });
+      return;
+    }
 
     const x = (event.clientX - CTM.e) / CTM.a;
     const y = (event.clientY - CTM.f) / CTM.d;
@@ -750,9 +808,162 @@ const triggerClearWalls = () => {
   });
 };
 
+const showItopModal = ref(false);
+const itopFormContent = ref('');
+const itopModalContainer = useTemplateRef<HTMLElement>('itopModalContainer');
+
+function loadScriptOnce(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // évite de recharger 10x les libs iTop si tu rappelles la route
+    const key = `data-itop-loaded-src`;
+    if (document.querySelector(`script[${key}="${CSS.escape(src)}"]`)) {
+      resolve();
+      return;
+    }
+
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = false;          // IMPORTANT: garder l'ordre
+    s.defer = false;
+    s.setAttribute(key, src);
+
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+/**
+ * Injecte du HTML iTop dans `target` et exécute les scripts inclus.
+ * - respecte l’ordre des scripts dans le HTML
+ * - exécute les inline <script> dans le scope global (window)
+ */
+async function injectHtmlAndRunScripts(html: string) {
+  // 1) parser HTML
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html;
+
+  // 2) collecter scripts en conservant l'ordre d’apparition
+  const scripts = Array.from(tpl.content.querySelectorAll("script"));
+
+  // 3) enlever les scripts du fragment avant injection (sinon ils restent dans le DOM)
+  for (const s of scripts) s.remove();
+
+  // 5) exécuter les scripts dans le bon ordre
+  let code = '';
+  for (const s of scripts) {
+    const src = s.getAttribute("src");
+    if (src) {
+      await loadScriptOnce(src);
+    } else {
+      const _code = s.textContent ?? "";
+      code += _code + "\n";
+    }
+  }
+  if (code.length > 0) {
+    window.eval(code);
+  }
+}
+
+watchEffect(() => {
+  if (showItopModal.value) {
+    injectHtmlAndRunScripts(itopFormContent.value);
+  }
+})
+
+const openItopRackForm = async () => {
+  try {
+    const response = await fetch(props.itopCreateRackUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-Combodo-Ajax': 'true',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new URLSearchParams({
+        att_code: 'physicaldevice_list',
+        host_class: 'Location',
+        host_id: String(props.roomId),
+        class: 'Rack'
+      })
+    });
+    itopFormContent.value = await response.text();
+    showItopModal.value = true;
+
+    // Attendre que le DOM soit mis à jour pour injecter le jQuery
+    setTimeout(() => {
+      if (itopModalContainer.value) {
+        const scripts = itopModalContainer.value.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          const newScript = document.createElement('script');
+          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+          newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+          oldScript.parentNode?.replaceChild(newScript, oldScript);
+        });
+
+        // Détecter le submit du formulaire
+        const form = itopModalContainer.value.querySelector('form');
+        if (form) {
+          form.addEventListener('submit', () => {
+            console.log('Formulaire iTop soumis');
+            // iTop ferme généralement la modale et rafraîchit la page ou une partie de la page
+            // On attend un peu pour laisser le temps à la requête de partir
+            setTimeout(() => {
+              closeItopModal();
+              reloadData();
+            }, 1000);
+          });
+        }
+
+        // Alternative : iTop utilise parfois des événements personnalisés ou ferme la fenêtre si c'est une popup
+        // On peut écouter les messages postés à la fenêtre
+        const messageHandler = (event: MessageEvent) => {
+          // On peut filtrer par origine si besoin : if (event.origin !== "https://itop.localhost:8009") return;
+          if (event.data && (event.data === 'itop.form.submitted' || event.data.type === 'itop.form.submitted')) {
+            closeItopModal();
+            reloadData();
+            window.removeEventListener('message', messageHandler);
+          }
+        };
+        window.addEventListener('message', messageHandler);
+      }
+    }, 100);
+  } catch (err) {
+    console.error('Erreur lors de la récupération du formulaire iTop:', err);
+    notifyError({
+      text: 'Erreur lors de la récupération du formulaire iTop'
+    });
+  }
+};
+
+const closeItopModal = () => {
+  showItopModal.value = false;
+  itopFormContent.value = '';
+};
+
+// Fonction pour recharger les données (émet un événement pour que le parent sache qu'il doit refresh)
+const reloadData = () => {
+  emit('saved', {
+    roomName: roomName.value,
+    layers: layers.value
+  });
+  // On pourrait aussi ajouter un emit spécifique 'refresh' si besoin
+};
+
+// On expose une méthode pour fermer la modale et refresh depuis l'extérieur si nécessaire
+defineExpose({
+  closeItopModal,
+  reloadData
+});
+
 const addRack = () => {
   if (currentLayerIndex.value === 0) return;
-  addRackRaw();
+  if (props.useItopForm) {
+    openItopRackForm();
+  } else {
+    addRackRaw();
+  }
 };
 
 const addCircuit = () => {
@@ -1194,6 +1405,7 @@ const pasteFromClipboard = async () => {
 const save = async () => {
   try {
     emit('saved', {
+      roomName: roomName.value,
       layers: layers.value
     });
     notifySuccess({
@@ -1209,6 +1421,16 @@ const save = async () => {
     });
   }
 };
+
+const cancelItopFormModal = () => {
+  showItopModal.value = false;
+  itopFormContent.value = '';
+}
+
+const confirmItopFormModal = () => {
+  emit('refresh');
+  cancelItopFormModal();
+}
 
 watch(currentLayerIndex, () => {
   selectedRackIndices.value = [];
@@ -1355,10 +1577,24 @@ provide<ExposedFunctions>(exposedFunctions, {
           :title="modalConfig.title"
           :message="modalConfig.message"
           :confirm-text="modalConfig.confirmText"
+          has-footer
 
           @confirm="modalConfig.onConfirm"
           @cancel="cancelModal"
       />
+
+      <!-- Modale alternative pour iTop -->
+      <teleport to="body">
+        <Modal
+            title="Créer un Rack"
+            :show="showItopModal"
+            :message="itopFormContent"
+            is-html
+
+            @cancel="cancelItopFormModal"
+            @confirm="confirmItopFormModal"
+        />
+      </teleport>
 
       <BuilderPropertiesPanel
           v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndices.length > 0 || selectedFootprint !== null || selectedCircuitIndices.length > 0"
@@ -1450,5 +1686,58 @@ provide<ExposedFunctions>(exposedFunctions, {
   background: #004a99; /* Bleu iTop Designer */
   border-bottom-right-radius: v-bind(radius);
   border-bottom-left-radius: v-bind(radius);
+}
+
+.itop-modal {
+  max-width: 800px !important;
+  width: 80% !important;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #666;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.modal-container {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
 }
 </style>

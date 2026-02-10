@@ -30,7 +30,7 @@ defineEmits<Emits>()
   <div>
     <div class="panel-header">
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-      <h3>Propriétés du Rack</h3>
+      <h3>Positionnement du Rack</h3>
     </div>
 
     <div class="property-group">

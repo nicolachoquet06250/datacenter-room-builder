@@ -52,7 +52,7 @@ const onYChange = (event: Event) => {
         <path d="M11 4H5a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6"/>
         <circle cx="11" cy="9" r="2"/>
       </svg>
-      <h3>Propriétés du Circuit</h3>
+      <h3>Positionnement du Circuit</h3>
     </div>
 
     <div v-if="!isMultiple && firstCircuit" class="property-form">

@@ -30,7 +30,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     
     // Ne pas pouvoir sélectionner une unité qui est déjà dans un footprint
     const isAlreadyInFootprint = currentLayer.value.footprints?.some(f => 
-      f.units.some((u: any) => u.x === snapX && u.y === snapY)
+      (f.units ?? []).some((u: any) => u.x === snapX && u.y === snapY)
     );
 
     if (isAlreadyInFootprint) {
@@ -97,7 +97,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         
         // Ne pas ajouter les unités qui sont déjà dans un footprint
         const isAlreadyInFootprint = currentLayer.value.footprints?.some(f => 
-          f.units.some((u: any) => u.x === x && u.y === y)
+          (f.units ?? []).some((u: any) => u.x === x && u.y === y)
         );
 
         if (!isAlreadyInFootprint) {
@@ -268,7 +268,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     const snapY = Math.floor(y / 20) * 20;
 
     return currentLayer.value.footprints.find(f => 
-      f.units.some(u => u.x === snapX && u.y === snapY)
+      (f.units ?? []).some(u => u.x === snapX && u.y === snapY)
     );
   };
 

@@ -83,7 +83,7 @@ const handleSelectCircuit = (e: MouseEvent, cIdx: number) => {
 }
 
 const getFootprintCenter = (footprint: Footprint) => {
-  if (!footprint.units || footprint.units.length === 0) return { x: 0, y: 0 };
+  if (!footprint.units || (footprint.units?.length ?? 0) === 0) return { x: 0, y: 0 };
   const minX = Math.min(...footprint.units.map(u => u.x));
   const maxX = Math.max(...footprint.units.map(u => u.x));
   const minY = Math.min(...footprint.units.map(u => u.y));
@@ -127,29 +127,31 @@ defineExpose({svgRef});
       >
         <g v-if="lIdx === 2 && layer?.footprints" class="footprints-layer">
           <g v-for="footprint in layer.footprints" :key="footprint.id">
-            <rect
-                v-for="(unit, uIdx) in footprint.units || []"
-                :key="uIdx"
-                :x="unit.x"
-                :y="unit.y"
-                :width="20"
-                :height="20"
-                :fill="footprint.color"
-                fill-opacity="0.2"
-            />
-            <text
-                v-if="footprint.name"
-                :x="getFootprintCenter(footprint).x"
-                :y="getFootprintCenter(footprint).y"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                class="footprint-label"
-                :fill="getContrastColor(footprint.color)"
-                fill-opacity="0.5"
-                pointer-events="none"
-            >
-              {{ footprint.name }}
-            </text>
+            <template v-if="(footprint.units?.length ?? 0) > 0">
+              <rect
+                  v-for="(unit, uIdx) in footprint.units || []"
+                  :key="uIdx"
+                  :x="unit.x"
+                  :y="unit.y"
+                  :width="20"
+                  :height="20"
+                  :fill="footprint.color"
+                  fill-opacity="0.2"
+              />
+              <text
+                  v-if="footprint.name"
+                  :x="getFootprintCenter(footprint).x"
+                  :y="getFootprintCenter(footprint).y"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  class="footprint-label"
+                  :fill="getContrastColor(footprint.color)"
+                  fill-opacity="0.5"
+                  pointer-events="none"
+              >
+                {{ footprint.name }}
+              </text>
+            </template>
           </g>
         </g>
         <polygon
@@ -278,30 +280,32 @@ defineExpose({svgRef});
              class="footprint-group"
              :class="{ 'selected': footprint.id === selectedFootprintId }"
           >
-            <rect
-                v-for="(unit, uIdx) in footprint.units || []"
-                :key="uIdx"
-                :x="unit.x"
-                :y="unit.y"
-                :width="20"
-                :height="20"
-                :fill="footprint.color"
-                :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
-                stroke="white"
-                :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
-            />
-            <text
-                v-if="footprint.name"
-                :x="getFootprintCenter(footprint).x"
-                :y="getFootprintCenter(footprint).y"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                class="footprint-label"
-                :fill="getContrastColor(footprint.color)"
-                pointer-events="none"
-            >
-              {{ footprint.name }}
-            </text>
+            <template v-if="(footprint.units?.length ?? 0) > 0">
+              <rect
+                  v-for="(unit, uIdx) in footprint.units || []"
+                  :key="uIdx"
+                  :x="unit.x"
+                  :y="unit.y"
+                  :width="20"
+                  :height="20"
+                  :fill="footprint.color"
+                  :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
+                  stroke="white"
+                  :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
+              />
+              <text
+                  v-if="footprint.name"
+                  :x="getFootprintCenter(footprint).x"
+                  :y="getFootprintCenter(footprint).y"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                  class="footprint-label"
+                  :fill="getContrastColor(footprint.color)"
+                  pointer-events="none"
+              >
+                {{ footprint.name }} {{footprint.units?.length ?? 0}}
+              </text>
+            </template>
           </g>
           <rect
               v-for="(unit, uIdx) in selectedUnits"

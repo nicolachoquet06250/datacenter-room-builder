@@ -7,6 +7,8 @@ declare global {
     y?: number | null;
     rotation?: number | null;
     podId?: string | null;
+    width?: number | null;
+    height?: number | null;
   }
 
   export interface Pod {
