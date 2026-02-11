@@ -13,7 +13,8 @@ type Props = {
   radius?: number
   disableAddRacks?: boolean
   useItopForm?: boolean
-  itopCreateRackUrl?: string
+  itopCreateRackUrl?: string,
+  isDataLoading?: boolean
 }
 
 type Emits = {
@@ -59,6 +60,7 @@ const props = withDefaults(
     disableAddRacks: false,
     useItopForm: false,
     itopCreateRackUrl: '/pages/UI.php?route=linkset.create_linked_object',
+    isDataLoading: false,
   }
 );
 
@@ -810,6 +812,7 @@ const triggerClearWalls = () => {
 
 const showItopModal = ref(false);
 const itopFormContent = ref('');
+const itopFormLoading = ref(false);
 const itopModalContainer = useTemplateRef<HTMLElement>('itopModalContainer');
 
 function loadScriptOnce(src: string): Promise<void> {
@@ -872,6 +875,8 @@ watchEffect(() => {
 })
 
 const openItopRackForm = async () => {
+  showItopModal.value = true;
+  itopFormLoading.value = true;
   try {
     const response = await fetch(props.itopCreateRackUrl, {
       method: 'POST',
@@ -889,7 +894,7 @@ const openItopRackForm = async () => {
       })
     });
     itopFormContent.value = await response.text();
-    showItopModal.value = true;
+    itopFormLoading.value = false;
 
     // Attendre que le DOM soit mis à jour pour injecter le jQuery
     setTimeout(() => {
@@ -1466,36 +1471,40 @@ provide<ExposedFunctions>(exposedFunctions, {
 
 <template>
   <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel" @contextmenu.prevent>
-    <BuilderToolbar
-        v-model:room-name="roomName"
-        :undo-disabled="undoStack.length === 0"
-        :redo-disabled="redoStack.length === 0"
-        :can-add-rack="walls.length > 2"
-        :show-add-rack="currentLayerIndex === 3"
-        :can-add-circuit="walls.length > 2"
-        :show-add-circuit="currentLayerIndex === 1"
-        :can-clear-walls="walls.length > 0"
-        :is-drawing-walls="isDrawingWalls"
-        :is-drawing-pillar="isDrawingPillar"
-        :zoom-level="zoomLevel"
-        :can-zoom-out="zoomLevel > 0.2"
-        :can-zoom-in="zoomLevel < 3"
-        :selected-layout-index="currentLayerIndex"
-        :radius="props.radius"
-        :disable-add-racks="disableAddRacks"
+    <div v-if="isDataLoading" />
 
-        @undo="undo"
-        @redo="redo"
-        @add-rack="addRack"
-        @add-circuit="addCircuit"
-        @toggle-walls="toggleIsDrawingWalls"
-        @toggle-pillar="toggleIsDrawingPillar"
-        @clear-walls="triggerClearWalls"
-        @zoom-out="zoomOut"
-        @zoom-in="zoomIn"
-        @reset-pan="resetPan"
-        @save="save"
-    />
+    <template v-if="!isDataLoading">
+      <BuilderToolbar
+          v-model:room-name="roomName"
+          :undo-disabled="undoStack.length === 0"
+          :redo-disabled="redoStack.length === 0"
+          :can-add-rack="walls.length > 2"
+          :show-add-rack="currentLayerIndex === 3"
+          :can-add-circuit="walls.length > 2"
+          :show-add-circuit="currentLayerIndex === 1"
+          :can-clear-walls="walls.length > 0"
+          :is-drawing-walls="isDrawingWalls"
+          :is-drawing-pillar="isDrawingPillar"
+          :zoom-level="zoomLevel"
+          :can-zoom-out="zoomLevel > 0.2"
+          :can-zoom-in="zoomLevel < 3"
+          :selected-layout-index="currentLayerIndex"
+          :radius="props.radius"
+          :disable-add-racks="disableAddRacks"
+
+          @undo="undo"
+          @redo="redo"
+          @add-rack="addRack"
+          @add-circuit="addCircuit"
+          @toggle-walls="toggleIsDrawingWalls"
+          @toggle-pillar="toggleIsDrawingPillar"
+          @clear-walls="triggerClearWalls"
+          @zoom-out="zoomOut"
+          @zoom-in="zoomIn"
+          @reset-pan="resetPan"
+          @save="save"
+      />
+    </template>
 
     <polygon
         v-if="!isDrawingWalls && (walls.length > 2 || isWallSelected)"
@@ -1536,6 +1545,7 @@ provide<ExposedFunctions>(exposedFunctions, {
           :selected-footprint-id="selectedFootprintId"
           :selected-circuit-indices="selectedCircuitIndices"
           :pillar-preview-point="pillarPreviewPoint"
+          :is-data-loading="isDataLoading"
 
           @mouseup="stopDrag"
           @deselect="deselect"
@@ -1556,7 +1566,11 @@ provide<ExposedFunctions>(exposedFunctions, {
           @start-drag-footprint="onStartDragFootprint"
           @dragover-rack="onDragOverRack"
           @drop-rack="onDropRack"
-      />
+      >
+        <template #loader>
+          <slot name="loader" />
+        </template>
+      </BuilderCanvas>
 
       <BuilderContextMenu
           :show="contextMenu.show"
@@ -1589,6 +1603,7 @@ provide<ExposedFunctions>(exposedFunctions, {
             title="Créer un Rack"
             :show="showItopModal"
             :message="itopFormContent"
+            :is-loading="itopFormLoading"
             is-html
 
             @cancel="cancelItopFormModal"
@@ -1633,7 +1648,7 @@ provide<ExposedFunctions>(exposedFunctions, {
       />
 
       <BuilderLayerPreviews
-          v-if="shouldShowLayers"
+          v-if="shouldShowLayers && !isDataLoading"
           v-model:current-layer-index="currentLayerIndex"
           :layers="layers"
           :viewport-rect="viewportRect"

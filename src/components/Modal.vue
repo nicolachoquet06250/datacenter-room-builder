@@ -6,6 +6,7 @@ type Props = {
   confirmText?: string;
   cancelText?: string;
   isHtml?: boolean,
+  isLoading?: boolean,
   hasFooter?: boolean
 }
 
@@ -16,9 +17,16 @@ type Emits = {
 </script>
 
 <script setup lang="ts">
-import {computed, useTemplateRef, watchEffect} from "vue";
+import {computed, useTemplateRef, watch} from "vue";
 
-const props = withDefaults(defineProps<Props>(), {isHtml: false, hasFooter: false});
+const props = withDefaults(
+  defineProps<Props>(),
+  {
+    isHtml: false,
+    hasFooter: false,
+    isLoading: false
+  }
+);
 
 const emit = defineEmits<Emits>();
 
@@ -115,9 +123,21 @@ const cancel = () => {
   emit('cancel');
 };
 
-watchEffect(() => {
-  htmlContent.value?.querySelector('button[name=cancel]')?.addEventListener('click', cancel);
-  htmlContent.value?.querySelector('form')?.addEventListener('submit', confirm);
+const handleHtmlContentClick = (e: MouseEvent) => {
+  if ((e.target as HTMLElement)?.parentElement?.tagName === 'BUTTON') {
+    if ((e.target as HTMLElement)?.parentElement?.getAttribute('name') === 'cancel') {
+      cancel();
+    }
+  }
+}
+
+watch(htmlContent, (htmlContent, oldHtmlContent) => {
+  if (htmlContent) {
+    htmlContent?.addEventListener('click', handleHtmlContentClick);
+  }
+  else {
+    oldHtmlContent?.removeEventListener('click', handleHtmlContentClick);
+  }
 });
 </script>
 
@@ -128,10 +148,18 @@ watchEffect(() => {
         <div class="modal-header">
           <h3>{{ title }}</h3>
         </div>
-        <div class="modal-body" ref="htmlContent" v-if="isHtml" v-html="message" />
+
+        <div class="modal-body" v-if="isHtml">
+          <div v-if="isLoading" class="loader-container modal-body">
+            <span class="loader" />
+          </div>
+          <div class="modal-body" ref="htmlContent" v-else-if="message" v-html="message" />
+        </div>
+
         <div class="modal-body" v-else>
           <p>{{ message }}</p>
         </div>
+
         <div class="modal-footer" v-if="hasFooter">
           <button class="btn btn-secondary" @click="cancel">
             {{ cancelText || 'Annuler' }}
@@ -226,5 +254,34 @@ watchEffect(() => {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+.loader-container {
+  height: 100%;
+  width: 100%;
+  min-height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.loader {
+  width: 48px;
+  height: 48px;
+  border: 5px solid #FFF;
+  border-bottom-color: #FF3D00;
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

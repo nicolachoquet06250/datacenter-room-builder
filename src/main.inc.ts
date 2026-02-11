@@ -11,6 +11,17 @@ window.addEventListener('DOMContentLoaded', () => {
     roomBuilder.setAttribute('room-id', '1')
     roomBuilder.setAttribute('room-name', 'Salle principale')
 
+    const spinner = document.createElement('span');
+    spinner.setAttribute('slot', 'loader');
+    spinner.classList.add('loader');
+
+    roomBuilder.appendChild(spinner);
+
+    roomBuilder.setAttribute('is-data-loading', '')
+
+    setTimeout(() => {
+        roomBuilder.removeAttribute('is-data-loading');
+    }, 4000);
 
     // @ts-ignore
     document.body.appendChild(roomBuilder);

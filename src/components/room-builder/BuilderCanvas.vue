@@ -30,6 +30,7 @@ type Props = {
   gridLabel: string;
   selectedFootprintId: string | null;
   selectedCircuitIndices: number[];
+  isDataLoading: boolean;
 }
 
 type Emits = {
@@ -94,7 +95,6 @@ const getFootprintCenter = (footprint: Footprint) => {
   };
 };
 
-
 defineExpose({svgRef});
 </script>
 
@@ -118,7 +118,7 @@ defineExpose({svgRef});
         :pan-offset="panOffset"
     />
 
-    <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`" v-if="layers && layers.length > 0">
+    <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`" v-if="layers && layers.length > 0 && !isDataLoading">
       <g
           v-for="(layer, lIdx) in layers"
           :key="`layer-${layer?.id || lIdx}`"
@@ -581,6 +581,10 @@ defineExpose({svgRef});
       </g>
     </g>
   </svg>
+
+  <div v-if="isDataLoading" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.5);">
+    <slot name="loader" />
+  </div>
 </template>
 
 <style scoped>
