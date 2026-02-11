@@ -4,15 +4,15 @@ type Props = {
   name: string,
   rotation?: number|null,
   x?: number | null,
-  y?: number | null
+  y?: number | null,
+  coord?: string | null
 }
 
 type Emits = {
   (e: 'remove-rack'): void;
   (e: 'name-updated', evt: Event): void;
   (e: 'rotation-changed', evt: Event): void;
-  (e: 'x-updated', evt: Event): void;
-  (e: 'y-updated', evt: Event): void;
+  (e: 'coord-updated', evt: Event): void;
 }
 </script>
 
@@ -20,7 +20,8 @@ type Emits = {
 withDefaults(defineProps<Props>(), {
   rotation: 0,
   x: 0,
-  y: 0
+  y: 0,
+  coord: ''
 })
 
 defineEmits<Emits>()
@@ -47,25 +48,17 @@ defineEmits<Emits>()
       />
     </div>
 
-    <div class="property-row">
-      <div class="property-group">
-        <label for="rack-x">X</label>
-        <input
-            id="rack-x"
-            type="number"
-            :value="x"
-            @input="$emit('x-updated', $event)"
-        />
-      </div>
-      <div class="property-group">
-        <label for="rack-y">Y</label>
-        <input
-            id="rack-y"
-            type="number"
-            :value="y"
-            @input="$emit('y-updated', $event)"
-        />
-      </div>
+    <div class="property-group">
+      <label for="rack-coord">
+        Coordonnée (ex: A1)
+      </label>
+      <input
+          id="rack-coord"
+          type="text"
+          :value="coord ?? ''"
+          placeholder="A1, B2, AA5..."
+          @input="$emit('coord-updated', $event)"
+      />
     </div>
 
     <div class="property-group">
@@ -103,15 +96,6 @@ defineEmits<Emits>()
 </template>
 
 <style scoped>
-.property-row {
-  display: flex;
-  gap: 1rem;
-}
-
-.property-row .property-group {
-  flex: 1;
-}
-
 h3 {
   margin: 0;
   font-size: 1rem;

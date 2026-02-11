@@ -46,12 +46,15 @@ import FootprintPanel from "../properties-panel/FootprintPanel.vue";
 import CircuitPanel from "../properties-panel/CircuitPanel.vue";
 import RoomPropertiesPanel from "../properties-panel/RoomPropertiesPanel.vue";
 import {useLayers} from "../../composables/useLayers.ts";
+import {useRoomBuilderGeometry, rackWidth, rackHeight} from "../../composables/useRoomBuilderGeometry.ts";
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<Emits>();
 
 const {currentLayerIndex} = useLayers(computed(() => props.walls));
+const {getWallBoundingBox} = useRoomBuilderGeometry();
+const wallBoundingBox = computed(() => getWallBoundingBox(props.walls));
 
 const showPanel = computed(() => {
   if (props.walls.length > 0) return true;
@@ -70,6 +73,38 @@ const selectedRack = computed(() => {
   return rack;
 });
 
+const coordLabel = computed(() => {
+  const bbox = wallBoundingBox.value;
+  const rack = selectedRack.value;
+  if (!bbox || !rack || rack.x == null || rack.y == null) return '';
+
+  const w = rackWidth;
+  const h = rackHeight;
+  const cx = rack.x + w / 2;
+  const cy = rack.y + h / 2;
+  const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
+
+  // Front = bord du bas dans la référence non-rotée → coin avant gauche = bottom-left
+  const vblx = -w / 2;
+  const vbly = h / 2;
+  const rotVx = vblx * Math.cos(theta) - vbly * Math.sin(theta);
+  const rotVy = vblx * Math.sin(theta) + vbly * Math.cos(theta);
+
+  const px = cx + rotVx;
+  const py = cy + rotVy;
+
+  const iH = Math.floor((px - bbox.minX) / 20);
+  const hLabel = (iH + 1).toString();
+  const iV = Math.floor((bbox.maxY - py - 1) / 20);
+  const letter = String.fromCharCode(65 + (iV % 26));
+  let vLabel = letter;
+  if (iV >= 26) {
+    const prefix = String.fromCharCode(65 + Math.floor(iV / 26) - 1);
+    vLabel = prefix + letter;
+  }
+  return `${vLabel}${hLabel}`;
+});
+
 const onNameInput = (event: Event) => {
   const target = event.target as HTMLInputElement;
   emit('update-rack-name', target.value);
@@ -80,14 +115,54 @@ const onRotationChange = (event: Event) => {
   emit('update-rack-rotation', Number(target.value));
 };
 
-const onXChange = (event: Event) => {
+const onCoordChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
-  emit('update-rack-x', Number(target.value));
-};
+  const val = (target.value || '').toUpperCase().replace(/\s+/g, '');
+  const match = val.match(/^([A-Z]+)(\d+)$/);
+  if (!match) return;
+  const letters = match[1]!;
+  const digits = match[2]!;
+  // Convert letters (A=1) to zero-based row index
+  let rowNumber = 0;
+  for (let i = 0; i < letters.length; i++) {
+    rowNumber = rowNumber * 26 + (letters.charCodeAt(i) - 64);
+  }
+  const rowIndex = rowNumber - 1; // zero-based
+  const colNumber = parseInt(digits, 10);
+  if (isNaN(colNumber) || colNumber <= 0) return;
+  const colIndex = colNumber - 1; // zero-based
+  const bbox = wallBoundingBox.value;
+  const rack = selectedRack.value;
+  if (!bbox || !rack) return;
 
-const onYChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  emit('update-rack-y', Number(target.value));
+  // Point voulu = coin avant gauche (bottom-left non-roté) sur la grille demandée
+  const px = bbox.minX + colIndex * 20;
+  const py = bbox.maxY - (rowIndex + 1) * 20;
+
+  const w = rackWidth;
+  const h = rackHeight;
+  const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
+
+  // vecteur bottom-left en repère centré
+  const vblx = -w / 2;
+  const vbly = h / 2;
+  const rotVx = vblx * Math.cos(theta) - vbly * Math.sin(theta);
+  const rotVy = vblx * Math.sin(theta) + vbly * Math.cos(theta);
+
+  // Centre recherché
+  const cx = px - rotVx;
+  const cy = py - rotVy;
+
+  // Recalcul du top-left à partir du centre
+  let x = cx - w / 2;
+  let y = cy - h / 2;
+
+  // Snap sur la grille de 20 px
+  x = Math.round(x / 20) * 20;
+  y = Math.round(y / 20) * 20;
+
+  emit('update-rack-x', x);
+  emit('update-rack-y', y);
 };
 </script>
 
@@ -96,11 +171,10 @@ const onYChange = (event: Event) => {
     <div v-if="selectedRackIndices.length === 1 && !isWallSelected" class="properties-panel">
       <RackPanel
           v-if="selectedRack"
-          v-bind="selectedRack"
+          v-bind="{...selectedRack, coord: coordLabel}"
           @name-updated="onNameInput"
           @rotation-changed="onRotationChange"
-          @x-updated="onXChange"
-          @y-updated="onYChange"
+          @coord-updated="onCoordChange"
           @remove-rack="$emit('remove-rack', selectedRackIndices[0]!)"
       />
     </div>

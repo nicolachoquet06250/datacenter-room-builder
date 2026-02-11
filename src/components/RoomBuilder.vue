@@ -487,10 +487,6 @@ const selectedFootprint = computed(() => {
   return currentLayer.value.footprints?.find(f => f.id === selectedFootprintId.value) || null;
 });
 
-const selectedCircuitSegmentKeys = computed(() =>
-  selectedCircuitIndices.value.map(idx => `${idx}`)
-);
-
 const circuitPaths = computed({
   get: () => layers.value[currentLayerIndex.value]?.circuits ?? [],
   set: (val) => {
@@ -715,20 +711,6 @@ const onStartDragCircuit = (event: MouseEvent, index: number) => {
       y: worldY - circuit.y
     };
   }
-};
-
-const onStartRotateCircuit = (event: MouseEvent, index: number) => {
-  takeSnapshot();
-  event.stopPropagation();
-  rotatingCircuitIndex.value = index;
-  selectedCircuitIndices.value = [index];
-
-  const circuit = circuitPaths.value[index];
-  const centerX = (circuit?.x ?? 0) + 40 / 2 + panOffset.value.x;
-  const centerY = (circuit?.y ?? 0) + 40 / 2 + panOffset.value.y;
-
-  startRotationAngle.value = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
-  initialCircuitRotation.value = circuit?.rotation || 0;
 };
 
 const rotateCircuit = (event: MouseEvent) => {
@@ -1536,18 +1518,15 @@ provide<ExposedFunctions>(exposedFunctions, {
           :rack-width="rackWidth"
           :rack-height="rackHeight"
           :is-interacting="isInteracting"
-          :get-pod-boundaries="getPodBoundaries"
           :selected-units="selectedUnits"
           :hovered-unit="hoveredUnit"
           :grid-label="gridLabel"
-          :selected-circuit-segment-keys="selectedCircuitSegmentKeys"
           :selected-pillar-indices="selectedPillarIndices"
           :selected-footprint-id="selectedFootprintId"
           :selected-circuit-indices="selectedCircuitIndices"
           :pillar-preview-point="pillarPreviewPoint"
           :is-data-loading="isDataLoading"
 
-          @mouseup="stopDrag"
           @deselect="deselect"
           @mousemove-svg="onMouseMoveSVG"
           @start-drag="startDragRack"
@@ -1561,7 +1540,6 @@ provide<ExposedFunctions>(exposedFunctions, {
           @start-drag-pillar="onStartDragPillar"
           @select-circuit="selectCircuit"
           @start-drag-circuit="onStartDragCircuit"
-          @start-rotate-circuit="onStartRotateCircuit"
           @select-footprint="onSelectFootprint"
           @start-drag-footprint="onStartDragFootprint"
           @dragover-rack="onDragOverRack"
@@ -1662,7 +1640,7 @@ provide<ExposedFunctions>(exposedFunctions, {
       <UnplacedRacksSidebar
           v-if="incompleteRacks.length > 0 && shouldShowLayers && currentLayerIndex === 3"
           :racks="incompleteRacks"
-          :selected-rack-id="selectedRackIndices.length === 1 && selectedRackIndices[0] !== undefined ? racks[selectedRackIndices[0]]?.id! : null"
+          :selected-rack-id="selectedRackIndices.length === 1 && selectedRackIndices[0] !== undefined ? (racks[selectedRackIndices[0]]?.id ?? null) : null"
           @select-rack="onSelectUnplacedRack"
           @drag-start="takeSnapshot"
       />

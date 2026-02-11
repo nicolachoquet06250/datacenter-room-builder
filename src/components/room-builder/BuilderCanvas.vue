@@ -535,7 +535,7 @@ defineExpose({svgRef});
                     :cx="pos.x"
                     :cy="pos.y"
                     r="6"
-                    class="rotation-handle"
+                    class="rotation-handle rack"
                     @mousedown="$emit('start-rotate', $event, tIdx)"
                 />
               </template>
@@ -682,7 +682,10 @@ defineExpose({svgRef});
   fill: white;
   stroke: #ff4500;
   stroke-width: 1.5;
-  cursor: alias;
+
+  &.rack {
+    cursor: alias;
+  }
 }
 
 .rack-label {
