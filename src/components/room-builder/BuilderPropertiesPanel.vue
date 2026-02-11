@@ -73,6 +73,13 @@ const selectedRack = computed(() => {
   return rack;
 });
 
+const selectedCircuit = computed(() => {
+  if (!props.circuits || props.selectedCircuitIndices.length !== 1) return null;
+  const circuit = props.circuits[props.selectedCircuitIndices[0]!];
+  if (!circuit) return null;
+  return circuit;
+});
+
 const coordLabel = computed(() => {
   const bbox = wallBoundingBox.value;
   const rack = selectedRack.value;
@@ -104,6 +111,64 @@ const coordLabel = computed(() => {
   }
   return `${vLabel}${hLabel}`;
 });
+
+const circuitCoordLabel = computed(() => {
+  const bbox = wallBoundingBox.value;
+  const circuit = selectedCircuit.value;
+  if (!bbox || !circuit || circuit.x == null || circuit.y == null) return '';
+
+  const cW = 40;
+  const cH = 40;
+  const px = circuit.x + cW; // coin bas droit X
+  const py = circuit.y + cH; // coin bas droit Y
+
+  const iH = Math.floor((px - bbox.minX - 1) / 20);
+  const hLabel = (iH + 1).toString();
+  const iV = Math.floor((bbox.maxY - py - 1) / 20);
+  const letter = String.fromCharCode(65 + (iV % 26));
+  let vLabel = letter;
+  if (iV >= 26) {
+    const prefix = String.fromCharCode(65 + Math.floor(iV / 26) - 1);
+    vLabel = prefix + letter;
+  }
+  return `${vLabel}${hLabel}`;
+});
+
+const onCircuitCoordChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const val = (target.value || '').toUpperCase().replace(/\s+/g, '');
+  const match = val.match(/^([A-Z]+)(\d+)$/);
+  if (!match) return;
+  const letters = match[1]!;
+  const digits = match[2]!;
+  let rowNumber = 0;
+  for (let i = 0; i < letters.length; i++) {
+    rowNumber = rowNumber * 26 + (letters.charCodeAt(i) - 64);
+  }
+  const rowIndex = rowNumber - 1; // zero-based
+  const colNumber = parseInt(digits, 10);
+  if (isNaN(colNumber) || colNumber <= 0) return;
+  const colIndex = colNumber - 1; // zero-based
+  const bbox = wallBoundingBox.value;
+  if (!bbox) return;
+
+  // Point voulu = coin bas droit du circuit sur la grille demandée
+  const px = bbox.minX + (colIndex + 1) * 20;
+  const py = bbox.maxY - (rowIndex + 1) * 20;
+
+  const cW = 40;
+  const cH = 40;
+
+  let x = px - cW;
+  let y = py - cH;
+
+  x = Math.round(x / 20) * 20;
+  y = Math.round(y / 20) * 20;
+
+  const idx = props.selectedCircuitIndices[0]!;
+  emit('update-circuit-x', idx, x);
+  emit('update-circuit-y', idx, y);
+};
 
 const onNameInput = (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -209,6 +274,8 @@ const onCoordChange = (event: Event) => {
       <CircuitPanel
         :selected-circuit-indices="selectedCircuitIndices"
         :circuits="circuits"
+        v-bind="{ coord: circuitCoordLabel }"
+        @coord-updated="onCircuitCoordChange"
         @delete-selection="$emit('delete-circuit-selection')"
         @update-name="(idx, val) => $emit('update-circuit-name', idx, val)"
         @update-rotation="(idx, val) => $emit('update-circuit-rotation', idx, val)"

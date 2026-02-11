@@ -2,6 +2,7 @@
 type Props = {
   selectedCircuitIndices: number[];
   circuits: Circuit[];
+  coord?: string | null;
 }
 
 type Emits = {
@@ -10,6 +11,7 @@ type Emits = {
   (e: 'update-rotation', index: number, value: number): void;
   (e: 'update-x', index: number, value: number): void;
   (e: 'update-y', index: number, value: number): void;
+  (e: 'coord-updated', evt: Event): void;
 }
 </script>
 
@@ -31,14 +33,8 @@ const onNameInput = (event: Event) => {
   emit('update-name', props.selectedCircuitIndices[0]!, target.value);
 };
 
-const onXChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  emit('update-x', props.selectedCircuitIndices[0]!, Number(target.value));
-};
-
-const onYChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  emit('update-y', props.selectedCircuitIndices[0]!, Number(target.value));
+const onCoordChange = (event: Event) => {
+  emit('coord-updated', event);
 };
 </script>
 
@@ -61,15 +57,9 @@ const onYChange = (event: Event) => {
         <input type="text" :value="firstCircuit.name" @input="onNameInput" />
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>Position X</label>
-          <input type="number" :value="firstCircuit.x" @input="onXChange" />
-        </div>
-        <div class="form-group">
-          <label>Position Y</label>
-          <input type="number" :value="firstCircuit.y" @input="onYChange" />
-        </div>
+      <div class="form-group">
+        <label>Coordonnée (ex: A1)</label>
+        <input type="text" :value="coord ?? ''" placeholder="A1, B2, AA5..." @input="onCoordChange" />
       </div>
     </div>
 
@@ -122,13 +112,6 @@ h3 {
   gap: 0.4rem;
   flex: 1;
   width: calc(50% - 10px);
-}
-
-.form-row {
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  gap: 1rem;
 }
 
 label {
