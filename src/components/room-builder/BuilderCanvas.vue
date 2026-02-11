@@ -303,7 +303,7 @@ defineExpose({svgRef});
                   :fill="getContrastColor(footprint.color)"
                   pointer-events="none"
               >
-                {{ footprint.name }} {{footprint.units?.length ?? 0}}
+                {{ footprint.name }}
               </text>
             </template>
           </g>
