@@ -1,30 +1,27 @@
-import {computed, ref, watch} from "vue";
-import {useLayers} from "./useLayers.ts";
+import {computed, ref} from "vue";
+import {useLayersState} from "./useLayers.ts";
 
 const isDrawingWalls = ref(false);
 const wallPreviewPoint = ref<Point | null>(null);
-const wallsRef = ref<Point[]>([]);
 const isWallSelected = ref(false);
 
 export const useDrawRoomWalls = () => {
-    const layers = ref<Layer[]>([]);
+    const wallsRef = ref<Point[]>([]);
+    const {layers: globalLayers, currentLayerIndex} = useLayersState();
+
     const walls = computed({
-        get: () => layers.value.length > 0 ? (layers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value,
+        get: () => {
+            return globalLayers.value.length > 0 ? (globalLayers.value[currentLayerIndex.value]?.walls || []) : wallsRef.value;
+        },
         set: (val) => {
-            if (layers.value.length > 0) {
-                layers.value.forEach(layer => {
+            if (globalLayers.value.length > 0) {
+                globalLayers.value.forEach(layer => {
                     layer.walls = JSON.parse(JSON.stringify(val));
                 });
             }
             wallsRef.value = JSON.parse(JSON.stringify(val));
         }
     });
-
-    const {layers: _layers, currentLayerIndex} = useLayers(walls);
-
-    watch(_layers, () => {
-        layers.value = _layers.value;
-    }, {immediate: true, once: true})
 
     const cancelDrawingWalls = () => {
         isDrawingWalls.value = false;

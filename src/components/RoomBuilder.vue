@@ -821,7 +821,7 @@ function loadScriptOnce(src: string): Promise<void> {
 
     const s = document.createElement("script");
     s.src = src;
-    s.async = false;          // IMPORTANT: garder l'ordre
+    s.async = false;          // IMPORTANT : garder l'ordre
     s.defer = false;
     s.setAttribute(key, src);
 
@@ -916,7 +916,7 @@ const openItopRackForm = async () => {
           });
         }
 
-        // Alternative : iTop utilise parfois des événements personnalisés ou ferme la fenêtre si c'est une popup
+        // Alternative : iTop utilise parfois des événements personnalisés ou ferme la fenêtre si c'est un popup
         // On peut écouter les messages postés à la fenêtre
         const messageHandler = (event: MessageEvent) => {
           // On peut filtrer par origine si besoin : if (event.origin !== "https://itop.localhost:8009") return;

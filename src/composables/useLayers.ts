@@ -149,3 +149,10 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
         initialize
     }
 }
+
+export const useLayersState = () => {
+    return {
+        layers,
+        currentLayerIndex,
+    }
+}

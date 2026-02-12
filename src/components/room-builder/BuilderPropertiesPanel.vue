@@ -91,7 +91,7 @@ const coordLabel = computed(() => {
   const cy = rack.y + h / 2;
   const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
 
-  // Front = bord du bas dans la référence non-rotée → coin avant gauche = bottom-left
+  // Front = bord du bas dans la référence non-rotée → coin avant gauche = bottom left
   const vblx = -w / 2;
   const vbly = h / 2;
   const rotVx = vblx * Math.cos(theta) - vbly * Math.sin(theta);
@@ -218,7 +218,7 @@ const onCoordChange = (event: Event) => {
   const cx = px - rotVx;
   const cy = py - rotVy;
 
-  // Recalcul du top-left à partir du centre
+  // Recalcul du top left à partir du centre
   let x = cx - w / 2;
   let y = cy - h / 2;
 
