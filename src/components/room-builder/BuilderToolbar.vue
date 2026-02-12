@@ -20,14 +20,14 @@ type Props = {
 type Emits = {
   (e: 'undo'): void;
   (e: 'redo'): void;
-  (e: 'addRack'): void;
-  (e: 'addCircuit'): void;
-  (e: 'toggleWalls'): void;
-  (e: 'togglePillar'): void;
-  (e: 'clearWalls'): void;
-  (e: 'zoomOut'): void;
-  (e: 'zoomIn'): void;
-  (e: 'resetPan'): void;
+  (e: 'add-rack'): void;
+  (e: 'add-circuit'): void;
+  (e: 'toggle-walls'): void;
+  (e: 'toggle-pillar'): void;
+  (e: 'clear-walls'): void;
+  (e: 'zoom-out'): void;
+  (e: 'zoom-in'): void;
+  (e: 'reset-pan'): void;
   (e: 'save'): void;
 }
 </script>
@@ -82,7 +82,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           class="toolbar-btn"
           title="Recentrer"
-          @click="$emit('resetPan')"
+          @click="$emit('reset-pan')"
       >
         <span class="icon">🎯</span>
       </button>
@@ -93,7 +93,7 @@ const radius = computed(() => `${props.radius}px`);
           class="toolbar-btn"
           :disabled="!canZoomOut"
           title="Zoom arrière"
-          @click="$emit('zoomOut')"
+          @click="$emit('zoom-out')"
       >-</button>
 
       <span class="zoom-text">
@@ -104,7 +104,7 @@ const radius = computed(() => `${props.radius}px`);
           class="toolbar-btn"
           :disabled="!canZoomIn"
           title="Zoom avant"
-          @click="$emit('zoomIn')"
+          @click="$emit('zoom-in')"
       >+</button>
     </div>
 
@@ -114,7 +114,7 @@ const radius = computed(() => `${props.radius}px`);
       <div class="toolbar-section rack-controls">
         <button
             class="toolbar-btn"
-            @click="$emit('addRack')"
+            @click="$emit('add-rack')"
             :disabled="!canAddRack"
             :title="!canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : 'Ajouter un rack'"
         >
@@ -131,7 +131,7 @@ const radius = computed(() => `${props.radius}px`);
       <div class="toolbar-section circuit-controls">
         <button
             class="toolbar-btn"
-            @click="$emit('addCircuit')"
+            @click="$emit('add-circuit')"
             :disabled="!canAddCircuit"
             :title="!canAddCircuit ? 'Dessinez d\'abord les murs pour ajouter des circuits' : 'Ajouter un circuit électrique'"
         >
@@ -148,7 +148,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           class="toolbar-btn"
           :class="{ 'active': isDrawingWalls }"
-          @click="$emit('toggleWalls')"
+          @click="$emit('toggle-walls')"
           :title="isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs'"
       >
         <span class="icon">✏️</span>
@@ -159,7 +159,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           class="toolbar-btn"
           :class="{ 'active': isDrawingPillar }"
-          @click="$emit('togglePillar')"
+          @click="$emit('toggle-pillar')"
           :title="isDrawingPillar ? 'Arrêter les poteaux' : 'Dessiner des poteaux'"
       >
         <span class="icon">⬛</span>
@@ -169,7 +169,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           v-if="canClearWalls"
           class="toolbar-btn btn-danger"
-          @click="$emit('clearWalls')"
+          @click="$emit('clear-walls')"
           title="Supprimer la pièce"
       >
         <span class="icon">🗑️</span>

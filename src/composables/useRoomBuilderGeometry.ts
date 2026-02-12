@@ -64,7 +64,7 @@ export const useRoomBuilderGeometry = () => {
   };
 
   const getWallBoundingBox = (walls: Point[] = []) => {
-    if (walls.length < 3) return null;
+    if (walls.length === 0) return null;
 
     const minX = Math.min(...walls.map(p => p.x));
     const minY = Math.min(...walls.map(p => p.y));

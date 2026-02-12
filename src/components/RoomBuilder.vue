@@ -4,6 +4,7 @@ export const exposedFunctions = Symbol('exposedFunctions');
 export type ExposedFunctions = {
   getWallBoundingBox(walls?: Point[] | undefined): (MinPoint & MaxPoint & Size) | null;
   getPodBoundaries(racks: Rack[], pods: { id: string; name: string }[]): Array<(Point & Size & { id: string }) | null>;
+  getGridLabel(x: number, y: number, wallBoundingBox: (Size & MinPoint & MaxPoint) | null, mode?: 'full' | 'letter' | 'number'): string;
 }
 
 type Props = {
@@ -499,7 +500,9 @@ const circuitPaths = computed({
 const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
 
 const wallBoundingBox = computed(() => {
-  if (isDrawingWalls.value) return null;
+  if (isDrawingWalls.value && wallPreviewPoint.value) {
+    return getWallBoundingBox([...walls.value, wallPreviewPoint.value]);
+  }
   return getWallBoundingBox(walls.value);
 });
 
@@ -538,21 +541,31 @@ const verticalCoords = computed(() => {
   return coords;
 });
 
-const gridLabel = computed(() => {
-  if (!hoveredUnit.value || !wallBoundingBox.value) return '';
+const getGridLabel = (x: number, y: number, wallBoundingBox: (Size & MinPoint & MaxPoint) | null, mode: 'full' | 'letter' | 'number' = 'full') => {
+  const originX = wallBoundingBox ? wallBoundingBox.minX : 0;
+  const originY = wallBoundingBox ? wallBoundingBox.maxY : 0;
   
-  const iH = Math.floor((hoveredUnit.value.x - wallBoundingBox.value.minX) / 20);
-  const hLabel = (iH + 1).toString();
+  const iH = Math.floor((x - originX) / 20);
+  const hLabel = iH <= 0 ? '0' : iH.toString();
   
-  const iV = Math.floor((wallBoundingBox.value.maxY - hoveredUnit.value.y - 1) / 20);
-  const label = String.fromCharCode(65 + (iV % 26));
+  const iV = Math.floor((originY - y) / 20);
+  const safeIV = Math.max(0, iV - 1);
+  
+  const label = String.fromCharCode(65 + (safeIV % 26));
   let vLabel = label;
-  if (iV >= 26) {
-    const prefix = String.fromCharCode(65 + Math.floor(iV / 26) - 1);
+  if (safeIV >= 26) {
+    const prefix = String.fromCharCode(65 + Math.floor(safeIV / 26) - 1);
     vLabel = prefix + label;
   }
   
+  if (mode === 'letter') return vLabel;
+  if (mode === 'number') return hLabel;
   return `${vLabel}${hLabel}`;
+};
+
+const gridLabel = computed(() => {
+  if (!hoveredUnit.value) return '';
+  return getGridLabel(hoveredUnit.value.x, hoveredUnit.value.y, wallBoundingBox.value);
 });
 
 const viewportRect = computed(() => ({
@@ -1001,14 +1014,14 @@ const selectCircuit = (event: MouseEvent, index: number) => {
 const onMouseMoveSVG = (event: MouseEvent) => {
   const svg = canvasComponent.value?.svgRef;
   if (!svg) return;
-  if (selectedUnits.value.length > 0) console.log(svg);
+  
   const pt = svg.createSVGPoint();
   pt.x = event.clientX;
   pt.y = event.clientY;
   const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
 
-  const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
-  const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+  const x = (svgP.x / (zoomLevel.value || 1)) - (panOffset.value.x || 0);
+  const y = (svgP.y / (zoomLevel.value || 1)) - (panOffset.value.y || 0);
 
   if (currentLayerIndex.value === 0) {
     if (draggingWallSegment.value) {
@@ -1098,7 +1111,10 @@ const onMouseMoveSVG = (event: MouseEvent) => {
 };
 
 const onMouseMove = (event: MouseEvent) => {
-  if (isDrawingWalls.value && !draggingWallSegment.value) return;
+  if (isDrawingWalls.value && !draggingWallSegment.value) {
+    onMouseMoveSVG(event);
+    return;
+  }
   if (isPanning.value) return panRunning(event);
   if (draggingRack.value !== null) dragRack(event);
   else if (rotatingRack.value !== null) rotateRack(event);
@@ -1155,8 +1171,8 @@ const deselect = (event: MouseEvent) => {
     pt.y = event.clientY;
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
 
-    const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
-    const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
+    const x = (svgP.x / (zoomLevel.value || 1)) - (panOffset.value.x || 0);
+    const y = (svgP.y / (zoomLevel.value || 1)) - (panOffset.value.y || 0);
 
     const lastPoint = walls.value.length > 0 ? walls.value[walls.value.length - 1] : null;
     const constrained = getConstrainedPoint(x, y, lastPoint!);
@@ -1166,10 +1182,9 @@ const deselect = (event: MouseEvent) => {
     if (walls.value.length > 2) {
       const firstPoint = walls.value[0];
       const dist = Math.sqrt(Math.pow(snapX - (firstPoint?.x ?? 0), 2) + Math.pow(snapY - (firstPoint?.y ?? 0), 2));
-      if (dist < 10) {
+      if (dist < 25) {
         cancelDrawingWalls();
         initializeLayers();
-
         return;
       }
     }
@@ -1178,10 +1193,14 @@ const deselect = (event: MouseEvent) => {
     createWall({ x: snapX, y: snapY });
     return;
   }
-  if ((event.target as SVGElement).classList.contains('canvas-background') ||
-      (event.target as SVGElement).closest('.footprints-layer') ||
-      (event.target as SVGElement).classList.contains('room-surface')) {
-    const isFootprintClick = (event.target as SVGElement).closest('.footprint-group');
+  
+  const target = event.target as SVGElement;
+  const isBackgroundClick = target.classList.contains('canvas-background') || 
+                           target.closest('.footprints-layer') || 
+                           target.classList.contains('room-surface');
+
+  if (isBackgroundClick) {
+    const isFootprintClick = target.closest('.footprint-group');
     if (!isFootprintClick) {
       selectedRackIndices.value = [];
       isWallSelected.value = false;
@@ -1445,9 +1464,10 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown);
 });
 
-provide<ExposedFunctions>(exposedFunctions, {
+  provide<ExposedFunctions>(exposedFunctions, {
   getWallBoundingBox,
-  getPodBoundaries
+  getPodBoundaries,
+  getGridLabel
 })
 </script>
 
@@ -1489,7 +1509,7 @@ provide<ExposedFunctions>(exposedFunctions, {
     </template>
 
     <polygon
-        v-if="!isDrawingWalls && (walls.length > 2 || isWallSelected)"
+        v-if="!isDrawingWalls && !isDrawingPillar && (walls.length > 2 || isWallSelected)"
         :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
         class="room-surface selected"
         style="pointer-events: none;"
@@ -1679,58 +1699,5 @@ provide<ExposedFunctions>(exposedFunctions, {
   background: #004a99; /* Bleu iTop Designer */
   border-bottom-right-radius: v-bind(radius);
   border-bottom-left-radius: v-bind(radius);
-}
-
-.itop-modal {
-  max-width: 800px !important;
-  width: 80% !important;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #666;
-}
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-}
-
-.modal-container {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Transitions */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
 }
 </style>

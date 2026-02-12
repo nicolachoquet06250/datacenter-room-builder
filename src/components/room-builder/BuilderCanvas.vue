@@ -69,7 +69,46 @@ const emit = defineEmits<Emits>();
 
 const svgRef = ref<SVGSVGElement | null>(null);
 
-const {getPodBoundaries} = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions);
+const {getPodBoundaries, getGridLabel} = inject<ExposedFunctions>(exposedFunctions, {} as ExposedFunctions);
+
+const getPreviewLabel = (point: Point | null, walls: Point[], wallBoundingBox: any) => {
+  if (!point) return '';
+  if (walls.length === 0) return '';
+  
+  if (walls.length === 1) {
+    const first = walls[0]!;
+    // On détermine la direction du segment de preview
+    const isHorizontal = Math.abs(point.y - first.y) < 1;
+    const isVertical = Math.abs(point.x - first.x) < 1;
+    
+    if (isHorizontal && !isVertical) return getGridLabel(point.x, point.y, wallBoundingBox, 'number');
+    if (isVertical && !isHorizontal) return getGridLabel(point.x, point.y, wallBoundingBox, 'letter');
+    return getGridLabel(point.x, point.y, wallBoundingBox, 'full');
+  }
+  
+  return getGridLabel(point.x, point.y, wallBoundingBox, 'full');
+};
+
+const getLabelOffset = (point: Point | null, wallBoundingBox: any) => {
+  if (!point || !wallBoundingBox) return { x: 10, y: -25 };
+  
+  let offsetX = 10;
+  let offsetY = -25;
+  
+  if (Math.abs(point.x - wallBoundingBox.minX) < 1) {
+    offsetX = -45; // Gauche
+  } else if (Math.abs(point.x - wallBoundingBox.maxX) < 1) {
+    offsetX = 10; // Droite
+  }
+  
+  if (Math.abs(point.y - wallBoundingBox.minY) < 1) {
+    offsetY = -25; // Haut
+  } else if (Math.abs(point.y - wallBoundingBox.maxY) < 1) {
+    offsetY = 10; // Bas
+  }
+  
+  return { x: offsetX, y: offsetY };
+};
 
 const handleSelectPillar = (e: MouseEvent, pIdx: number) => {
   if (!props.isDrawingPillar) {
@@ -112,13 +151,15 @@ defineExpose({svgRef});
       @mousemove="$emit('mousemove-svg', $event)"
       @dragover.prevent="$emit('dragover-rack', $event)"
       @drop="$emit('drop-rack', $event)"
+      @click.right.prevent
   >
     <BuilderGrid
         :zoom-level="zoomLevel"
         :pan-offset="panOffset"
     />
 
-    <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`" v-if="layers && layers.length > 0 && !isDataLoading">
+    <g :transform="`scale(${zoomLevel}) translate(${panOffset.x}, ${panOffset.y})`" v-if="!isDataLoading">
+      <!-- On s'assure que le groupe actif est dessiné en DERNIER pour être au-dessus -->
       <g
           v-for="(layer, lIdx) in layers"
           :key="`layer-${layer?.id || lIdx}`"
@@ -238,7 +279,7 @@ defineExpose({svgRef});
         </g>
       </g>
 
-      <g v-if="walls.length > 0 || currentLayerIndex === 3" class="layer-active">
+      <g v-if="walls.length > 0 || currentLayerIndex === 3 || isDrawingWalls || isDrawingPillar" class="layer-active">
         <polygon
             v-if="!isDrawingWalls && walls.length > 2"
             :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
@@ -260,6 +301,7 @@ defineExpose({svgRef});
             style="pointer-events: none;"
         />
 
+
         <polygon
             v-if="!isDrawingWalls && walls.length > 2"
             :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
@@ -268,7 +310,7 @@ defineExpose({svgRef});
               selected: isWallSelected,
               'layer-footprints': currentLayerIndex === 2
             }"
-            @mousedown="(!isDrawingPillar && !isDrawingWalls) && $emit('select-wall', $event)"
+            @mousedown.stop="(!isDrawingPillar && !isDrawingWalls) && $emit('select-wall', $event)"
             stroke="rgba(255,255,255,0.3)"
             stroke-width="1"
             stroke-linejoin="round"
@@ -365,7 +407,46 @@ defineExpose({svgRef});
               :cy="wallPreviewPoint.y"
               r="4"
               fill="#333"
+              style="pointer-events: none;"
           />
+          <g v-if="walls.length > 0" class="first-point-label" style="pointer-events: none;">
+            <rect
+                :x="walls[0]!.x + getLabelOffset(walls[0], wallBoundingBox).x"
+                :y="walls[0]!.y + getLabelOffset(walls[0], wallBoundingBox).y"
+                :width="getGridLabel(walls[0]!.x, walls[0]!.y, wallBoundingBox).length > 2 ? 40 : 30"
+                height="18"
+                rx="3"
+                fill="rgba(0, 0, 0, 0.75)"
+            />
+            <text
+                :x="walls[0]!.x + getLabelOffset(walls[0], wallBoundingBox).x + (getGridLabel(walls[0]!.x, walls[0]!.y, wallBoundingBox).length > 2 ? 20 : 15)"
+                :y="walls[0]!.y + getLabelOffset(walls[0], wallBoundingBox).y + 12"
+                text-anchor="middle"
+                fill="white"
+                style="font-size: 10px; font-weight: bold; font-family: sans-serif;"
+            >
+              {{ getGridLabel(walls[0]!.x, walls[0]!.y, wallBoundingBox) }}
+            </text>
+          </g>
+          <g v-if="wallPreviewPoint && walls.length > 0" class="preview-coordinate-label" style="pointer-events: none;">
+            <rect
+                :x="wallPreviewPoint.x + getLabelOffset(wallPreviewPoint, wallBoundingBox).x"
+                :y="wallPreviewPoint.y + getLabelOffset(wallPreviewPoint, wallBoundingBox).y"
+                :width="getPreviewLabel(wallPreviewPoint, walls, wallBoundingBox).length > 2 ? 40 : 30"
+                height="18"
+                rx="3"
+                fill="rgba(0, 0, 0, 0.75)"
+            />
+            <text
+                :x="wallPreviewPoint.x + getLabelOffset(wallPreviewPoint, wallBoundingBox).x + (getPreviewLabel(wallPreviewPoint, walls, wallBoundingBox).length > 2 ? 20 : 15)"
+                :y="wallPreviewPoint.y + getLabelOffset(wallPreviewPoint, wallBoundingBox).y + 12"
+                text-anchor="middle"
+                fill="white"
+                style="font-size: 10px; font-weight: bold; font-family: sans-serif;"
+            >
+              {{ getPreviewLabel(wallPreviewPoint, walls, wallBoundingBox) }}
+            </text>
+          </g>
           <line
               v-if="walls.length > 0 && wallPreviewPoint"
               :x1="walls[walls.length - 1]?.x"
@@ -378,6 +459,7 @@ defineExpose({svgRef});
               stroke-linecap="round"
               stroke-dasharray="8,4"
               opacity="0.6"
+              style="pointer-events: none;"
           />
           <line
               v-if="walls.length > 2 && wallPreviewPoint"
@@ -391,6 +473,7 @@ defineExpose({svgRef});
               stroke-linecap="round"
               stroke-dasharray="8,4"
               opacity="0.6"
+              style="pointer-events: none;"
           />
         </template>
 
