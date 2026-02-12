@@ -411,16 +411,16 @@ defineExpose({svgRef});
           />
           <g v-if="walls.length > 0" class="first-point-label" style="pointer-events: none;">
             <rect
-                :x="walls[0]!.x + getLabelOffset(walls[0], wallBoundingBox).x"
-                :y="walls[0]!.y + getLabelOffset(walls[0], wallBoundingBox).y"
+                :x="walls[0]!.x + getLabelOffset(walls[0]!, wallBoundingBox).x"
+                :y="walls[0]!.y + getLabelOffset(walls[0]!, wallBoundingBox).y"
                 :width="getGridLabel(walls[0]!.x, walls[0]!.y, wallBoundingBox).length > 2 ? 40 : 30"
                 height="18"
                 rx="3"
                 fill="rgba(0, 0, 0, 0.75)"
             />
             <text
-                :x="walls[0]!.x + getLabelOffset(walls[0], wallBoundingBox).x + (getGridLabel(walls[0]!.x, walls[0]!.y, wallBoundingBox).length > 2 ? 20 : 15)"
-                :y="walls[0]!.y + getLabelOffset(walls[0], wallBoundingBox).y + 12"
+                :x="walls[0]!.x + getLabelOffset(walls[0]!, wallBoundingBox).x + (getGridLabel(walls[0]!.x, walls[0]!.y, wallBoundingBox).length > 2 ? 20 : 15)"
+                :y="walls[0]!.y + getLabelOffset(walls[0]!, wallBoundingBox).y + 12"
                 text-anchor="middle"
                 fill="white"
                 style="font-size: 10px; font-weight: bold; font-family: sans-serif;"
