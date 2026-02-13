@@ -161,10 +161,6 @@ const langKeys = computed(() => {
 
 provide('langs', langKeys);
 
-watch(langKeys, langKeys => {
-  console.log('langKeys changed', langKeys);
-}, {immediate: true});
-
 watchEffect(() => {
   console.log('propsLayers', propsLayers.value)
 })

@@ -42,7 +42,6 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
 
     onMounted(() => {
         if (defaultLayers && defaultLayers.value.length > 0) {
-            console.log('defaultLayers', defaultLayers.value)
             let initialLayers: Layer[];
             if (defaultLayers.value[0]!.name === layerNames[0]) {
                 initialLayers = defaultLayers.value.map((layer) => ({
@@ -87,7 +86,6 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
 
     watch(defaultLayers, () => {
         if (defaultLayers && defaultLayers.value.length > 0) {
-            console.log('defaultLayers', defaultLayers.value)
             let initialLayers: Layer[];
             if (defaultLayers.value[0]!.name === layerNames[0]) {
                 initialLayers = defaultLayers.value.map((layer) => ({
