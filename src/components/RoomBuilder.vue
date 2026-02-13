@@ -80,7 +80,7 @@ const {
   isElementInWalls
 } = useRoomBuilderGeometry();
 
-const {error: notifyError, success: notifySuccess} = useNotify();
+const {error: notifyError} = useNotify();
 
 const {
   wallPreviewPoint, isWallSelected, isDrawingWalls, wallsRef, walls,
@@ -948,7 +948,6 @@ const reloadData = () => {
     roomName: roomName.value,
     layers: layers.value
   });
-  // On pourrait aussi ajouter un emit spécifique 'refresh' si besoin
 };
 
 // On expose une méthode pour fermer la modale et refresh depuis l'extérieur si nécessaire
@@ -1409,23 +1408,12 @@ const pasteFromClipboard = async () => {
 };
 
 const save = async () => {
-  try {
     emit('saved', {
       roomName: roomName.value,
       layers: layers.value
     });
-    notifySuccess({
-      title: 'Sauvegarde',
-      text: 'Sauvegarde réussie'
-    });
     undoStack.value = [];
     redoStack.value = [];
-  } catch (e) {
-    console.error(e);
-    notifyError({
-      text: 'Erreur lors de la sauvegarde'
-    });
-  }
 };
 
 const cancelItopFormModal = () => {
