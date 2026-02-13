@@ -1,7 +1,6 @@
 import { defineCustomElement } from 'vue'
 import RoomBuilder from './components/RoomBuilder.vue'
 import dataJson from './assets/data.json';
-import {useNotify} from "./composables/useNotify.ts";
 
 const RoomBuilderElement = defineCustomElement(RoomBuilder)
 
@@ -33,7 +32,3 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log('Room saved:', event.detail[0])
     })
 })
-
-const {success, error} = useNotify();
-
-export {success, error};
