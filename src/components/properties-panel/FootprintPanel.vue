@@ -13,7 +13,7 @@ type Emits = {
 </script>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import {computed, type ComputedRef, inject} from 'vue';
 
 const props = defineProps<Props>()
 
@@ -28,13 +28,15 @@ const minY = computed(() => {
   if (!props.footprint.units?.length) return 0;
   return Math.min(...props.footprint.units.map(u => u.y));
 });
+
+const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 </script>
 
 <template>
   <div>
     <div class="panel-header">
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>
-      <h3>Positionnement du Footprint</h3>
+      <h3>{{ langs['FloorPlanBuilder:Panels:Footprints:Title'] }}</h3>
     </div>
 
     <div class="property-info">
@@ -46,7 +48,7 @@ const minY = computed(() => {
     </div>
 
     <div class="property-group">
-      <label for="footprint-name">Nom</label>
+      <label for="footprint-name">{{ langs['FloorPlanBuilder:Panels:Footprints:Name'] }}</label>
       <input
           id="footprint-name"
           type="text"
@@ -59,7 +61,7 @@ const minY = computed(() => {
     <div class="property-info">
       <span class="info-label">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12l-1.41-1.41L13 17.17V3h-2v14.17l-6.59-6.58L3 12l9 9 9-9z"/></svg>
-        Unités
+        {{ langs['FloorPlanBuilder:Panels:Footprints:Units'] }}
       </span>
       <span class="info-value">{{ footprint.units?.length }}</span>
     </div>
@@ -90,7 +92,7 @@ const minY = computed(() => {
     <div class="property-group">
       <label>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
-        Couleur
+        {{ langs['FloorPlanBuilder:Panels:Footprints:Color'] }}
       </label>
       <div class="color-preview-container" @click="$emit('change-color', footprint.id)">
         <div class="color-preview" :style="{ backgroundColor: footprint.color }"></div>
@@ -104,7 +106,7 @@ const minY = computed(() => {
     <div class="actions">
       <button @click="$emit('delete-footprint', footprint.id)" class="btn btn-danger">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-        Supprimer le Footprint
+        {{ langs['FloorPlanBuilder:Panels:Footprints:Remove'] }}
       </button>
     </div>
   </div>

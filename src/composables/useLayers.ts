@@ -3,7 +3,12 @@ import {computed, type ComputedRef, onMounted, type Ref, ref, watch} from "vue";
 const layers = ref<Layer[]>([]);
 const currentLayerIndex = ref(0);
 
-export const layerNames = ['Murs', 'Circuits électriques', 'Surfaces au sol', 'Baies'] as const;
+export const layerNames = [
+    'FloorPlanBuilder:Layers:Walls:Title',
+    'FloorPlanBuilder:Layers:Circuits:Title',
+    'FloorPlanBuilder:Layers:Footprints:Title',
+    'FloorPlanBuilder:Layers:Racks:Title'
+] as const;
 
 export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer[]>) => {
     if (!defaultLayers) {
@@ -37,7 +42,7 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
 
     onMounted(() => {
         if (defaultLayers && defaultLayers.value.length > 0) {
-            console.log(defaultLayers.value)
+            console.log('defaultLayers', defaultLayers.value)
             let initialLayers: Layer[];
             if (defaultLayers.value[0]!.name === layerNames[0]) {
                 initialLayers = defaultLayers.value.map((layer) => ({
@@ -82,7 +87,7 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
 
     watch(defaultLayers, () => {
         if (defaultLayers && defaultLayers.value.length > 0) {
-            console.log(defaultLayers.value)
+            console.log('defaultLayers', defaultLayers.value)
             let initialLayers: Layer[];
             if (defaultLayers.value[0]!.name === layerNames[0]) {
                 initialLayers = defaultLayers.value.map((layer) => ({

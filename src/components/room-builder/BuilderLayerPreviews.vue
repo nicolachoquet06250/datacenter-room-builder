@@ -11,13 +11,15 @@ type Props = {
 </script>
 
 <script setup lang="ts">
-import {inject} from "vue";
+import {computed, type ComputedRef, inject} from "vue";
 import {type ExposedFunctions, exposedFunctions} from "../RoomBuilder.vue";
 import {getContrastColor} from "../../utils/colors";
 
 defineProps<Props>();
 
 const currentLayerIndex = defineModel<number>('currentLayerIndex');
+
+const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 
 const {
   getWallBoundingBox,
@@ -48,7 +50,9 @@ const getFootprintCenter = (footprint: Footprint) => {
     >
       <div class="preview-header">
         <div class="preview-index-badge">{{ index + 1 }}</div>
-        <div class="preview-title" :title="layer.name">{{ layer.name }}</div>
+        <div class="preview-title" :title="langs[layer.name]!">
+          {{ langs[layer.name] }}
+        </div>
         <div v-if="currentLayerIndex === index" class="active-indicator"></div>
       </div>
       <div class="mini-map-container">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { rackHeight, rackWidth } from '../../composables/useRoomBuilderGeometry';
+import {computed, type ComputedRef, inject} from "vue";
 
 defineProps<{
   racks: Rack[];
@@ -12,6 +13,8 @@ const emit = defineEmits<{
 }>();
 
 const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
+
+const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 
 const onDragStart = (event: DragEvent, rack: Rack) => {
   if (event.dataTransfer) {
@@ -75,7 +78,7 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
   <div class="unplaced-racks-sidebar">
     <div class="sidebar-header">
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-      <h3>Racks à positionner</h3>
+      <h3>{{ langs['FloorPlanBuilder:Panels:RacksToSetPosition:Title'] }}</h3>
     </div>
     <div class="racks-list">
       <div
@@ -92,7 +95,7 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
         </div>
         <div class="rack-info">
           <div class="rack-name">{{ rack.name }}</div>
-          <div class="rack-status">Position/Rotation manquante</div>
+          <div class="rack-status">{{ langs['FloorPlanBuilder:Panels:RackToSetPosition:MissingPositionAndRotation'] }}</div>
         </div>
       </div>
     </div>

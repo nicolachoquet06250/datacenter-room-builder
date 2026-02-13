@@ -16,7 +16,7 @@ type Emits = {
 </script>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import {computed, type ComputedRef, inject} from 'vue';
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
@@ -27,6 +27,8 @@ const firstCircuit = computed(() => {
   if (props.selectedCircuitIndices.length === 0) return null;
   return props.circuits[props.selectedCircuitIndices[0]!] || null;
 });
+
+const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 
 const onNameInput = (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -48,23 +50,23 @@ const onCoordChange = (event: Event) => {
         <path d="M11 4H5a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6"/>
         <circle cx="11" cy="9" r="2"/>
       </svg>
-      <h3>Positionnement du Circuit</h3>
+      <h3>{{ langs['FloorPlanBuilder:Panels:Circuits:Title'] }}</h3>
     </div>
 
     <div v-if="!isMultiple && firstCircuit" class="property-form">
       <div class="form-group">
-        <label>Nom</label>
+        <label>{{ langs['FloorPlanBuilder:Panels:Circuits:Name'] }}</label>
         <input type="text" :value="firstCircuit.name" @input="onNameInput" />
       </div>
 
       <div class="form-group">
-        <label>Coordonnée (ex: A1)</label>
+        <label>{{ langs['FloorPlanBuilder:Panels:Circuits:Coordinates'] }} (ex: A1)</label>
         <input type="text" :value="coord ?? ''" placeholder="A1, B2, AA5..." @input="onCoordChange" />
       </div>
     </div>
 
     <div v-else-if="isMultiple" class="property-info">
-      <span class="info-label">Circuits sélectionnés</span>
+      <span class="info-label">{{ langs['FloorPlanBuilder:Panels:Circuits:Multiple:Title'] }}</span>
       <span class="info-value">{{ selectedCircuitIndices.length }}</span>
     </div>
 
@@ -73,7 +75,7 @@ const onCoordChange = (event: Event) => {
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
         </svg>
-        Supprimer la sélection
+        {{ langs['FloorPlanBuilder:Panels:Circuits:Remove'] }}
       </button>
     </div>
   </div>

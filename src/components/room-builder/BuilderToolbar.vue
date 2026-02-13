@@ -12,7 +12,7 @@ type Props = {
   zoomLevel: number;
   canZoomOut: boolean;
   canZoomIn: boolean;
-  selectedLayoutIndex: number | null;
+  selectedLayerIndex: number | null;
   radius: number;
   disableAddRacks: boolean
 }
@@ -33,7 +33,7 @@ type Emits = {
 </script>
 
 <script setup lang="ts">
-import {computed} from "vue";
+import {computed, type ComputedRef, inject} from "vue";
 
 const props = defineProps<Props>();
 
@@ -42,6 +42,8 @@ defineEmits<Emits>();
 const roomName = defineModel<string>('roomName');
 
 const radius = computed(() => `${props.radius}px`);
+
+const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 </script>
 
 <template>
@@ -50,7 +52,7 @@ const radius = computed(() => `${props.radius}px`);
       <input 
         v-model="roomName"
         placeholder="Nom de la salle"
-        title="Nom de la salle"
+        :title="langs['FloorPlanBuilder:Toolbar:Room:Name']"
       />
     </div>
 
@@ -60,7 +62,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           class="toolbar-btn"
           :disabled="undoDisabled"
-          title="Annuler (Ctrl+Z)"
+          :title="`${langs['FloorPlanBuilder:Toolbar:History:Previous']} (Ctrl+Z)`"
           @click="$emit('undo')"
       >
         <span class="icon">↶</span>
@@ -69,7 +71,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           class="toolbar-btn"
           :disabled="redoDisabled"
-          title="Rétablir (Ctrl+Maj+Z)"
+          :title="`${langs['FloorPlanBuilder:Toolbar:History:Next']} (Ctrl+Maj+Z)`"
           @click="$emit('redo')"
       >
         <span class="icon">↷</span>
@@ -81,7 +83,7 @@ const radius = computed(() => `${props.radius}px`);
     <div class="toolbar-section zoom-controls">
       <button
           class="toolbar-btn"
-          title="Recentrer"
+          :title="langs['FloorPlanBuilder:Toolbar:Move:Center']"
           @click="$emit('reset-pan')"
       >
         <span class="icon">🎯</span>
@@ -92,7 +94,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           class="toolbar-btn"
           :disabled="!canZoomOut"
-          title="Zoom arrière"
+          :title="langs['FloorPlanBuilder:Toolbar:Zoom:Out']"
           @click="$emit('zoom-out')"
       >-</button>
 
@@ -103,7 +105,7 @@ const radius = computed(() => `${props.radius}px`);
       <button
           class="toolbar-btn"
           :disabled="!canZoomIn"
-          title="Zoom avant"
+          :title="langs['FloorPlanBuilder:Toolbar:Zoom:In']"
           @click="$emit('zoom-in')"
       >+</button>
     </div>
@@ -116,11 +118,11 @@ const radius = computed(() => `${props.radius}px`);
             class="toolbar-btn"
             @click="$emit('add-rack')"
             :disabled="!canAddRack"
-            :title="!canAddRack ? 'Dessinez d\'abord les murs pour ajouter des racks' : 'Ajouter un rack'"
+            :title="langs['FloorPlanBuilder:Toolbar:Layers:Racks:Title']"
         >
           <span class="icon">+</span>
 
-          <span class="label">Rack</span>
+          <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Layers:Racks'] }}</span>
         </button>
       </div>
     </template>
@@ -133,44 +135,44 @@ const radius = computed(() => `${props.radius}px`);
             class="toolbar-btn"
             @click="$emit('add-circuit')"
             :disabled="!canAddCircuit"
-            :title="!canAddCircuit ? 'Dessinez d\'abord les murs pour ajouter des circuits' : 'Ajouter un circuit électrique'"
+            :title="langs['FloorPlanBuilder:Toolbar:Layers:Circuits:Title']"
         >
           <span class="icon">+</span>
 
-          <span class="label">Circuit</span>
+          <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Layers:Circuits'] }}</span>
         </button>
       </div>
     </template>
 
-    <div class="toolbar-section action-controls" v-if="selectedLayoutIndex === 0">
+    <div class="toolbar-section action-controls" v-if="selectedLayerIndex === 0">
       <div class="toolbar-divider"/>
 
       <button
           class="toolbar-btn"
           :class="{ 'active': isDrawingWalls }"
           @click="$emit('toggle-walls')"
-          :title="isDrawingWalls ? 'Arrêter les murs' : 'Dessiner les murs'"
+          :title="langs[`FloorPlanBuilder:Toolbar:Layers:Walls:Title:${isDrawingWalls ? 'Stop' : 'Start'}`]"
       >
         <span class="icon">✏️</span>
 
-        <span class="label">Murs</span>
+        <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Layers:Walls'] }}</span>
       </button>
 
       <button
           class="toolbar-btn"
           :class="{ 'active': isDrawingPillar }"
           @click="$emit('toggle-pillar')"
-          :title="isDrawingPillar ? 'Arrêter les poteaux' : 'Dessiner des poteaux'"
+          :title="langs[`FloorPlanBuilder:Toolbar:Layers:Walls:Pillars:Title:${isDrawingPillar ? 'Stop' : 'Start'}`]"
       >
         <span class="icon">⬛</span>
-        <span class="label">Poteaux</span>
+        <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Layers:Walls:Pillars'] }}</span>
       </button>
 
       <button
           v-if="canClearWalls"
           class="toolbar-btn btn-danger"
           @click="$emit('clear-walls')"
-          title="Supprimer la pièce"
+          :title="langs['FloorPlanBuilder:Toolbar:Layers:Walls:Remove']"
       >
         <span class="icon">🗑️</span>
       </button>
@@ -187,7 +189,7 @@ const radius = computed(() => `${props.radius}px`);
 
       <button @click="$emit('save')" class="toolbar-btn btn-primary">
         <span class="icon">💾</span>
-        <span class="label">Sauvegarder</span>
+        <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Save'] }}</span>
       </button>
     </div>
   </div>

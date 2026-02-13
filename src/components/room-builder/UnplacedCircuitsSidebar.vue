@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {computed, type ComputedRef, inject} from "vue";
+
 defineProps<{
   circuits: Circuit[];
   selectedCircuitId: string | null;
@@ -12,6 +14,8 @@ const emit = defineEmits<{
 const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
 const circuitWidth = 40;
 const circuitHeight = 40;
+
+const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 
 const onDragStart = (event: DragEvent, circuit: Circuit) => {
   if (event.dataTransfer) {
@@ -71,7 +75,7 @@ const onDragStart = (event: DragEvent, circuit: Circuit) => {
         <path d="M11 4H5a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h6"/>
         <circle cx="11" cy="9" r="2"/>
       </svg>
-      <h3>Circuits à positionner</h3>
+      <h3>{{ langs['FloorPlanBuilder:Panels:CircuitsToSetPosition:Title'] }}r</h3>
     </div>
     <div class="circuits-list">
       <div
@@ -88,7 +92,7 @@ const onDragStart = (event: DragEvent, circuit: Circuit) => {
         </div>
         <div class="circuit-info">
           <div class="circuit-name">{{ circuit.name }}</div>
-          <div class="circuit-status">Position manquante</div>
+          <div class="circuit-status">{{ langs['FloorPlanBuilder:Panels:CircuitToSetPosition:MissingPosition'] }}</div>
         </div>
       </div>
     </div>

@@ -15,7 +15,9 @@ type Props = {
   disableAddRacks?: boolean
   useItopForm?: boolean
   itopCreateRackUrl?: string,
-  isDataLoading?: boolean
+  isDataLoading?: boolean,
+  language?: string,
+  langKeys?: string
 }
 
 type Emits = {
@@ -62,12 +64,106 @@ const props = withDefaults(
     useItopForm: false,
     itopCreateRackUrl: '/pages/UI.php?route=linkset.create_linked_object',
     isDataLoading: false,
+    language: 'FR FR',
+    langKeys: JSON.stringify({
+      'FR FR': {
+        'FloorPlanBuilder:Toolbar:Room:Name': 'Nom de la salle',
+
+        'FloorPlanBuilder:Toolbar:History:Previous': 'Annuler',
+        'FloorPlanBuilder:Toolbar:History:Next': 'Rétablir',
+
+        'FloorPlanBuilder:Toolbar:Move:Center': 'Recentrer',
+
+        'FloorPlanBuilder:Toolbar:Zoom:In': 'Zoom avant',
+        'FloorPlanBuilder:Toolbar:Zoom:Out': 'Zoom arrière',
+
+        'FloorPlanBuilder:Toolbar:Layers:Walls': 'Murs',
+        'FloorPlanBuilder:Toolbar:Layers:Walls:Title:Start': 'Dessiner les murs',
+        'FloorPlanBuilder:Toolbar:Layers:Walls:Title:Stop': 'Arrêter les murs',
+        'FloorPlanBuilder:Toolbar:Layers:Walls:Pillars': 'Poteaux',
+        'FloorPlanBuilder:Toolbar:Layers:Walls:Pillars:Title:Start': 'Dessiner des poteaux',
+        'FloorPlanBuilder:Toolbar:Layers:Walls:Pillars:Title:Stop': 'Arrêter les poteaux',
+        'FloorPlanBuilder:Toolbar:Layers:Walls:Remove': 'Supprimer la pièce',
+
+        'FloorPlanBuilder:Toolbar:Layers:Circuits': 'Circuit',
+        'FloorPlanBuilder:Toolbar:Layers:Circuits:Title': 'Ajouter un circuit électrique',
+
+        'FloorPlanBuilder:Toolbar:Layers:Racks': 'Rack',
+        'FloorPlanBuilder:Toolbar:Layers:Racks:Title': 'Ajouter un rack',
+
+        'FloorPlanBuilder:Toolbar:Save': 'Sauvegarder',
+
+        'FloorPlanBuilder:Layers:Walls:Title': 'Murs',
+        'FloorPlanBuilder:Layers:Circuits:Title': 'Circuits électriques',
+        'FloorPlanBuilder:Layers:Footprints:Title': 'Surfaces au sol',
+        'FloorPlanBuilder:Layers:Racks:Title': 'Baies',
+
+        'FloorPlanBuilder:Panels:Room:Title': 'Propriétés de la pièce',
+        'FloorPlanBuilder:Panels:Room:WallsNumber': 'Nombre de murs',
+        'FloorPlanBuilder:Panels:Room:UnitsNumber': 'Nombre d\'unités',
+        'FloorPlanBuilder:Panels:Room:TotalArea': 'Superficie totale',
+        'FloorPlanBuilder:Panels:Room:TotalArea:Sublabel': 'Basé sur une unité de 600mm',
+
+        'FloorPlanBuilder:Panels:Pillars:Title': 'Positionnement du poteau',
+        'FloorPlanBuilder:Panels:Pillars:XPosition': 'Position X',
+        'FloorPlanBuilder:Panels:Pillars:YPosition': 'Position Y',
+        'FloorPlanBuilder:Panels:Pillars:Remove': 'Supprimer les poteaux',
+        'FloorPlanBuilder:Panels:Pillar:Remove': 'Supprimer le poteaux',
+
+        'FloorPlanBuilder:Panels:Circuits:Title': 'Positionnement du circuit',
+        'FloorPlanBuilder:Panels:Circuits:Multiple:Title': 'Positionnement du circuit',
+        'FloorPlanBuilder:Panels:Circuits:Name': 'Nom',
+        'FloorPlanBuilder:Panels:Circuits:Coordinates': 'Coordonnées',
+        'FloorPlanBuilder:Panels:Circuits:Remove': 'Supprimer la sélection',
+
+        'FloorPlanBuilder:Panels:Footprints:Title': 'Positionnement du Footprint',
+        'FloorPlanBuilder:Panels:Footprints:Name': 'Nom',
+        'FloorPlanBuilder:Panels:Footprints:Units': 'Unités',
+        'FloorPlanBuilder:Panels:Footprints:Color': 'Couleur',
+        'FloorPlanBuilder:Panels:Footprints:Remove': 'Supprimer le Footprint',
+
+        'FloorPlanBuilder:Panels:Racks:Title': 'Positionnement du Rack',
+        'FloorPlanBuilder:Panels:Racks:Multiple:Title': 'Selection multiple',
+        'FloorPlanBuilder:Panels:Racks:Multiple:SelectedElements': 'éléments sélectionnés',
+        'FloorPlanBuilder:Panels:Racks:Name': 'Nom du Rack',
+        'FloorPlanBuilder:Panels:Racks:Coordinates': 'Coordonnée',
+        'FloorPlanBuilder:Panels:Racks:Rotation': 'Rotation',
+        'FloorPlanBuilder:Panels:Racks:Remove': 'Supprimer le Rack',
+
+        'FloorPlanBuilder:Panels:CircuitsToSetPosition:Title': 'Circuits à positionner',
+        'FloorPlanBuilder:Panels:CircuitToSetPosition:MissingPosition': 'Position manquante',
+
+        'FloorPlanBuilder:Panels:FootprintsToSetPosition:Title': 'Footprints à positionner',
+        'FloorPlanBuilder:Panels:FootprintToSetPosition:MissingPosition': 'Position manquante',
+        'FloorPlanBuilder:Panels:FootprintToSetPosition:Unnamed': 'Emprinte sans nom',
+
+        'FloorPlanBuilder:Panels:RacksToSetPosition:Title': 'Footprints à positionner',
+        'FloorPlanBuilder:Panels:RackToSetPosition:MissingPositionAndRotation': 'Position/Rotation manquante',
+      }
+    })
   }
 );
 
+watch(() => props.language, lang => {
+  console.log('lang changed', lang);
+}, {immediate: true});
+
 const emit = defineEmits<Emits>();
 
-const propsLayers = computed<Layer[]>(() => JSON.parse(props.layers))
+const propsLayers = computed<Layer[]>(() => JSON.parse(props.layers));
+const langKeys = computed(() => {
+  const langs = JSON.parse(props.langKeys);
+
+  return langs[props.language!] ?? Object.entries(langs['FR FR']).map(([key, value]) => ({
+    [key]: `${value} (FR FR)`
+  })).reduce((r, c) => ({ ...r, ...c }), {});
+});
+
+provide('langs', langKeys);
+
+watch(langKeys, langKeys => {
+  console.log('langKeys changed', langKeys);
+}, {immediate: true});
 
 watchEffect(() => {
   console.log('propsLayers', propsLayers.value)
@@ -104,19 +200,19 @@ const shouldShowLayers = computed(() => {
 });
 
 const incompleteRacks = computed(() => {
-  const baiesLayer = layers.value.find(l => l.name === 'Baies');
+  const baiesLayer = layers.value.find(l => l.name === 'FloorPlanBuilder:Layers:Racks:Title');
   if (!baiesLayer) return [];
   return baiesLayer.racks.filter(r => r.x === undefined || r.x === null || r.y === undefined || r.y === null || r.rotation === undefined || r.rotation === null);
 });
 
 const incompleteCircuits = computed(() => {
-  const circuitsLayer = layers.value.find(l => l.name === 'Circuits électriques');
+  const circuitsLayer = layers.value.find(l => l.name === 'FloorPlanBuilder:Layers:Circuits:Title');
   if (!circuitsLayer) return [];
   return circuitsLayer.circuits.filter(c => c.x === undefined || c.x === null || c.y === undefined || c.y === null);
 });
 
 const incompleteFootprints = computed(() => {
-  const surfacesLayer = layers.value.find(l => l.name === 'Surfaces au sol');
+  const surfacesLayer = layers.value.find(l => l.name === 'FloorPlanBuilder:Layers:Footprints:Title');
   if (!surfacesLayer) return [];
   return surfacesLayer.footprints.filter(f => (!f.units || f.units.length === 0) && f.width && f.height);
 });
@@ -1463,38 +1559,37 @@ onUnmounted(() => {
   <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel" @contextmenu.prevent>
     <div v-if="isDataLoading" />
 
-    <template v-if="!isDataLoading">
-      <BuilderToolbar
-          v-model:room-name="roomName"
-          :undo-disabled="undoStack.length === 0"
-          :redo-disabled="redoStack.length === 0"
-          :can-add-rack="walls.length > 2"
-          :show-add-rack="currentLayerIndex === 3"
-          :can-add-circuit="walls.length > 2"
-          :show-add-circuit="currentLayerIndex === 1"
-          :can-clear-walls="walls.length > 0"
-          :is-drawing-walls="isDrawingWalls"
-          :is-drawing-pillar="isDrawingPillar"
-          :zoom-level="zoomLevel"
-          :can-zoom-out="zoomLevel > 0.2"
-          :can-zoom-in="zoomLevel < 3"
-          :selected-layout-index="currentLayerIndex"
-          :radius="props.radius"
-          :disable-add-racks="disableAddRacks"
+    <BuilderToolbar
+        v-if="!isDataLoading"
+        v-model:room-name="roomName"
+        :undo-disabled="undoStack.length === 0"
+        :redo-disabled="redoStack.length === 0"
+        :can-add-rack="walls.length > 2"
+        :show-add-rack="currentLayerIndex === 3"
+        :can-add-circuit="walls.length > 2"
+        :show-add-circuit="currentLayerIndex === 1"
+        :can-clear-walls="walls.length > 0"
+        :is-drawing-walls="isDrawingWalls"
+        :is-drawing-pillar="isDrawingPillar"
+        :zoom-level="zoomLevel"
+        :can-zoom-out="zoomLevel > 0.2"
+        :can-zoom-in="zoomLevel < 3"
+        :selected-layer-index="currentLayerIndex"
+        :radius="props.radius"
+        :disable-add-racks="disableAddRacks"
 
-          @undo="undo"
-          @redo="redo"
-          @add-rack="addRack"
-          @add-circuit="addCircuit"
-          @toggle-walls="toggleIsDrawingWalls"
-          @toggle-pillar="toggleIsDrawingPillar"
-          @clear-walls="triggerClearWalls"
-          @zoom-out="zoomOut"
-          @zoom-in="zoomIn"
-          @reset-pan="resetPan"
-          @save="save"
-      />
-    </template>
+        @undo="undo"
+        @redo="redo"
+        @add-rack="addRack"
+        @add-circuit="addCircuit"
+        @toggle-walls="toggleIsDrawingWalls"
+        @toggle-pillar="toggleIsDrawingPillar"
+        @clear-walls="triggerClearWalls"
+        @zoom-out="zoomOut"
+        @zoom-in="zoomIn"
+        @reset-pan="resetPan"
+        @save="save"
+    />
 
     <polygon
         v-if="!isDrawingWalls && !isDrawingPillar && (walls.length > 2 || isWallSelected)"
@@ -1649,6 +1744,7 @@ onUnmounted(() => {
           v-if="incompleteRacks.length > 0 && shouldShowLayers && currentLayerIndex === 3"
           :racks="incompleteRacks"
           :selected-rack-id="selectedRackIndices.length === 1 && selectedRackIndices[0] !== undefined ? (racks[selectedRackIndices[0]]?.id ?? null) : null"
+
           @select-rack="onSelectUnplacedRack"
           @drag-start="takeSnapshot"
       />
@@ -1657,6 +1753,7 @@ onUnmounted(() => {
           v-if="incompleteCircuits.length > 0 && shouldShowLayers && currentLayerIndex === 1"
           :circuits="incompleteCircuits"
           :selected-circuit-id="selectedCircuitIndices.length === 1 && selectedCircuitIndices[0] !== undefined ? String(circuitPaths[selectedCircuitIndices[0]]?.id!) : null"
+
           @select-circuit="onSelectUnplacedCircuit"
           @drag-start="takeSnapshot"
       />
@@ -1665,6 +1762,7 @@ onUnmounted(() => {
           v-if="incompleteFootprints.length > 0 && shouldShowLayers && currentLayerIndex === 2"
           :footprints="incompleteFootprints"
           :selected-footprint-id="selectedFootprintId"
+
           @select-footprint="onSelectUnplacedFootprint"
           @drag-start="onStartDragUnplacedFootprint"
       />

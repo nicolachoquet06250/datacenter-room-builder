@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {computed, type ComputedRef, inject} from "vue";
+
 defineProps<{
   footprints: Footprint[];
   selectedFootprintId: string | null;
@@ -8,6 +10,8 @@ const emit = defineEmits<{
   (e: 'select-footprint', id: string): void;
   (e: 'drag-start', event: DragEvent, footprint: Footprint): void;
 }>();
+
+const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 
 const onDragStart = (event: DragEvent, footprint: Footprint) => {
   emit('drag-start', event, footprint);
@@ -46,7 +50,7 @@ const onDragStart = (event: DragEvent, footprint: Footprint) => {
         <path d="M9 3v18"/>
         <path d="M15 3v18"/>
       </svg>
-      <h3>Footprints à positionner</h3>
+      <h3>{{ langs['FloorPlanBuilder:Panels:FootprintsToSetPosition:Title'] }}</h3>
     </div>
     <div class="footprints-list">
       <div
@@ -64,8 +68,8 @@ const onDragStart = (event: DragEvent, footprint: Footprint) => {
           </svg>
         </div>
         <div class="footprint-info">
-          <div class="footprint-name">{{ footprint.name || 'Empreinte sans nom' }}</div>
-          <div class="footprint-status">{{ footprint.width }}mm x {{ footprint.height }}mm - Position manquante</div>
+          <div class="footprint-name">{{ footprint.name || langs['FloorPlanBuilder:Panels:FootprintToSetPosition:Unnamed'] }}</div>
+          <div class="footprint-status">{{ footprint.width }}mm x {{ footprint.height }}mm - {{ langs['FloorPlanBuilder:Panels:FootprintToSetPosition:MissingPosition'] }}</div>
         </div>
       </div>
     </div>
