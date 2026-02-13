@@ -1589,7 +1589,7 @@ onUnmounted(() => {
           :title="modalConfig.title"
           :message="modalConfig.message"
           :confirm-text="modalConfig.confirmText"
-          has-footer
+          has-footer center
 
           @confirm="modalConfig.onConfirm"
           @cancel="cancelModal"

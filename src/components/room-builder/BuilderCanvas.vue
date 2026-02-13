@@ -145,7 +145,8 @@ defineExpose({svgRef});
       class="canvas-svg"
       :class="{
         interacting: isInteracting,
-        'drawing-walls': isDrawingWalls
+        'drawing-walls': isDrawingWalls,
+        'drawing-pillar': isDrawingPillar
       }"
       @mousedown="$emit('deselect', $event)"
       @mousemove="$emit('mousemove-svg', $event)"
@@ -211,6 +212,7 @@ defineExpose({svgRef});
             :width="20"
             :height="20"
             fill="#333"
+            class="pillar-rect inactive"
         />
         <g v-if="layer?.circuits?.length">
           <template v-for="(circuit, circuitIdx) in layer.circuits" :key="`circuit-${layer?.id || lIdx}-${circuitIdx}`">
@@ -314,6 +316,7 @@ defineExpose({svgRef});
             stroke="rgba(255,255,255,0.3)"
             stroke-width="1"
             stroke-linejoin="round"
+            :style="{ pointerEvents: isDrawingPillar ? 'none' : 'auto' }"
         />
 
         <g v-if="currentLayerIndex === 2 && layers[2]?.footprints" class="footprints-layer">
@@ -382,7 +385,7 @@ defineExpose({svgRef});
             :height="20"
             fill="#333"
             fill-opacity="0.5"
-            style="pointer-events: none;"
+            style="pointer-events: none; cursor: crosshair;"
         />
 
         <g v-if="!isDrawingWalls && isWallSelected && currentLayerIndex === 0">
@@ -637,7 +640,7 @@ defineExpose({svgRef});
               :fill="selectedPillarIndices.includes(pIdx) ? '#0d6efd' : '#333'"
               :stroke="selectedPillarIndices.includes(pIdx) ? '#fff' : 'none'"
               :stroke-width="selectedPillarIndices.includes(pIdx) ? 2 : 0"
-              :style="{ cursor: isDrawingPillar ? 'crosshair' : 'pointer' }"
+              class="pillar-rect"
               @mousedown.stop="handleSelectPillar($event, pIdx)"
           />
         </g>
@@ -685,7 +688,8 @@ defineExpose({svgRef});
   cursor: grabbing;
 }
 
-.canvas-svg.drawing-walls {
+.canvas-svg.drawing-walls,
+.canvas-svg.drawing-pillar {
   cursor: crosshair !important;
 }
 
@@ -820,5 +824,13 @@ defineExpose({svgRef});
 }
 .footprint-group.draggable {
   cursor: move;
+}
+
+.pillar-rect {
+  cursor: crosshair;
+}
+
+.pillar-rect.inactive {
+  cursor: default;
 }
 </style>

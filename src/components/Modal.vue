@@ -7,7 +7,8 @@ type Props = {
   cancelText?: string;
   isHtml?: boolean,
   isLoading?: boolean,
-  hasFooter?: boolean
+  hasFooter?: boolean,
+  center?: boolean
 }
 
 type Emits = {
@@ -45,6 +46,10 @@ const message = computed(() => props.isHtml ? `<style>
     align-items: flex-start;
     z-index: 20;
     overflow-y: auto;
+
+    &.centeed {
+        align-items: center;
+    }
 }
 
 .modal-container {
@@ -143,7 +148,7 @@ watch(htmlContent, (htmlContent, oldHtmlContent) => {
 
 <template>
   <Transition name="modal">
-    <div v-if="show" class="modal-overlay" @click.self="cancel">
+    <div v-if="show" :class="['modal-overlay', {centered: center}]" @click.self="cancel">
       <div class="modal-container">
         <div class="modal-header">
           <h3>{{ title }}</h3>
@@ -186,6 +191,10 @@ watch(htmlContent, (htmlContent, oldHtmlContent) => {
   align-items: flex-start;
   z-index: 20;
   overflow-y: auto;
+
+  &.centered {
+    align-items: center;
+  }
 }
 
 .modal-container {
