@@ -17,8 +17,11 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   const hoveredUnit = ref<Point | null>(null);
   const selectedFootprintId = ref<string | null>(null);
   const draggingFootprintId = ref<string | null>(null);
+  const rotatingFootprintId = ref<string | null>(null);
   const footprintUnitsBeforeDrag = ref<Point[]>([]);
   const startMouseSVGPos = { x: 0, y: 0 };
+  const startRotationAngle = ref(0);
+  const initialFootprintRotation = ref(0);
   const { isPointInPolygon } = useRoomBuilderGeometry();
 
   const getRandomColor = () => colors.value[Math.floor(Math.random() * colors.value.length)]!;
@@ -376,7 +379,51 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
   const resetFootprintState = () => {
     draggingFootprintId.value = null;
+    rotatingFootprintId.value = null;
     footprintUnitsBeforeDrag.value = [];
+  };
+
+  const startRotateFootprint = (event: MouseEvent, footprintId: string, zoomLevel: number, panOffset: { x: number, y: number }) => {
+    if (!currentLayer.value.footprints) return;
+    const footprint = currentLayer.value.footprints.find(f => f.id === footprintId);
+    if (!footprint || !footprint.units || footprint.units.length === 0) return;
+
+    event.stopPropagation();
+    selectedFootprintId.value = footprintId;
+    rotatingFootprintId.value = footprintId;
+
+    const minX = Math.min(...footprint.units.map(u => u.x));
+    const maxX = Math.max(...footprint.units.map(u => u.x));
+    const minY = Math.min(...footprint.units.map(u => u.y));
+    const maxY = Math.max(...footprint.units.map(u => u.y));
+
+    const centerX = (minX + maxX + 20) / 2 + panOffset.x;
+    const centerY = (minY + maxY + 20) / 2 + panOffset.y;
+
+    startRotationAngle.value = Math.atan2(event.clientY / zoomLevel - centerY, event.clientX / zoomLevel - centerX);
+    initialFootprintRotation.value = footprint.rotation ?? 0;
+  };
+
+  const rotateFootprint = (event: MouseEvent, zoomLevel: number, panOffset: { x: number, y: number }) => {
+    if (!rotatingFootprintId.value) return;
+    const footprint = currentLayer.value.footprints?.find(f => f.id === rotatingFootprintId.value);
+    if (!footprint || !footprint.units || footprint.units.length === 0) return;
+
+    const minX = Math.min(...footprint.units.map(u => u.x));
+    const maxX = Math.max(...footprint.units.map(u => u.x));
+    const minY = Math.min(...footprint.units.map(u => u.y));
+    const maxY = Math.max(...footprint.units.map(u => u.y));
+
+    const centerX = (minX + maxX + 20) / 2 + panOffset.x;
+    const centerY = (minY + maxY + 20) / 2 + panOffset.y;
+
+    const currentAngle = Math.atan2(event.clientY / zoomLevel - centerY, event.clientX / zoomLevel - centerX);
+    const deltaAngle = (currentAngle - startRotationAngle.value) * (180 / Math.PI);
+
+    const rawRotation = (initialFootprintRotation.value + deltaAngle) % 360;
+    const snapped = Math.round(rawRotation / 90) * 90;
+
+    updateFootprintRotation(rotatingFootprintId.value, snapped);
   };
 
   const updateFootprintX = (footprintId: string, newX: number) => {
@@ -433,6 +480,71 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     }
   };
 
+  const updateFootprintRotation = (footprintId: string, newRotation: number) => {
+    if (!currentLayer.value.footprints) return;
+    const footprint = currentLayer.value.footprints.find(f => f.id === footprintId);
+    if (footprint) {
+      const prev = footprint.rotation ?? 0;
+      const delta = (newRotation - prev) % 360;
+
+      if (delta === 0) return;
+
+      const norm = (v: number) => ((v % 360) + 360) % 360;
+      const prevParity = Math.floor(norm(prev) / 90) % 2;
+      const newParity = Math.floor(norm(newRotation) / 90) % 2;
+
+      if (prevParity !== newParity) {
+        const w = footprint.width;
+        footprint.width = footprint.height;
+        footprint.height = w;
+      }
+
+      // Si le footprint a des unités (placé sur la grille), on fait pivoter les unités
+      if (footprint.units && footprint.units.length > 0) {
+        const minX = Math.min(...footprint.units.map(u => u.x));
+        const maxX = Math.max(...footprint.units.map(u => u.x));
+        const minY = Math.min(...footprint.units.map(u => u.y));
+        const maxY = Math.max(...footprint.units.map(u => u.y));
+
+        // Centre de rotation (centre du rectangle englobant)
+        const centerX = (minX + maxX + 20) / 2;
+        const centerY = (minY + maxY + 20) / 2;
+
+        const rad = (delta * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        const newUnits = footprint.units.map(u => {
+          // Centrer sur (0,0) par rapport au centre du rectangle englobant, mais en considérant le centre de l'unité
+          const ux = u.x + 10;
+          const uy = u.y + 10;
+
+          const dx = ux - centerX;
+          const dy = uy - centerY;
+
+          const rx = dx * cos - dy * sin;
+          const ry = dx * sin + dy * cos;
+
+          // Revenir aux coordonnées globales et snap sur la grille de 20px (coin haut-gauche)
+          return {
+            x: Math.round((centerX + rx - 10) / 20) * 20,
+            y: Math.round((centerY + ry - 10) / 20) * 20
+          };
+        });
+
+        // Vérification des murs
+        if (walls.value.length > 2) {
+          const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
+          if (!allInside) return;
+        }
+
+        footprint.units = newUnits;
+      }
+
+      footprint.rotation = newRotation;
+    }
+  };
+
   return {
     selectedUnits,
     isSelecting,
@@ -454,5 +566,10 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     updateFootprintX,
     updateFootprintY,
     updateFootprintName,
+    updateFootprintRotation,
+    // rotation à la souris
+    rotatingFootprintId,
+    startRotateFootprint,
+    rotateFootprint,
   };
 };

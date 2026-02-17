@@ -49,6 +49,7 @@ type Emits = {
   (e: 'start-drag-circuit', event: MouseEvent, index: number): void;
   (e: 'select-footprint', id: string): void;
   (e: 'start-drag-footprint', event: MouseEvent, id: string): void;
+  (e: 'start-rotate-footprint', event: MouseEvent, id: string): void;
   (e: 'drop-rack', event: DragEvent): void;
   (e: 'dragover-rack', event: DragEvent): void;
 }
@@ -132,6 +133,15 @@ const getFootprintCenter = (footprint: Footprint) => {
     x: (minX + maxX + 20) / 2,
     y: (minY + maxY + 20) / 2
   };
+};
+
+const getFootprintBBox = (footprint: Footprint) => {
+  if (!footprint.units || footprint.units.length === 0) return null;
+  const minX = Math.min(...footprint.units.map(u => u.x));
+  const maxX = Math.max(...footprint.units.map(u => u.x));
+  const minY = Math.min(...footprint.units.map(u => u.y));
+  const maxY = Math.max(...footprint.units.map(u => u.y));
+  return { minX, minY, maxX, maxY, width: (maxX - minX + 20), height: (maxY - minY + 20) };
 };
 
 defineExpose({svgRef});
@@ -321,7 +331,6 @@ defineExpose({svgRef});
 
         <g v-if="currentLayerIndex === 2 && layers[2]?.footprints" class="footprints-layer">
           <g v-for="footprint in layers[2].footprints" :key="footprint.id"
-             @mousedown.stop="$emit('start-drag-footprint', $event, footprint.id)"
              class="footprint-group"
              :class="{ 'selected': footprint.id === selectedFootprintId }"
           >
@@ -337,6 +346,7 @@ defineExpose({svgRef});
                   :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
                   stroke="white"
                   :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
+                  @mousedown.stop="$emit('start-drag-footprint', $event, footprint.id)"
               />
               <text
                   v-if="footprint.name"
@@ -350,6 +360,23 @@ defineExpose({svgRef});
               >
                 {{ footprint.name }}
               </text>
+
+              <template v-if="footprint.id === selectedFootprintId && getFootprintBBox(footprint)">
+                <circle
+                    v-for="(pos, pIdx) in [
+                      {x: getFootprintBBox(footprint)!.minX, y: getFootprintBBox(footprint)!.minY},
+                      {x: getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width, y: getFootprintBBox(footprint)!.minY},
+                      {x: getFootprintBBox(footprint)!.minX, y: getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height},
+                      {x: getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width, y: getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height}
+                    ]"
+                    :key="pIdx"
+                    :cx="pos.x"
+                    :cy="pos.y"
+                    r="6"
+                    class="rotation-handle footprint"
+                    @mousedown.stop="$emit('start-rotate-footprint', $event, footprint.id)"
+                />
+              </template>
             </template>
           </g>
           <rect
@@ -770,7 +797,7 @@ defineExpose({svgRef});
   stroke: #ff4500;
   stroke-width: 1.5;
 
-  &.rack {
+  &.rack, &.footprint {
     cursor: alias;
   }
 }

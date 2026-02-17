@@ -76,7 +76,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
             id="rack-rotation"
             type="number"
             :value="rotation ?? 0"
-            step="45"
+            step="90"
             @input="$emit('rotation-changed', $event)"
         />
         <span class="suffix">deg</span>

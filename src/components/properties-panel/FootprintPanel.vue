@@ -10,6 +10,7 @@ type Emits = {
   (e: 'update-x', id: string, value: number): void;
   (e: 'update-y', id: string, value: number): void;
   (e: 'update-name', id: string, value: string): void;
+  (e: 'update-rotation', id: string, value: number): void;
 }
 </script>
 
@@ -91,6 +92,23 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
     </div>
 
     <div class="property-group">
+      <label for="footprint-rotation">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        {{ langs['FloorPlanBuilder:Panels:Footprints:Rotation'] }} (° )
+      </label>
+      <div class="input-with-suffix">
+        <input
+            id="footprint-rotation"
+            type="number"
+            :value="footprint.rotation ?? 0"
+            step="90"
+            @input="(e) => $emit('update-rotation', footprint.id, Number((e.target as HTMLInputElement).value))"
+        />
+        <span class="suffix">deg</span>
+      </div>
+    </div>
+
+    <div class="property-group">
       <label>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
         {{ langs['FloorPlanBuilder:Panels:Footprints:Color'] }}
@@ -121,6 +139,26 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
 .property-row .property-group {
   flex: 1;
+}
+
+.input-with-suffix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-suffix input {
+  padding-right: 3rem;
+}
+
+.suffix {
+  position: absolute;
+  right: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  pointer-events: none;
+  text-transform: uppercase;
 }
 
 h3 {

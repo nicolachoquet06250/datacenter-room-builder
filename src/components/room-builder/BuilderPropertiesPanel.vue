@@ -30,6 +30,7 @@ type Emits = {
   (e: 'update-footprint-x', id: string, value: number): void;
   (e: 'update-footprint-y', id: string, value: number): void;
   (e: 'update-footprint-name', id: string, value: string): void;
+  (e: 'update-footprint-rotation', id: string, value: number): void;
   (e: 'update-circuit-name', index: number, value: string): void;
   (e: 'update-circuit-rotation', index: number, value: number): void;
   (e: 'update-circuit-x', index: number, value: number): void;
@@ -272,6 +273,7 @@ const onCoordChange = (event: Event) => {
           @update-x="(id, val) => $emit('update-footprint-x', id, val)"
           @update-y="(id, val) => $emit('update-footprint-y', id, val)"
           @update-name="(id, val) => $emit('update-footprint-name', id, val)"
+          @update-rotation="(id, val) => $emit('update-footprint-rotation', id, val)"
       />
     </div>
 

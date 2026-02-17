@@ -126,6 +126,7 @@ const props = withDefaults(
         'FloorPlanBuilder:Panels:Footprints:Name': 'Nom',
         'FloorPlanBuilder:Panels:Footprints:Units': 'Unités',
         'FloorPlanBuilder:Panels:Footprints:Color': 'Couleur',
+        'FloorPlanBuilder:Panels:Footprints:Rotation': 'Rotation',
         'FloorPlanBuilder:Panels:Footprints:Remove': 'Supprimer le Footprint',
 
         'FloorPlanBuilder:Panels:Racks:Title': 'Positionnement du Rack',
@@ -429,7 +430,9 @@ const {
   selectFootprint, startDragFootprint,
   dragFootprint, resetFootprintState,
   updateFootprintX, updateFootprintY,
-  updateFootprintName,
+  updateFootprintName, updateFootprintRotation,
+  // rotation à la souris
+  rotatingFootprintId, startRotateFootprint, rotateFootprint
 } = useFootprints(currentLayer, walls);
 
 const canvasComponent = useTemplateRef<InstanceType<typeof BuilderCanvas>>('canvasComponent');
@@ -442,6 +445,11 @@ const {
 const onStartDragFootprint = (event: MouseEvent, id: string) => {
   takeSnapshot();
   startDragFootprint(event, id);
+};
+
+const onStartRotateFootprint = (event: MouseEvent, id: string) => {
+  takeSnapshot();
+  startRotateFootprint(event, id, zoomLevel.value, panOffset.value);
 };
 
 const onStartDragUnplacedFootprint = () => {
@@ -461,6 +469,11 @@ const onUpdateFootprintY = (id: string, value: number) => {
 const onUpdateFootprintName = (id: string, value: string) => {
   takeSnapshot();
   updateFootprintName(id, value);
+};
+
+const onUpdateFootprintRotation = (id: string, value: number) => {
+  takeSnapshot();
+  updateFootprintRotation(id, value);
 };
 
 const {zoomLevel, zoomIn, zoomOut, onWheel} = useZoom();
@@ -494,6 +507,15 @@ const resetPan = () => {
 const {isPanning, panStart, panStop, panRunning} = usePan(props.roomId);
 
 const {
+  undoStack, redoStack,
+  takeSnapshot, undo, redo
+} = useRoomBuilderHistory({
+  layers,
+  walls,
+  currentLayerIndex
+});
+
+const {
   racks, selectedRackIndices,
   rotatingRack, panOffset,
   draggingRack,
@@ -507,16 +529,7 @@ const {
   updateRackX,
   updateRackY,
   resetRackState
-} = useRacksCrud(props.roomId);
-
-const {
-  undoStack, redoStack,
-  takeSnapshot, undo, redo
-} = useRoomBuilderHistory({
-  layers,
-  walls,
-  currentLayerIndex
-});
+} = useRacksCrud(props.roomId, takeSnapshot);
 
 const {
   draggingWallSegment,
@@ -1225,6 +1238,7 @@ const onMouseMove = (event: MouseEvent) => {
   if (draggingRack.value !== null) dragRack(event);
   else if (rotatingRack.value !== null) rotateRack(event);
   else if (rotatingCircuitIndex.value !== null) rotateCircuit(event);
+  else if (rotatingFootprintId.value !== null) rotateFootprint(event, zoomLevel.value, panOffset.value);
   else if (draggingFootprintId.value !== null) {
     dragFootprint(event, zoomLevel.value, panOffset.value);
   } else if (draggingCircuitIndex.value !== null || draggingPillarIndex.value !== null) {
@@ -1732,6 +1746,7 @@ provide<ExposedFunctions>(exposedFunctions, {
           @start-drag-circuit="onStartDragCircuit"
           @select-footprint="onSelectFootprint"
           @start-drag-footprint="onStartDragFootprint"
+          @start-rotate-footprint="onStartRotateFootprint"
           @dragover-rack="onDragOverRack"
           @drop-rack="onDropRack"
       >
@@ -1813,6 +1828,7 @@ provide<ExposedFunctions>(exposedFunctions, {
           @update-footprint-x="onUpdateFootprintX"
           @update-footprint-y="onUpdateFootprintY"
           @update-footprint-name="onUpdateFootprintName"
+          @update-footprint-rotation="onUpdateFootprintRotation"
           @delete-circuit-selection="onConfirmDeleteCircuitSelection"
           @clear-walls="triggerClearWalls"
       />

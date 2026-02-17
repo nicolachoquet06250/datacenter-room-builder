@@ -43,6 +43,7 @@ declare global {
     width?: number;
     height?: number;
     name?: string;
+    rotation?: number;
   }
 
   export interface Circuit {

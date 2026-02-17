@@ -15,17 +15,18 @@ const draggingRack = ref<number | null>(null);
 const rackPositionsBeforeDrag = ref<Point[]>([]);
 const lastMousePos = { x: 0, y: 0 };
 
-export const useRacksCrud = (roomId: number) => {
+export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) => {
     const {zoomLevel} = useZoom();
     const {walls} = useDrawRoomWalls();
     const {currentLayer, layers, currentLayerIndex} = useLayers(walls);
     const {getWallBoundingBox} = useRoomBuilderGeometry();
 
-    const {takeSnapshot} = useRoomBuilderHistory({
+    const {takeSnapshot: internalTakeSnapshot} = useRoomBuilderHistory({
         layers,
         walls,
         currentLayerIndex
     });
+    const takeSnapshot = externalTakeSnapshot || internalTakeSnapshot;
     const {isPointInPolygon} = useRoomBuilderGeometry()
 
     const {isDrawingWalls, isWallSelected} = useDrawRoomWalls();
@@ -153,6 +154,7 @@ export const useRacksCrud = (roomId: number) => {
         if (selectedRackIndices.value.length !== 1) return;
         const rack = racks.value[selectedRackIndices.value[0]!];
         if (!rack) return;
+        takeSnapshot();
         rack.name = value;
     };
 
@@ -160,13 +162,15 @@ export const useRacksCrud = (roomId: number) => {
         if (selectedRackIndices.value.length !== 1) return;
         const rack = racks.value[selectedRackIndices.value[0]!];
         if (!rack) return;
-        rack.rotation = Math.round((value ?? 0) / 45) * 45;
+        takeSnapshot();
+        rack.rotation = Math.round((value ?? 0) / 90) * 90;
     };
 
     const updateRackX = (value: number) => {
         if (selectedRackIndices.value.length !== 1) return;
         const rack = racks.value[selectedRackIndices.value[0]!];
         if (!rack) return;
+        takeSnapshot();
         rack.x = value;
     };
 
@@ -174,6 +178,7 @@ export const useRacksCrud = (roomId: number) => {
         if (selectedRackIndices.value.length !== 1) return;
         const rack = racks.value[selectedRackIndices.value[0]!];
         if (!rack) return;
+        takeSnapshot();
         rack.y = value;
     };
 
@@ -255,7 +260,7 @@ export const useRacksCrud = (roomId: number) => {
         const deltaAngle = (currentAngle - startRotationAngle.value) * (180 / Math.PI);
 
         const rawRotation = (initialRackRotation.value + deltaAngle) % 360;
-        rack!.rotation = Math.round(rawRotation / 45) * 45;
+        rack!.rotation = Math.round(rawRotation / 90) * 90;
     }
 
     const resetRackState = () => {
