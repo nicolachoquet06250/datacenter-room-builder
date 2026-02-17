@@ -322,12 +322,14 @@ defineExpose({svgRef});
               selected: isWallSelected,
               'layer-footprints': currentLayerIndex === 2
             }"
-            @mousedown.stop="(!isDrawingPillar && !isDrawingWalls) && $emit('select-wall', $event)"
+            @mousedown="$emit('deselect', $event)"
             stroke="rgba(255,255,255,0.3)"
             stroke-width="1"
             stroke-linejoin="round"
             :style="{ pointerEvents: isDrawingPillar ? 'none' : 'auto' }"
         />
+<!--        Pour la création de footprints à la volée depuis l'interface -->
+<!--        @mousedown.stop="(!isDrawingPillar && !isDrawingWalls) && $emit('select-wall', $event)"-->
 
         <g v-if="currentLayerIndex === 2 && layers[2]?.footprints" class="footprints-layer">
           <g v-for="footprint in layers[2].footprints" :key="footprint.id"

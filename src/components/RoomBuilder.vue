@@ -26,11 +26,6 @@ type Emits = {
     roomName: string,
     layers: Layer[]
   }): void;
-  (e: 'deleted', payload: {
-    roomId: number,
-    class: 'Rack' | 'CircuitElec' | 'FootPrint',
-    id: number | string
-  }): void;
   (e: 'refresh'): void;
 }
 </script>
@@ -705,14 +700,6 @@ const onRemoveRack = (index: number) => {
     title: 'Supprimer le rack',
     message: 'Voulez-vous vraiment supprimer ce rack ?',
     onConfirm: () => {
-      // takeSnapshot();
-      // if (props.useItopForm) {
-      //   emit('deleted', {
-      //     roomId: props.roomId,
-      //     class: 'Rack',
-      //     id: index
-      //   })
-      // }
       removeRack(index, props.useItopForm);
     }
   });
@@ -1367,18 +1354,28 @@ const deselect = (event: MouseEvent) => {
   }
   
   const target = event.target as SVGElement;
+  const isFootprintClick = target.closest('.footprint-group');
+  if (selectedFootprintId.value !== null && !isFootprintClick) {
+    // Désélectionner le footprint quand on clique n'importe où en dehors de lui
+    selectedUnits.value = [];
+    selectFootprint(null);
+  }
   const isBackgroundClick = target.classList.contains('canvas-background') || 
                            target.closest('.footprints-layer') || 
                            target.classList.contains('room-surface');
 
   if (isBackgroundClick) {
-    const isFootprintClick = target.closest('.footprint-group');
-    if (!isFootprintClick) {
+    const isFootprintGroupClick = target.closest('.footprint-group');
+    if (!isFootprintGroupClick) {
       selectedRackIndices.value = [];
       isWallSelected.value = false;
       selectedPillarIndices.value = [];
       selectFootprint(null);
       selectedCircuitIndices.value = [];
+
+      if (target.classList.contains('room-surface') && currentLayerIndex.value === 0) {
+        isWallSelected.value = true;
+      }
     }
 
     const svg = canvasComponent.value?.svgRef;
@@ -1506,7 +1503,15 @@ const handleKeyDown = (event: KeyboardEvent) => {
           takeSnapshot();
           const sortedIndices = [...selectedRackIndices.value].sort((a, b) => b - a);
           sortedIndices.forEach(index => {
-            racks.value.splice(index, 1);
+            if (props.useItopForm) {
+              racks.value = racks.value.map(r => ({
+                ...r,
+                ...(r.id === index ? { x: null, y: null } : {})
+              }))
+            }
+            else {
+              racks.value.splice(index, 1);
+            }
           });
           selectedRackIndices.value = [];
         }
@@ -1551,7 +1556,7 @@ const handleKeyDown = (event: KeyboardEvent) => {
         message: 'Voulez-vous vraiment supprimer la surface au sol sélectionnée ?',
         onConfirm: () => {
           takeSnapshot();
-          deleteFootprint(selectedFootprintId.value!);
+          deleteFootprint(selectedFootprintId.value!, props.useItopForm);
           selectFootprint(null);
         }
       });

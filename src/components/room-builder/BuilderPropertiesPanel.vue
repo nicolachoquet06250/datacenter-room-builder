@@ -88,15 +88,13 @@ const coordLabel = computed(() => {
   const rack = selectedRack.value;
   if (!bbox || !rack || rack.x == null || rack.y == null) return '';
 
-  const w = rackWidth;
-  const h = rackHeight;
-  const cx = rack.x + w / 2;
-  const cy = rack.y + h / 2;
-  const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
-
   // Front = bord du bas dans la référence non-rotée → coin avant gauche = bottom left
-  const vblx = -w / 2;
-  const vbly = h / 2;
+  const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
+  const cx = rack.x + rackWidth / 2;
+  const cy = rack.y + rackHeight / 2;
+
+  const vblx = -rackWidth / 2;
+  const vbly = rackHeight / 2;
   const rotVx = vblx * Math.cos(theta) - vbly * Math.sin(theta);
   const rotVy = vblx * Math.sin(theta) + vbly * Math.cos(theta);
 
@@ -207,13 +205,11 @@ const onCoordChange = (event: Event) => {
   const px = bbox.minX + colIndex * 20;
   const py = bbox.maxY - (rowIndex + 1) * 20;
 
-  const w = rackWidth;
-  const h = rackHeight;
   const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
 
   // vecteur bottom-left en repère centré
-  const vblx = -w / 2;
-  const vbly = h / 2;
+  const vblx = -rackWidth / 2;
+  const vbly = rackHeight / 2;
   const rotVx = vblx * Math.cos(theta) - vbly * Math.sin(theta);
   const rotVy = vblx * Math.sin(theta) + vbly * Math.cos(theta);
 
@@ -222,8 +218,8 @@ const onCoordChange = (event: Event) => {
   const cy = py - rotVy;
 
   // Recalcul du top left à partir du centre
-  let x = cx - w / 2;
-  let y = cy - h / 2;
+  let x = cx - rackWidth / 2;
+  let y = cy - rackHeight / 2;
 
   // Snap sur la grille de 20 px
   x = Math.round(x / 20) * 20;

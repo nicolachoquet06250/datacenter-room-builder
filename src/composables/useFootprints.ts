@@ -391,39 +391,61 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     event.stopPropagation();
     selectedFootprintId.value = footprintId;
     rotatingFootprintId.value = footprintId;
+    footprintUnitsBeforeDrag.value = footprint.units.map(u => ({ ...u }));
 
     const minX = Math.min(...footprint.units.map(u => u.x));
     const maxX = Math.max(...footprint.units.map(u => u.x));
     const minY = Math.min(...footprint.units.map(u => u.y));
     const maxY = Math.max(...footprint.units.map(u => u.y));
 
-    const centerX = (minX + maxX + 20) / 2 + panOffset.x;
-    const centerY = (minY + maxY + 20) / 2 + panOffset.y;
+    // Centre de la BBox du footprint (en world coordinates)
+    const worldCenterX = (minX + maxX + 20) / 2;
+    const worldCenterY = (minY + maxY + 20) / 2;
 
-    startRotationAngle.value = Math.atan2(event.clientY / zoomLevel - centerY, event.clientX / zoomLevel - centerX);
+    // Conversion en coordonnées relatives au SVG (coordonnées "panoramées" mais pas encore zoomées)
+    const centerX = worldCenterX + panOffset.x;
+    const centerY = worldCenterY + panOffset.y;
+
+    // Récupération de la position de la souris par rapport au SVG
+    const svg = (event.target as any).ownerSVGElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const mouseX = (event.clientX - rect.left) / zoomLevel;
+    const mouseY = (event.clientY - rect.top) / zoomLevel;
+
+    startRotationAngle.value = Math.atan2(mouseY - centerY, mouseX - centerX);
     initialFootprintRotation.value = footprint.rotation ?? 0;
   };
 
   const rotateFootprint = (event: MouseEvent, zoomLevel: number, panOffset: { x: number, y: number }) => {
     if (!rotatingFootprintId.value) return;
     const footprint = currentLayer.value.footprints?.find(f => f.id === rotatingFootprintId.value);
-    if (!footprint || !footprint.units || footprint.units.length === 0) return;
+    if (!footprint || footprintUnitsBeforeDrag.value.length === 0) return;
 
-    const minX = Math.min(...footprint.units.map(u => u.x));
-    const maxX = Math.max(...footprint.units.map(u => u.x));
-    const minY = Math.min(...footprint.units.map(u => u.y));
-    const maxY = Math.max(...footprint.units.map(u => u.y));
+    const minX = Math.min(...footprintUnitsBeforeDrag.value.map(u => u.x));
+    const maxX = Math.max(...footprintUnitsBeforeDrag.value.map(u => u.x));
+    const minY = Math.min(...footprintUnitsBeforeDrag.value.map(u => u.y));
+    const maxY = Math.max(...footprintUnitsBeforeDrag.value.map(u => u.y));
 
-    const centerX = (minX + maxX + 20) / 2 + panOffset.x;
-    const centerY = (minY + maxY + 20) / 2 + panOffset.y;
+    const worldCenterX = (minX + maxX + 20) / 2;
+    const worldCenterY = (minY + maxY + 20) / 2;
 
-    const currentAngle = Math.atan2(event.clientY / zoomLevel - centerY, event.clientX / zoomLevel - centerX);
+    const centerX = worldCenterX + panOffset.x;
+    const centerY = worldCenterY + panOffset.y;
+
+    const svg = (event.target as any).ownerSVGElement;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const mouseX = (event.clientX - rect.left) / zoomLevel;
+    const mouseY = (event.clientY - rect.top) / zoomLevel;
+
+    const currentAngle = Math.atan2(mouseY - centerY, mouseX - centerX);
     const deltaAngle = (currentAngle - startRotationAngle.value) * (180 / Math.PI);
 
     const rawRotation = (initialFootprintRotation.value + deltaAngle) % 360;
     const snapped = Math.round(rawRotation / 90) * 90;
 
-    updateFootprintRotation(rotatingFootprintId.value, snapped);
+    updateFootprintRotation(rotatingFootprintId.value, snapped, true);
   };
 
   const updateFootprintX = (footprintId: string, newX: number) => {
@@ -480,7 +502,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     }
   };
 
-  const updateFootprintRotation = (footprintId: string, newRotation: number) => {
+  const updateFootprintRotation = (footprintId: string, newRotation: number, fromInteraction = false) => {
     if (!currentLayer.value.footprints) return;
     const footprint = currentLayer.value.footprints.find(f => f.id === footprintId);
     if (footprint) {
@@ -501,10 +523,15 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
       // Si le footprint a des unités (placé sur la grille), on fait pivoter les unités
       if (footprint.units && footprint.units.length > 0) {
-        const minX = Math.min(...footprint.units.map(u => u.x));
-        const maxX = Math.max(...footprint.units.map(u => u.x));
-        const minY = Math.min(...footprint.units.map(u => u.y));
-        const maxY = Math.max(...footprint.units.map(u => u.y));
+        // En mode interaction, on part des unités initiales pour éviter les dérives cumulatives
+        const sourceUnits = (fromInteraction && footprintUnitsBeforeDrag.value.length > 0)
+          ? footprintUnitsBeforeDrag.value
+          : footprint.units;
+
+        const minX = Math.min(...sourceUnits.map(u => u.x));
+        const maxX = Math.max(...sourceUnits.map(u => u.x));
+        const minY = Math.min(...sourceUnits.map(u => u.y));
+        const maxY = Math.max(...sourceUnits.map(u => u.y));
 
         // Centre de rotation (centre du rectangle englobant)
         const centerX = (minX + maxX + 20) / 2;
@@ -514,7 +541,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         const cos = Math.cos(rad);
         const sin = Math.sin(rad);
 
-        const newUnits = footprint.units.map(u => {
+        const newUnits = sourceUnits.map(u => {
           // Centrer sur (0,0) par rapport au centre du rectangle englobant, mais en considérant le centre de l'unité
           const ux = u.x + 10;
           const uy = u.y + 10;

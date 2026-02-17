@@ -1,6 +1,12 @@
 export const rackWidth = 40;
 export const rackHeight = 40;
 
+export const getRackDimensions = (rack: Rack) => {
+  const w = (rack.width && rack.width > 0) ? Math.round(rack.width / 600 * 20) : rackWidth;
+  const h = (rack.height && rack.height > 0) ? Math.round(rack.height / 600 * 20) : rackHeight;
+  return { w, h };
+};
+
 const getRackCorners = (rack: Rack) => {
   const x = rack.x || 0;
   const y = rack.y || 0;
@@ -169,19 +175,19 @@ export const useRoomBuilderGeometry = () => {
     };
   };
 
-  const isElementInWalls = (x: number, y: number, rotation: number | null, polygon: Point[], width: number = 40, height: number = 40) => {
+  const isElementInWalls = (x: number, y: number, rotation: number | null, polygon: Point[], _width?: number, _height?: number) => {
     if (polygon.length < 3) return true;
 
     const corners = [
       { x, y },
-      { x: x + width, y },
-      { x, y: y + height },
-      { x: x + width, y: y + height }
+      { x: x + rackWidth, y },
+      { x, y: y + rackHeight },
+      { x: x + rackWidth, y: y + rackHeight }
     ];
 
     const angle = ((rotation || 0) * Math.PI) / 180;
-    const cx = x + width / 2;
-    const cy = y + height / 2;
+    const cx = x + rackWidth / 2;
+    const cy = y + rackHeight / 2;
 
     return corners.every(corner => {
       let finalX = corner.x;
