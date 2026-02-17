@@ -11,6 +11,7 @@ type Props = {
   selectedCircuitIndices: number[];
   circuits: Circuit[];
   contextMenuOptions: { type: string; podId?: string };
+  useItopForm: boolean;
 }
 
 type Emits = {
@@ -238,6 +239,7 @@ const onCoordChange = (event: Event) => {
       <RackPanel
           v-if="selectedRack"
           v-bind="{...selectedRack, coord: coordLabel}"
+          :use-itop-form="useItopForm"
           @name-updated="onNameInput"
           @rotation-changed="onRotationChange"
           @coord-updated="onCoordChange"
@@ -264,6 +266,7 @@ const onCoordChange = (event: Event) => {
     <div v-else-if="selectedFootprint" class="properties-panel">
       <FootprintPanel
           :footprint="selectedFootprint"
+          :use-itop-form="useItopForm"
           @delete-footprint="$emit('delete-footprint', $event)"
           @change-color="$emit('change-footprint-color', $event)"
           @update-x="(id, val) => $emit('update-footprint-x', id, val)"
@@ -277,6 +280,7 @@ const onCoordChange = (event: Event) => {
         :selected-circuit-indices="selectedCircuitIndices"
         :circuits="circuits"
         v-bind="{ coord: circuitCoordLabel }"
+        :use-itop-form="useItopForm"
         @coord-updated="onCircuitCoordChange"
         @delete-selection="$emit('delete-circuit-selection')"
         @update-name="(idx, val) => $emit('update-circuit-name', idx, val)"
@@ -290,6 +294,7 @@ const onCoordChange = (event: Event) => {
       <MultipleRackPanel
           :selected-rack-indices="selectedRackIndices"
           :context-menu-options="contextMenuOptions"
+          :use-itop-form="useItopForm"
 
           @create-pod="$emit('create-pod')"
           @delete-pod="$emit('delete-pod', contextMenuOptions.podId!)"

@@ -120,13 +120,13 @@ const props = withDefaults(
         'FloorPlanBuilder:Panels:Circuits:Multiple:Title': 'Positionnement du circuit',
         'FloorPlanBuilder:Panels:Circuits:Name': 'Nom',
         'FloorPlanBuilder:Panels:Circuits:Coordinates': 'Coordonnées',
-        'FloorPlanBuilder:Panels:Circuits:Remove': 'Annuler le placement du circuit',
+        'FloorPlanBuilder:Panels:Circuits:Remove': 'Supprimer la sélection',
 
         'FloorPlanBuilder:Panels:Footprints:Title': 'Positionnement du Footprint',
         'FloorPlanBuilder:Panels:Footprints:Name': 'Nom',
         'FloorPlanBuilder:Panels:Footprints:Units': 'Unités',
         'FloorPlanBuilder:Panels:Footprints:Color': 'Couleur',
-        'FloorPlanBuilder:Panels:Footprints:Remove': 'Annuler le placement du Footprint',
+        'FloorPlanBuilder:Panels:Footprints:Remove': 'Supprimer le Footprint',
 
         'FloorPlanBuilder:Panels:Racks:Title': 'Positionnement du Rack',
         'FloorPlanBuilder:Panels:Racks:Multiple:Title': 'Selection multiple',
@@ -134,7 +134,7 @@ const props = withDefaults(
         'FloorPlanBuilder:Panels:Racks:Name': 'Nom du Rack',
         'FloorPlanBuilder:Panels:Racks:Coordinates': 'Coordonnée',
         'FloorPlanBuilder:Panels:Racks:Rotation': 'Rotation',
-        'FloorPlanBuilder:Panels:Racks:Remove': 'Annuler le placement du Rack',
+        'FloorPlanBuilder:Panels:Racks:Remove': 'Supprimer le Rack',
 
         'FloorPlanBuilder:Panels:CircuitsToSetPosition:Title': 'Circuits à positionner',
         'FloorPlanBuilder:Panels:CircuitToSetPosition:MissingPosition': 'Position manquante',
@@ -1792,6 +1792,7 @@ provide<ExposedFunctions>(exposedFunctions, {
           :selected-circuit-indices="selectedCircuitIndices"
           :circuits="layers[currentLayerIndex]?.circuits ?? []"
           :context-menu-options="contextMenuOptions"
+          :use-itop-form="useItopForm"
 
           @remove-rack="onRemoveRack"
           @create-pod="createPod"
