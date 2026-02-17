@@ -118,6 +118,57 @@ export const useRoomBuilderGeometry = () => {
     return inside;
   };
 
+  const findClosestPointInside = (x: number, y: number, polygon: Point[], _margin: number = 20): Point => {
+    if (polygon.length < 3) return { x, y };
+    if (isPointInPolygon(x, y, polygon)) return { x, y };
+
+    let minDistance = Infinity;
+    let closestPoint = { x, y };
+
+    // Vérifier chaque segment du polygone
+    for (let i = 0; i < polygon.length; i++) {
+      const p1 = polygon[i]!;
+      const p2 = polygon[(i + 1) % polygon.length]!;
+
+      // Trouver le point le plus proche sur le segment [p1, p2]
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const lengthSq = dx * dx + dy * dy;
+
+      let t = ((x - p1.x) * dx + (y - p1.y) * dy) / lengthSq;
+      t = Math.max(0, Math.min(1, t));
+
+      const projectionX = p1.x + t * dx;
+      const projectionY = p1.y + t * dy;
+
+      const distance = Math.sqrt((x - projectionX) ** 2 + (y - projectionY) ** 2);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPoint = { x: projectionX, y: projectionY };
+      }
+    }
+
+    // On déplace le point un peu vers l'intérieur pour être sûr de ne pas être sur la ligne
+    // On trouve le centre de gravité du polygone comme direction "vers l'intérieur"
+    const centerX = polygon.reduce((sum, p) => sum + p.x, 0) / polygon.length;
+    const centerY = polygon.reduce((sum, p) => sum + p.y, 0) / polygon.length;
+
+    const dirX = centerX - closestPoint.x;
+    const dirY = centerY - closestPoint.y;
+    const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
+
+    // Déplacement vers l'intérieur (par exemple de 5 unités ou de la marge demandée)
+    const moveDist = 5;
+    let finalX = closestPoint.x + (dirX / dirLen) * moveDist;
+    let finalY = closestPoint.y + (dirY / dirLen) * moveDist;
+
+    // Arrondir au snap si nécessaire (ici on laisse l'appelant gérer le snap final si besoin)
+    return {
+      x: Math.round(finalX / 20) * 20,
+      y: Math.round(finalY / 20) * 20
+    };
+  };
+
   const isElementInWalls = (x: number, y: number, rotation: number | null, polygon: Point[], width: number = 40, height: number = 40) => {
     if (polygon.length < 3) return true;
 
@@ -156,6 +207,7 @@ export const useRoomBuilderGeometry = () => {
     getWallBoundingBox,
     getConstrainedPoint,
     isPointInPolygon,
+    findClosestPointInside,
     isElementInWalls
   };
 };

@@ -2,6 +2,11 @@ import {ref, type Ref} from 'vue';
 import {nanoid} from 'nanoid';
 import {useRoomBuilderGeometry} from './useRoomBuilderGeometry';
 
+export const colors = ref([
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+  '#F06292', '#AED581', '#FFD54F', '#4DB6AC', '#BA68C8'
+]);
+
 export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => {
   const selectedUnits = ref<any[]>([]);
   const isSelecting = ref(false);
@@ -16,12 +21,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   const startMouseSVGPos = { x: 0, y: 0 };
   const { isPointInPolygon } = useRoomBuilderGeometry();
 
-  const colors = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-    '#F06292', '#AED581', '#FFD54F', '#4DB6AC', '#BA68C8'
-  ];
-
-  const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)]!;
+  const getRandomColor = () => colors.value[Math.floor(Math.random() * colors.value.length)]!;
 
   const startSelection = (x: number, y: number) => {
     isSelecting.value = true;
@@ -249,9 +249,23 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     selectedUnits.value = [];
   };
 
-  const deleteFootprint = (footprintId: string) => {
+  const deleteFootprint = (footprintId: string, justUnplace = false) => {
     if (!currentLayer.value.footprints) return;
-    currentLayer.value.footprints = currentLayer.value.footprints.filter(f => f.id !== footprintId);
+
+    if (justUnplace) {
+      currentLayer.value.footprints = currentLayer.value.footprints.map(f => ({
+        ...f,
+        ...(f.id === footprintId ? {
+          color: '',
+          x: null,
+          y: null,
+          units: []
+        } : {})
+      }));
+    }
+    else {
+      currentLayer.value.footprints = currentLayer.value.footprints.filter(f => f.id !== footprintId);
+    }
   };
 
   const changeFootprintColor = (footprintId: string) => {

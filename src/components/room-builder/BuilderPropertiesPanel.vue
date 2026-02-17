@@ -34,6 +34,7 @@ type Emits = {
   (e: 'update-circuit-x', index: number, value: number): void;
   (e: 'update-circuit-y', index: number, value: number): void;
   (e: 'delete-circuit-selection'): void;
+  (e: 'clear-walls'): void;
 }
 </script>
 
@@ -240,7 +241,7 @@ const onCoordChange = (event: Event) => {
           @name-updated="onNameInput"
           @rotation-changed="onRotationChange"
           @coord-updated="onCoordChange"
-          @remove-rack="$emit('remove-rack', selectedRackIndices[0]!)"
+          @remove-rack="$emit('remove-rack', selectedRack.id)"
       />
     </div>
 
@@ -248,6 +249,7 @@ const onCoordChange = (event: Event) => {
       <RoomPropertiesPanel
         :wall-count="walls.length"
         :unit-count="unitCount"
+        @clear-walls="$emit('clear-walls')"
       />
     </div>
 

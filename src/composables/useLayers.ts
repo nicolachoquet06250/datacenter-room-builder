@@ -15,7 +15,12 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
         defaultLayers = computed<Layer[]>(() => []);
     }
 
-    const clearLayers = () => layers.value = [];
+    const clearLayers = () => {
+        layers.value.forEach(layer => {
+            layer.walls = [];
+            layer.pillars = [];
+        });
+    }
 
     const initialize = () => {
         const finalWalls = [...walls.value];

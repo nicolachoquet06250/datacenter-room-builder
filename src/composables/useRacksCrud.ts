@@ -121,9 +121,31 @@ export const useRacksCrud = (roomId: number) => {
         selectedRackIndices.value = [racks.value.length - 1];
     };
 
-    const removeRack = (index: number) => {
+    const removeRack = (index: number, justUnplace = false) => {
         takeSnapshot();
-        racks.value.splice(index, 1);
+        if (justUnplace) {
+            console.log(racks.value.map(r => ({
+                ...r,
+                ...(r.id === index ? {
+                    podId: null,
+                    x: null,
+                    y: null,
+                    rotation: null,
+                } : {})
+            })))
+            racks.value = racks.value.map(r => ({
+                ...r,
+                ...(r.id === index ? {
+                    podId: null,
+                    x: null,
+                    y: null,
+                    rotation: null,
+                } : {})
+            }))
+        }
+        else {
+            racks.value.splice(index, 1);
+        }
         selectedRackIndices.value = [];
     };
 

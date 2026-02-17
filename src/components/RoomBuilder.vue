@@ -17,13 +17,19 @@ type Props = {
   itopCreateRackUrl?: string,
   isDataLoading?: boolean,
   language?: string,
-  langKeys?: string
+  langKeys?: string,
+  footprintColors?: string
 }
 
 type Emits = {
   (e: 'saved', payload: {
     roomName: string,
     layers: Layer[]
+  }): void;
+  (e: 'deleted', payload: {
+    roomId: number,
+    class: 'Rack' | 'CircuitElec' | 'FootPrint',
+    id: number | string
   }): void;
   (e: 'refresh'): void;
 }
@@ -51,7 +57,7 @@ import {usePodsCrud} from "../composables/usePodsCrud.ts";
 import {useRacksCrud} from "../composables/useRacksCrud.ts";
 import {useZoom} from "../composables/useZoom.ts";
 import {useModal} from "../composables/useModal.ts";
-import {useFootprints} from "../composables/useFootprints.ts";
+import {colors, useFootprints} from "../composables/useFootprints.ts";
 import {useWallResizer} from "../composables/useWallResizer.ts";
 import {usePillars} from "../composables/usePillars.ts";
 
@@ -114,13 +120,13 @@ const props = withDefaults(
         'FloorPlanBuilder:Panels:Circuits:Multiple:Title': 'Positionnement du circuit',
         'FloorPlanBuilder:Panels:Circuits:Name': 'Nom',
         'FloorPlanBuilder:Panels:Circuits:Coordinates': 'Coordonnées',
-        'FloorPlanBuilder:Panels:Circuits:Remove': 'Supprimer la sélection',
+        'FloorPlanBuilder:Panels:Circuits:Remove': 'Annuler le placement du circuit',
 
         'FloorPlanBuilder:Panels:Footprints:Title': 'Positionnement du Footprint',
         'FloorPlanBuilder:Panels:Footprints:Name': 'Nom',
         'FloorPlanBuilder:Panels:Footprints:Units': 'Unités',
         'FloorPlanBuilder:Panels:Footprints:Color': 'Couleur',
-        'FloorPlanBuilder:Panels:Footprints:Remove': 'Supprimer le Footprint',
+        'FloorPlanBuilder:Panels:Footprints:Remove': 'Annuler le placement du Footprint',
 
         'FloorPlanBuilder:Panels:Racks:Title': 'Positionnement du Rack',
         'FloorPlanBuilder:Panels:Racks:Multiple:Title': 'Selection multiple',
@@ -128,19 +134,20 @@ const props = withDefaults(
         'FloorPlanBuilder:Panels:Racks:Name': 'Nom du Rack',
         'FloorPlanBuilder:Panels:Racks:Coordinates': 'Coordonnée',
         'FloorPlanBuilder:Panels:Racks:Rotation': 'Rotation',
-        'FloorPlanBuilder:Panels:Racks:Remove': 'Supprimer le Rack',
+        'FloorPlanBuilder:Panels:Racks:Remove': 'Annuler le placement du Rack',
 
         'FloorPlanBuilder:Panels:CircuitsToSetPosition:Title': 'Circuits à positionner',
         'FloorPlanBuilder:Panels:CircuitToSetPosition:MissingPosition': 'Position manquante',
 
         'FloorPlanBuilder:Panels:FootprintsToSetPosition:Title': 'Footprints à positionner',
         'FloorPlanBuilder:Panels:FootprintToSetPosition:MissingPosition': 'Position manquante',
-        'FloorPlanBuilder:Panels:FootprintToSetPosition:Unnamed': 'Emprinte sans nom',
+        'FloorPlanBuilder:Panels:FootprintToSetPosition:Unnamed': 'Footprint sans nom',
 
         'FloorPlanBuilder:Panels:RacksToSetPosition:Title': 'Footprints à positionner',
         'FloorPlanBuilder:Panels:RackToSetPosition:MissingPositionAndRotation': 'Position/Rotation manquante',
       }
-    })
+    }),
+    footprintColors: '[]'
   }
 );
 
@@ -158,6 +165,7 @@ const langKeys = computed(() => {
     [key]: `${value} (FR FR)`
   })).reduce((r, c) => ({ ...r, ...c }), {});
 });
+const footprintColors = computed(() => JSON.parse(props.footprintColors));
 
 provide('langs', langKeys);
 
@@ -167,9 +175,8 @@ watchEffect(() => {
 
 const {
   getPodBoundaries, getWallBoundingBox,
-  getConstrainedPoint,
-  isPointInPolygon,
-  isElementInWalls
+  getConstrainedPoint, isPointInPolygon,
+  isElementInWalls, findClosestPointInside
 } = useRoomBuilderGeometry();
 
 const {error: notifyError} = useNotify();
@@ -672,6 +679,8 @@ const isInteracting = computed(() =>
     rotatingRack.value !== null ||
     draggingPillarIndex.value !== null ||
     draggingCircuitIndex.value !== null ||
+    draggingWallSegment.value !== null ||
+    draggingFootprintId.value !== null ||
     isPanning.value ||
     isDrawingWalls.value ||
     isSelecting.value ||
@@ -683,8 +692,15 @@ const onRemoveRack = (index: number) => {
     title: 'Supprimer le rack',
     message: 'Voulez-vous vraiment supprimer ce rack ?',
     onConfirm: () => {
-      takeSnapshot();
-      removeRack(index);
+      // takeSnapshot();
+      // if (props.useItopForm) {
+      //   emit('deleted', {
+      //     roomId: props.roomId,
+      //     class: 'Rack',
+      //     id: index
+      //   })
+      // }
+      removeRack(index, props.useItopForm);
     }
   });
 };
@@ -750,7 +766,7 @@ const onConfirmDeleteFootprint = (id: string) => {
     message: 'Voulez-vous vraiment supprimer cette surface au sol ?',
     onConfirm: () => {
       takeSnapshot();
-      deleteFootprint(id);
+      deleteFootprint(id, props.useItopForm);
       if (selectedFootprintId.value === id) {
         selectFootprint(null);
       }
@@ -883,15 +899,14 @@ const onSelectPillar = (event: MouseEvent, index: number) => {
 const triggerClearWalls = () => {
   triggerConfirm({
     title: 'Supprimer la pièce',
-    message: 'Voulez-vous vraiment supprimer la pièce ainsi que tous les racks et pods à l\'intérieur ?',
+    message: 'Voulez-vous vraiment supprimer la pièce ?',
     confirmText: 'Supprimer',
     onConfirm: () => {
       takeSnapshot();
       clearLayers();
       wallsRef.value = [];
-      currentLayerIndex.value = 0;
+      selectedPillarIndices.value = [];
       isWallSelected.value = false;
-      selectedRackIndices.value = [];
       cancelDrawingWalls();
     }
   });
@@ -1218,6 +1233,9 @@ const onMouseMove = (event: MouseEvent) => {
 };
 
 const stopDrag = () => {
+  if (draggingWallSegment.value !== null) {
+    ensureElementsInsideWalls();
+  }
   panStop();
   resetRackState();
   resetFootprintState();
@@ -1228,6 +1246,54 @@ const stopDrag = () => {
   if (currentLayerIndex.value === 2) {
     stopSelection();
   }
+};
+
+const ensureElementsInsideWalls = () => {
+  if (walls.value.length < 3) return;
+
+  layers.value.forEach(layer => {
+    // Repositionner les racks
+    layer.racks.forEach(rack => {
+      if (rack.x !== null && rack.y !== null) {
+        if (!isElementInWalls(rack.x ?? 0, rack.y ?? 0, rack.rotation || 0, walls.value)) {
+          const closest = findClosestPointInside(rack.x ?? 0, rack.y ?? 0, walls.value);
+          rack.x = closest.x;
+          rack.y = closest.y;
+        }
+      }
+    });
+
+    // Repositionner les footprints
+    layer.footprints.forEach(footprint => {
+      (footprint.units ?? []).forEach(unit => {
+        if (!isPointInPolygon(unit.x, unit.y, walls.value)) {
+          const closest = findClosestPointInside(unit.x, unit.y, walls.value);
+          unit.x = closest.x;
+          unit.y = closest.y;
+        }
+      });
+    });
+
+    // Repositionner les circuits
+    layer.circuits.forEach(circuit => {
+      if (circuit.x !== null && circuit.y !== null) {
+        if (!isElementInWalls(circuit.x ?? 0, circuit.y ?? 0, circuit.rotation || 0, walls.value)) {
+          const closest = findClosestPointInside(circuit.x ?? 0, circuit.y ?? 0, walls.value);
+          circuit.x = closest.x;
+          circuit.y = closest.y;
+        }
+      }
+    });
+
+    // Repositionner les pillars
+    if (layer.pillars) {
+      layer.pillars.forEach((pillar, index) => {
+        if (!isPointInPolygon(pillar.x, pillar.y, walls.value)) {
+          layer.pillars![index] = findClosestPointInside(pillar.x, pillar.y, walls.value);
+        }
+      });
+    }
+  });
 };
 
 const deselect = (event: MouseEvent) => {
@@ -1276,6 +1342,7 @@ const deselect = (event: MouseEvent) => {
       if (dist < 25) {
         cancelDrawingWalls();
         initializeLayers();
+        ensureElementsInsideWalls();
         return;
       }
     }
@@ -1364,7 +1431,26 @@ const deleteSelectedCircuits = () => {
   if (selectedCircuitIndices.value.length === 0) return;
 
   takeSnapshot();
-  circuitPaths.value = circuitPaths.value.filter((_, idx) => !selectedCircuitIndices.value.includes(idx));
+  if (props.useItopForm) {
+    circuitPaths.value = circuitPaths.value.map(c => ({
+      ...c,
+      ...(c.id === circuitPaths.value[selectedCircuitIndices.value[0]!]!.id ? {
+        x: null,
+        y: null
+      } : {})
+    }));
+
+    console.log(selectedCircuitIndices.value[0], circuitPaths.value.map(c => ({
+      ...c,
+      ...(c.id === circuitPaths.value[selectedCircuitIndices.value[0]!]!.id ? {
+        x: null,
+        y: null
+      } : {})
+    })));
+  }
+  else {
+    circuitPaths.value = circuitPaths.value.filter((_, idx) => !selectedCircuitIndices.value.includes(idx));
+  }
   selectedCircuitIndices.value = [];
 };
 
@@ -1536,15 +1622,20 @@ watch(() => props.roomId, async (newId) => {
 });
 
 onMounted(() => {
+  if (footprintColors.value.length > 0) {
+    colors.value = footprintColors.value;
+  }
   window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('mouseup', stopDrag);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateCanvasSize);
   window.removeEventListener('keydown', handleKeyDown);
+  window.removeEventListener('mouseup', stopDrag);
 });
 
-  provide<ExposedFunctions>(exposedFunctions, {
+provide<ExposedFunctions>(exposedFunctions, {
   getWallBoundingBox,
   getPodBoundaries,
   getGridLabel
@@ -1722,6 +1813,7 @@ onUnmounted(() => {
           @update-footprint-y="onUpdateFootprintY"
           @update-footprint-name="onUpdateFootprintName"
           @delete-circuit-selection="onConfirmDeleteCircuitSelection"
+          @clear-walls="triggerClearWalls"
       />
 
       <BuilderLayerPreviews

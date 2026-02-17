@@ -18,6 +18,7 @@ window.addEventListener('DOMContentLoaded', () => {
     roomBuilder.appendChild(spinner);
 
     roomBuilder.setAttribute('is-data-loading', '')
+    roomBuilder.setAttribute('use-itop-form', '')
 
     setTimeout(() => {
         roomBuilder.removeAttribute('is-data-loading');
