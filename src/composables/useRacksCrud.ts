@@ -4,6 +4,7 @@ import {useRoomBuilderHistory} from "./useRoomBuilderHistory.ts";
 import {useDrawRoomWalls} from "./useDrawRoomWalls.ts";
 import {rackHeight, rackWidth, useRoomBuilderGeometry} from "./useRoomBuilderGeometry.ts";
 import {useZoom} from "./useZoom.ts";
+import {SNAP_SIZE} from "../constants";
 
 const selectedRackIndices = ref<number[]>([]);
 const rotatingRack = ref<number | null>(null);
@@ -57,16 +58,16 @@ export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) 
             const centerX = wallBoundingBox.value.minX + wallBoundingBox.value.width / 2;
             const centerY = wallBoundingBox.value.minY + wallBoundingBox.value.height / 2;
 
-            startX = Math.round((centerX - rackWidth / 2) / 20) * 20;
-            startY = Math.round((centerY - rackHeight / 2) / 20) * 20;
+            startX = Math.round((centerX - rackWidth / 2) / SNAP_SIZE) * SNAP_SIZE;
+            startY = Math.round((centerY - rackHeight / 2) / SNAP_SIZE) * SNAP_SIZE;
 
             if (!isPointInPolygon(startX + rackWidth / 2, startY + rackHeight / 2, walls.value)) {
                 let found = false;
-                for (let x = wallBoundingBox.value.minX + 20; x < wallBoundingBox.value.maxX; x += 20) {
-                    for (let y = wallBoundingBox.value.minY + 20; y < wallBoundingBox.value.maxY; y += 20) {
+                for (let x = wallBoundingBox.value.minX + SNAP_SIZE; x < wallBoundingBox.value.maxX; x += SNAP_SIZE) {
+                    for (let y = wallBoundingBox.value.minY + SNAP_SIZE; y < wallBoundingBox.value.maxY; y += SNAP_SIZE) {
                         if (isPointInPolygon(x, y, walls.value)) {
-                            startX = Math.round((x - rackWidth / 2) / 20) * 20;
-                            startY = Math.round((y - rackHeight / 2) / 20) * 20;
+                            startX = Math.round((x - rackWidth / 2) / SNAP_SIZE) * SNAP_SIZE;
+                            startY = Math.round((y - rackHeight / 2) / SNAP_SIZE) * SNAP_SIZE;
                             found = true;
                             break;
                         }
@@ -93,8 +94,8 @@ export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) 
         const newRack = JSON.parse(JSON.stringify(rack));
         delete newRack.id;
         newRack.name = `${rack?.name} (copie)`;
-        newRack.x += 20;
-        newRack.y += 20;
+        newRack.x += SNAP_SIZE;
+        newRack.y += SNAP_SIZE;
 
         racks.value.push(newRack);
         selectedRackIndices.value = [racks.value.length - 1];
@@ -115,8 +116,8 @@ export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) 
         takeSnapshot();
         const newRack = data;
         delete newRack._type;
-        newRack.x += 20;
-        newRack.y += 20;
+        newRack.x += SNAP_SIZE;
+        newRack.y += SNAP_SIZE;
 
         racks.value.push(newRack);
         selectedRackIndices.value = [racks.value.length - 1];
@@ -235,8 +236,8 @@ export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) 
             const rawX = initialPos.x + deltaX;
             const rawY = initialPos.y + deltaY;
 
-            const snapX = Math.round(rawX / 20) * 20;
-            const snapY = Math.round(rawY / 20) * 20;
+            const snapX = Math.round(rawX / SNAP_SIZE) * SNAP_SIZE;
+            const snapY = Math.round(rawY / SNAP_SIZE) * SNAP_SIZE;
 
             if (walls.value.length > 2) {
                 const { isElementInWalls } = useRoomBuilderGeometry();

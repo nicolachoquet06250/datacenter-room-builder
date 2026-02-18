@@ -1,6 +1,7 @@
 import {ref, type Ref} from 'vue';
 import {nanoid} from 'nanoid';
 import {useRoomBuilderGeometry} from './useRoomBuilderGeometry';
+import {SNAP_SIZE, GRID_SIZE} from "../constants";
 
 export const colors = ref([
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
@@ -28,8 +29,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
   const startSelection = (x: number, y: number) => {
     isSelecting.value = true;
-    const snapX = Math.floor(x / 20) * 20;
-    const snapY = Math.floor(y / 20) * 20;
+    const snapX = Math.floor(x / SNAP_SIZE) * SNAP_SIZE;
+    const snapY = Math.floor(y / SNAP_SIZE) * SNAP_SIZE;
     
     // Ne pas pouvoir sélectionner une unité qui est déjà dans un footprint
     const isAlreadyInFootprint = currentLayer.value.footprints?.some(f => 
@@ -43,7 +44,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
       return;
     }
 
-    if (walls.value.length > 2 && !isPointInPolygon(snapX + 10, snapY + 10, walls.value)) {
+    if (walls.value.length > 2 && !isPointInPolygon(snapX + SNAP_SIZE / 2, snapY + SNAP_SIZE / 2, walls.value)) {
       selectionStart.value = null;
       selectionMode.value = null;
       initialSelection.value = [...selectedUnits.value];
@@ -56,8 +57,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     if (index === -1) {
       // Vérifier si le nouveau point est adjacent à la sélection existante
       const isAdjacent = selectedUnits.value.length === 0 || selectedUnits.value.some(u => 
-        (Math.abs(u.x - snapX) === 20 && u.y === snapY) || 
-        (u.x === snapX && Math.abs(u.y - snapY) === 20)
+        (Math.abs(u.x - snapX) === SNAP_SIZE && u.y === snapY) || 
+        (u.x === snapX && Math.abs(u.y - snapY) === SNAP_SIZE)
       );
 
       if (!isAdjacent) {
@@ -80,8 +81,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   const updateSelection = (currentX: number, currentY: number) => {
     if (!isSelecting.value || !selectionStart.value || !selectionMode.value) return;
 
-    const snapX = Math.floor(currentX / 20) * 20;
-    const snapY = Math.floor(currentY / 20) * 20;
+    const snapX = Math.floor(currentX / SNAP_SIZE) * SNAP_SIZE;
+    const snapY = Math.floor(currentY / SNAP_SIZE) * SNAP_SIZE;
 
     const minX = Math.min(selectionStart.value.x, snapX);
     const maxX = Math.max(selectionStart.value.x, snapX);
@@ -91,9 +92,9 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     // Collecter les unités du rectangle actuel
     const rectUnits: any[] = [];
     let allInside = true;
-    for (let x = minX; x <= maxX; x += 20) {
-      for (let y = minY; y <= maxY; y += 20) {
-        if (walls.value.length > 2 && !isPointInPolygon(x + 10, y + 10, walls.value)) {
+    for (let x = minX; x <= maxX; x += SNAP_SIZE) {
+      for (let y = minY; y <= maxY; y += SNAP_SIZE) {
+        if (walls.value.length > 2 && !isPointInPolygon(x + SNAP_SIZE / 2, y + SNAP_SIZE / 2, walls.value)) {
           allInside = false;
           break;
         }
@@ -150,8 +151,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         connected.add(key);
         
         const neighbors = [
-          { x: x + 20, y }, { x: x - 20, y },
-          { x, y: y + 20 }, { x, y: y - 20 }
+          { x: x + SNAP_SIZE, y }, { x: x - SNAP_SIZE, y },
+          { x, y: y + SNAP_SIZE }, { x, y: y - SNAP_SIZE }
         ];
         
         for (const n of neighbors) {
@@ -195,36 +196,36 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     const stack: Point[] = [];
 
     // On commence le remplissage depuis tout le périmètre (avec une marge d'une unité.)
-    for (let x = minX - 20; x <= maxX + 20; x += 20) {
-      stack.push({ x, y: minY - 20 });
-      stack.push({ x, y: maxY + 20 });
+    for (let x = minX - SNAP_SIZE; x <= maxX + SNAP_SIZE; x += SNAP_SIZE) {
+      stack.push({ x, y: minY - SNAP_SIZE });
+      stack.push({ x, y: maxY + SNAP_SIZE });
     }
-    for (let y = minY; y <= maxY; y += 20) {
-      stack.push({ x: minX - 20, y });
-      stack.push({ x: maxX + 20, y });
+    for (let y = minY; y <= maxY; y += SNAP_SIZE) {
+      stack.push({ x: minX - SNAP_SIZE, y });
+      stack.push({ x: maxX + SNAP_SIZE, y });
     }
 
     while (stack.length > 0) {
       const { x, y } = stack.pop()!;
       const key = `${x},${y}`;
       if (reachableFromOutside.has(key) || selectedSet.has(key)) continue;
-      if (x < minX - 20 || x > maxX + 20 || y < minY - 20 || y > maxY + 20) continue;
+      if (x < minX - SNAP_SIZE || x > maxX + SNAP_SIZE || y < minY - SNAP_SIZE || y > maxY + SNAP_SIZE) continue;
 
       reachableFromOutside.add(key);
-      stack.push({ x: x + 20, y });
-      stack.push({ x: x - 20, y });
-      stack.push({ x, y: y + 20 });
-      stack.push({ x, y: y - 20 });
+      stack.push({ x: x + SNAP_SIZE, y });
+      stack.push({ x: x - SNAP_SIZE, y });
+      stack.push({ x, y: y + SNAP_SIZE });
+      stack.push({ x, y: y - SNAP_SIZE });
     }
 
     // Toutes les unités du rectangle englobant qui ne sont ni sélectionnées ni "extérieures" sont des trous à remplir
-    for (let x = minX; x <= maxX; x += 20) {
-      for (let y = minY; y <= maxY; y += 20) {
+    for (let x = minX; x <= maxX; x += SNAP_SIZE) {
+      for (let y = minY; y <= maxY; y += SNAP_SIZE) {
         const key = `${x},${y}`;
         if (!selectedSet.has(key) && !reachableFromOutside.has(key)) {
           // C'est un trou interne, on l'ajoute s'il est dans la pièce
           if (walls.value.length > 2) {
-            if (isPointInPolygon(x + 10, y + 10, walls.value)) {
+            if (isPointInPolygon(x + SNAP_SIZE / 2, y + SNAP_SIZE / 2, walls.value)) {
               unitsToInclude.push({ x, y });
             }
           } else {
@@ -281,8 +282,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
   const getFootprintAt = (x: number, y: number) => {
     if (!currentLayer.value.footprints) return null;
-    const snapX = Math.floor(x / 20) * 20;
-    const snapY = Math.floor(y / 20) * 20;
+    const snapX = Math.floor(x / SNAP_SIZE) * SNAP_SIZE;
+    const snapY = Math.floor(y / SNAP_SIZE) * SNAP_SIZE;
 
     return currentLayer.value.footprints.find(f => 
       (f.units ?? []).some(u => u.x === snapX && u.y === snapY)
@@ -290,10 +291,11 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   };
 
   const updateHoveredUnit = (x: number, y: number) => {
-    const snapX = Math.floor(x / 20) * 20;
-    const snapY = Math.floor(y / 20) * 20;
+    // Pour l'affichage de la vignette de coordonnées, on utilise la grille principale (GRID_SIZE)
+    const snapX = Math.floor(x / GRID_SIZE) * GRID_SIZE;
+    const snapY = Math.floor(y / GRID_SIZE) * GRID_SIZE;
 
-    if (walls.value.length > 2 && !isPointInPolygon(snapX + 10, snapY + 10, walls.value)) {
+    if (walls.value.length > 2 && !isPointInPolygon(snapX + GRID_SIZE / 2, snapY + GRID_SIZE / 2, walls.value)) {
       hoveredUnit.value = null;
       return;
     }
@@ -354,8 +356,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     const deltaX = currentX - startX;
     const deltaY = currentY - startY;
 
-    const snapDeltaX = Math.round(deltaX / 20) * 20;
-    const snapDeltaY = Math.round(deltaY / 20) * 20;
+    const snapDeltaX = Math.round(deltaX / SNAP_SIZE) * SNAP_SIZE;
+    const snapDeltaY = Math.round(deltaY / SNAP_SIZE) * SNAP_SIZE;
 
     if (snapDeltaX === 0 && snapDeltaY === 0) {
       // Si on est revenu à la position de départ (ou proche), on remet les unités d'origine
@@ -464,7 +466,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     }));
 
     if (walls.value.length > 2) {
-      const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
+      const allInside = newUnits.every(u => isPointInPolygon(u.x + SNAP_SIZE / 2, u.y + SNAP_SIZE / 2, walls.value));
       if (!allInside) return;
     }
 
@@ -487,7 +489,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     }));
 
     if (walls.value.length > 2) {
-      const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
+      const allInside = newUnits.every(u => isPointInPolygon(u.x + SNAP_SIZE / 2, u.y + SNAP_SIZE / 2, walls.value));
       if (!allInside) return;
     }
 
@@ -534,8 +536,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         const maxY = Math.max(...sourceUnits.map(u => u.y));
 
         // Centre de rotation (centre du rectangle englobant)
-        const centerX = (minX + maxX + 20) / 2;
-        const centerY = (minY + maxY + 20) / 2;
+        const centerX = (minX + maxX + SNAP_SIZE) / 2;
+        const centerY = (minY + maxY + SNAP_SIZE) / 2;
 
         const rad = (delta * Math.PI) / 180;
         const cos = Math.cos(rad);
@@ -543,8 +545,8 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
         const newUnits = sourceUnits.map(u => {
           // Centrer sur (0,0) par rapport au centre du rectangle englobant, mais en considérant le centre de l'unité
-          const ux = u.x + 10;
-          const uy = u.y + 10;
+          const ux = u.x + SNAP_SIZE / 2;
+          const uy = u.y + SNAP_SIZE / 2;
 
           const dx = ux - centerX;
           const dy = uy - centerY;
@@ -554,14 +556,14 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
           // Revenir aux coordonnées globales et snap sur la grille de 20px (coin haut-gauche)
           return {
-            x: Math.round((centerX + rx - 10) / 20) * 20,
-            y: Math.round((centerY + ry - 10) / 20) * 20
+            x: Math.round((centerX + rx - SNAP_SIZE / 2) / SNAP_SIZE) * SNAP_SIZE,
+            y: Math.round((centerY + ry - SNAP_SIZE / 2) / SNAP_SIZE) * SNAP_SIZE
           };
         });
 
         // Vérification des murs
         if (walls.value.length > 2) {
-          const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
+          const allInside = newUnits.every(u => isPointInPolygon(u.x + SNAP_SIZE / 2, u.y + SNAP_SIZE / 2, walls.value));
           if (!allInside) return;
         }
 

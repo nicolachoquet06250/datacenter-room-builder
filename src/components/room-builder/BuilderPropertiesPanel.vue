@@ -50,6 +50,7 @@ import CircuitPanel from "../properties-panel/CircuitPanel.vue";
 import RoomPropertiesPanel from "../properties-panel/RoomPropertiesPanel.vue";
 import {useLayers} from "../../composables/useLayers.ts";
 import {useRoomBuilderGeometry, rackWidth, rackHeight} from "../../composables/useRoomBuilderGeometry.ts";
+import { SNAP_SIZE, GRID_SIZE } from "../../constants";
 
 const props = defineProps<Props>();
 
@@ -101,9 +102,9 @@ const coordLabel = computed(() => {
   const px = cx + rotVx;
   const py = cy + rotVy;
 
-  const iH = Math.floor((px - bbox.minX) / 20);
+  const iH = Math.floor((px - bbox.minX) / GRID_SIZE);
   const hLabel = (iH + 1).toString();
-  const iV = Math.floor((bbox.maxY - py - 1) / 20);
+  const iV = Math.floor((bbox.maxY - py - 1) / GRID_SIZE);
   const letter = String.fromCharCode(65 + (iV % 26));
   let vLabel = letter;
   if (iV >= 26) {
@@ -123,9 +124,9 @@ const circuitCoordLabel = computed(() => {
   const px = circuit.x + cW; // coin bas droit X
   const py = circuit.y + cH; // coin bas droit Y
 
-  const iH = Math.floor((px - bbox.minX - 1) / 20);
+  const iH = Math.floor((px - bbox.minX - 1) / GRID_SIZE);
   const hLabel = (iH + 1).toString();
-  const iV = Math.floor((bbox.maxY - py - 1) / 20);
+  const iV = Math.floor((bbox.maxY - py - 1) / GRID_SIZE);
   const letter = String.fromCharCode(65 + (iV % 26));
   let vLabel = letter;
   if (iV >= 26) {
@@ -154,8 +155,8 @@ const onCircuitCoordChange = (event: Event) => {
   if (!bbox) return;
 
   // Point voulu = coin bas droit du circuit sur la grille demandée
-  const px = bbox.minX + (colIndex + 1) * 20;
-  const py = bbox.maxY - (rowIndex + 1) * 20;
+  const px = bbox.minX + (colIndex + 1) * GRID_SIZE;
+  const py = bbox.maxY - (rowIndex + 1) * GRID_SIZE;
 
   const cW = 40;
   const cH = 40;
@@ -163,8 +164,8 @@ const onCircuitCoordChange = (event: Event) => {
   let x = px - cW;
   let y = py - cH;
 
-  x = Math.round(x / 20) * 20;
-  y = Math.round(y / 20) * 20;
+  x = Math.round(x / SNAP_SIZE) * SNAP_SIZE;
+  y = Math.round(y / SNAP_SIZE) * SNAP_SIZE;
 
   const idx = props.selectedCircuitIndices[0]!;
   emit('update-circuit-x', idx, x);
@@ -202,8 +203,8 @@ const onCoordChange = (event: Event) => {
   if (!bbox || !rack) return;
 
   // Point voulu = coin avant gauche (bottom-left non-roté) sur la grille demandée
-  const px = bbox.minX + colIndex * 20;
-  const py = bbox.maxY - (rowIndex + 1) * 20;
+  const px = bbox.minX + colIndex * GRID_SIZE;
+  const py = bbox.maxY - (rowIndex + 1) * GRID_SIZE;
 
   const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
 
@@ -222,8 +223,8 @@ const onCoordChange = (event: Event) => {
   let y = cy - rackHeight / 2;
 
   // Snap sur la grille de 20 px
-  x = Math.round(x / 20) * 20;
-  y = Math.round(y / 20) * 20;
+  x = Math.round(x / SNAP_SIZE) * SNAP_SIZE;
+  y = Math.round(y / SNAP_SIZE) * SNAP_SIZE;
 
   emit('update-rack-x', x);
   emit('update-rack-y', y);

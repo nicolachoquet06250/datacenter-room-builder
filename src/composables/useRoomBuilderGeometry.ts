@@ -1,3 +1,5 @@
+import { SNAP_SIZE } from "../constants";
+
 export const rackWidth = 40;
 export const rackHeight = 40;
 
@@ -80,7 +82,7 @@ export const useRoomBuilderGeometry = () => {
     return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
   };
 
-  const getConstrainedPoint = (currentX: number, currentY: number, lastPoint: Point | null, snap: number = 20): Point => {
+  const getConstrainedPoint = (currentX: number, currentY: number, lastPoint: Point | null, snap: number = SNAP_SIZE): Point => {
     const snapX = Math.round(currentX / snap) * snap;
     const snapY = Math.round(currentY / snap) * snap;
 
@@ -170,8 +172,8 @@ export const useRoomBuilderGeometry = () => {
 
     // Arrondir au snap si nécessaire (ici on laisse l'appelant gérer le snap final si besoin)
     return {
-      x: Math.round(finalX / 20) * 20,
-      y: Math.round(finalY / 20) * 20
+      x: Math.round(finalX / SNAP_SIZE) * SNAP_SIZE,
+      y: Math.round(finalY / SNAP_SIZE) * SNAP_SIZE
     };
   };
 

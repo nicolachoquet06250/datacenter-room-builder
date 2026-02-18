@@ -55,6 +55,7 @@ import {useModal} from "../composables/useModal.ts";
 import {colors, useFootprints} from "../composables/useFootprints.ts";
 import {useWallResizer} from "../composables/useWallResizer.ts";
 import {usePillars} from "../composables/usePillars.ts";
+import {SNAP_SIZE, GRID_SIZE} from "../constants";
 
 const props = withDefaults(
   defineProps<Props>(),
@@ -289,8 +290,8 @@ const onDropRack = (event: DragEvent) => {
     const rawX = worldX - w / 2;
     const rawY = worldY - h / 2;
 
-    const snapX = Math.round(rawX / 20) * 20;
-    const snapY = Math.round(rawY / 20) * 20;
+    const snapX = Math.round(rawX / SNAP_SIZE) * SNAP_SIZE;
+    const snapY = Math.round(rawY / SNAP_SIZE) * SNAP_SIZE;
 
     if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, 0, walls.value, w, h)) {
       notifyError({
@@ -339,8 +340,8 @@ const onDropRack = (event: DragEvent) => {
     const rawX = worldX - 20; // circuitWidth / 2
     const rawY = worldY - 20; // circuitHeight / 2
 
-    const snapX = Math.round(rawX / 20) * 20;
-    const snapY = Math.round(rawY / 20) * 20;
+    const snapX = Math.round(rawX / SNAP_SIZE) * SNAP_SIZE;
+    const snapY = Math.round(rawY / SNAP_SIZE) * SNAP_SIZE;
 
     if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, 0, walls.value)) {
       notifyError({
@@ -389,8 +390,8 @@ const onDropRack = (event: DragEvent) => {
     const rawX = worldX - widthPx / 2;
     const rawY = worldY - heightPx / 2;
 
-    const snapX = Math.round(rawX / 20) * 20;
-    const snapY = Math.round(rawY / 20) * 20;
+    const snapX = Math.round(rawX / SNAP_SIZE) * SNAP_SIZE;
+    const snapY = Math.round(rawY / SNAP_SIZE) * SNAP_SIZE;
 
     const newUnits: Point[] = [];
     for (let curX = 0; curX < widthPx; curX += 20) {
@@ -616,13 +617,13 @@ const wallBoundingBox = computed(() => {
 const horizontalCoords = computed(() => {
   if (!wallBoundingBox.value) return [];
   const coords = [] as Array<Point & { label: string }>;
-  const steps = Math.floor(wallBoundingBox.value.width / 20);
+  const steps = Math.floor(wallBoundingBox.value.width / GRID_SIZE);
   for (let i = 0; i < steps; i++) {
     const label = (i + 1).toString();
     coords.push({
       label,
-      x: wallBoundingBox.value.minX + (i * 20) + 10,
-      y: wallBoundingBox.value.maxY + 20
+      x: wallBoundingBox.value.minX + (i * GRID_SIZE) + 10,
+      y: wallBoundingBox.value.maxY + GRID_SIZE
     });
   }
   return coords;
@@ -631,7 +632,7 @@ const horizontalCoords = computed(() => {
 const verticalCoords = computed(() => {
   if (!wallBoundingBox.value) return [];
   const coords = [] as Array<Point& { label: string }>;
-  const steps = Math.floor(wallBoundingBox.value.height / 20);
+  const steps = Math.floor(wallBoundingBox.value.height / GRID_SIZE);
   for (let i = 0; i < steps; i++) {
     const label = String.fromCharCode(65 + (i % 26));
     let finalLabel = label;
@@ -641,8 +642,8 @@ const verticalCoords = computed(() => {
     }
     coords.push({
       label: finalLabel,
-      x: wallBoundingBox.value.minX - 20,
-      y: wallBoundingBox.value.maxY - (i * 20) - 10
+      x: wallBoundingBox.value.minX - GRID_SIZE,
+      y: wallBoundingBox.value.maxY - (i * GRID_SIZE) - 10
     });
   }
   return coords;
@@ -652,10 +653,10 @@ const getGridLabel = (x: number, y: number, wallBoundingBox: (Size & MinPoint & 
   const originX = wallBoundingBox ? wallBoundingBox.minX : 0;
   const originY = wallBoundingBox ? wallBoundingBox.maxY : 0;
   
-  const iH = Math.floor((x - originX) / 20);
-  const hLabel = iH <= 0 ? '0' : iH.toString();
+  const iH = Math.floor((x - originX) / GRID_SIZE);
+  const hLabel = (iH + 1) <= 0 ? '0' : (iH + 1).toString();
   
-  const iV = Math.floor((originY - y) / 20);
+  const iV = Math.floor((originY - y) / GRID_SIZE);
   const safeIV = Math.max(0, iV - 1);
   
   const label = String.fromCharCode(65 + (safeIV % 26));
@@ -1137,7 +1138,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
   }
 
   if (draggingPillarIndex.value !== null) {
-    const constrained = getConstrainedPoint(x, y, null, 10);
+    const constrained = getConstrainedPoint(x, y, null, SNAP_SIZE);
     if (walls.value.length > 2 && !isPointInPolygon(constrained.x, constrained.y, walls.value)) {
       return;
     }
@@ -1150,8 +1151,8 @@ const onMouseMoveSVG = (event: MouseEvent) => {
     if (circuit) {
       const rawX = x - draggingCircuitStart.value.x;
       const rawY = y - draggingCircuitStart.value.y;
-      const snapX = Math.round(rawX / 20) * 20;
-      const snapY = Math.round(rawY / 20) * 20;
+      const snapX = Math.round(rawX / SNAP_SIZE) * SNAP_SIZE;
+      const snapY = Math.round(rawY / SNAP_SIZE) * SNAP_SIZE;
 
       if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, circuit.rotation || 0, walls.value)) {
         return;
@@ -1164,7 +1165,7 @@ const onMouseMoveSVG = (event: MouseEvent) => {
   }
 
   if (isDrawingPillar.value) {
-    const constrained = getConstrainedPoint(x, y, null, 10);
+    const constrained = getConstrainedPoint(x, y, null, SNAP_SIZE);
     if (walls.value.length > 2 && isPointInPolygon(constrained.x, constrained.y, walls.value)) {
       pillarPreviewPoint.value = constrained;
     } else {
@@ -1202,13 +1203,13 @@ const onMouseMoveSVG = (event: MouseEvent) => {
   } else {
     // Pour les autres layers, on met à jour hoveredUnit si on est dans les murs
     // pour afficher le tooltip de coordonnées.
-    const snapX = Math.floor(x / 20) * 20;
-    const snapY = Math.floor(y / 20) * 20;
+    const snapX = Math.floor(x / GRID_SIZE) * GRID_SIZE;
+    const snapY = Math.floor(y / GRID_SIZE) * GRID_SIZE;
 
     // On vérifie d'abord si on survole un élément qui doit quand même afficher le tooltip
     const isOverBlockingElement = (event.target as HTMLElement)?.closest('.rack-rect, .pillars-layer rect, .footprint-group');
 
-    if (isOverBlockingElement || (walls.value.length > 2 && isPointInPolygon(snapX + 10, snapY + 10, walls.value))) {
+    if (isOverBlockingElement || (walls.value.length > 2 && isPointInPolygon(snapX + GRID_SIZE / 2, snapY + GRID_SIZE / 2, walls.value))) {
       hoveredUnit.value = { x: snapX, y: snapY };
     } else {
       hoveredUnit.value = null;
@@ -1310,7 +1311,7 @@ const deselect = (event: MouseEvent) => {
     const x = (svgP.x / zoomLevel.value) - panOffset.value.x;
     const y = (svgP.y / zoomLevel.value) - panOffset.value.y;
 
-    const constrained = getConstrainedPoint(x, y, null, 10);
+    const constrained = getConstrainedPoint(x, y, null, SNAP_SIZE);
     if (walls.value.length > 2 && !isPointInPolygon(constrained.x, constrained.y, walls.value)) {
       return;
     }
@@ -1405,8 +1406,8 @@ const deselect = (event: MouseEvent) => {
       }
     } else if (event.button === 2) { // Right-click
       const footprint = getFootprintAt(x, y);
-      const clickedUnitX = Math.floor(x / 20) * 20;
-      const clickedUnitY = Math.floor(y / 20) * 20;
+      const clickedUnitX = Math.floor(x / SNAP_SIZE) * SNAP_SIZE;
+      const clickedUnitY = Math.floor(y / SNAP_SIZE) * SNAP_SIZE;
       const isUnitSelected = selectedUnits.value.some(u => u.x === clickedUnitX && u.y === clickedUnitY);
 
       if (footprint) {

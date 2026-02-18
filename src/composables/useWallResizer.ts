@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue';
+import { SNAP_SIZE } from "../constants";
 
 export const useWallResizer = (walls: Ref<Point[]>) => {
   const draggingWallSegment = ref<{ index: number; isHorizontal: boolean } | null>(null);
@@ -15,8 +16,8 @@ export const useWallResizer = (walls: Ref<Point[]>) => {
     if (draggingWallSegment.value === null) return;
 
     const { index, isHorizontal } = draggingWallSegment.value;
-    const snapX = Math.round(x / 20) * 20;
-    const snapY = Math.round(y / 20) * 20;
+    const snapX = Math.round(x / SNAP_SIZE) * SNAP_SIZE;
+    const snapY = Math.round(y / SNAP_SIZE) * SNAP_SIZE;
 
     const newWalls = walls.value.map(p => ({ ...p }));
     const n = newWalls.length;
