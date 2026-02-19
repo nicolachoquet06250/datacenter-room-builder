@@ -218,6 +218,14 @@
         "units": null,
         "color": "#BA68C8",
         "name": "Footprint 2"
+      },
+      {
+        "id": "ARwCD3LbXCi7wQ4MK3EBa",
+        "width": 1200,
+        "height": 800,
+        "units": null,
+        "color": "#BA68C8",
+        "name": "Footprint 3"
       }
     ],
     "circuits": [],

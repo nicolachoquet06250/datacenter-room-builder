@@ -23,15 +23,17 @@ const onDragStart = (event: DragEvent, footprint: Footprint) => {
     
     // Create a ghost image for better UX
     const ghost = document.createElement('div');
-    ghost.style.width = `${(footprint.width || 1200) / 600 * 20}px`;
-    ghost.style.height = `${(footprint.height || 1200) / 600 * 20}px`;
+    const widthPx = (footprint.width || 1200) / 600 * 20;
+    const heightPx = (footprint.height || 1200) / 600 * 20;
+    ghost.style.width = `${widthPx}px`;
+    ghost.style.height = `${heightPx}px`;
     ghost.style.backgroundColor = footprint.color || '#cbd5e0';
     ghost.style.opacity = '0.5';
     ghost.style.position = 'absolute';
     ghost.style.top = '-1000px';
     document.body.appendChild(ghost);
     
-    event.dataTransfer.setDragImage(ghost, ((footprint.width || 1200) / 600 * 20) / 2, ((footprint.height || 1200) / 600 * 20) / 2);
+    event.dataTransfer.setDragImage(ghost, widthPx / 2, heightPx / 2);
     
     setTimeout(() => {
       document.body.removeChild(ghost);

@@ -126,22 +126,40 @@ const handleSelectCircuit = (e: MouseEvent, cIdx: number) => {
 const getFootprintCenter = (footprint: Footprint) => {
   if (!footprint.units || (footprint.units?.length ?? 0) === 0) return { x: 0, y: 0 };
   const minX = Math.min(...footprint.units.map(u => u.x));
-  const maxX = Math.max(...footprint.units.map(u => u.x));
   const minY = Math.min(...footprint.units.map(u => u.y));
-  const maxY = Math.max(...footprint.units.map(u => u.y));
+  
+  let widthPx = (footprint.width || 1200) / 600 * 20;
+  let heightPx = (footprint.height || 1200) / 600 * 20;
+
+  const normRotation = ((footprint.rotation || 0) % 360 + 360) % 360;
+  if (normRotation === 90 || normRotation === 270) {
+    const tmp = widthPx;
+    widthPx = heightPx;
+    heightPx = tmp;
+  }
+
   return {
-    x: (minX + maxX + 20) / 2,
-    y: (minY + maxY + 20) / 2
+    x: minX + widthPx / 2,
+    y: minY + heightPx / 2
   };
 };
 
 const getFootprintBBox = (footprint: Footprint) => {
   if (!footprint.units || footprint.units.length === 0) return null;
   const minX = Math.min(...footprint.units.map(u => u.x));
-  const maxX = Math.max(...footprint.units.map(u => u.x));
   const minY = Math.min(...footprint.units.map(u => u.y));
-  const maxY = Math.max(...footprint.units.map(u => u.y));
-  return { minX, minY, maxX, maxY, width: (maxX - minX + 20), height: (maxY - minY + 20) };
+  
+  let widthPx = (footprint.width || 1200) / 600 * 20;
+  let heightPx = (footprint.height || 1200) / 600 * 20;
+
+  const normRotation = ((footprint.rotation || 0) % 360 + 360) % 360;
+  if (normRotation === 90 || normRotation === 270) {
+    const tmp = widthPx;
+    widthPx = heightPx;
+    heightPx = tmp;
+  }
+
+  return { minX, minY, maxX: minX + widthPx, maxY: minY + heightPx, width: widthPx, height: heightPx };
 };
 
 defineExpose({svgRef});
@@ -181,15 +199,13 @@ defineExpose({svgRef});
           <g v-for="footprint in layer.footprints" :key="footprint.id">
             <template v-if="(footprint.units?.length ?? 0) > 0">
               <rect
-                  v-for="(unit, uIdx) in footprint.units || []"
-                  :key="uIdx"
-                  :x="unit.x"
-                  :y="unit.y"
-                  :width="20"
-                  :height="20"
-                  :fill="footprint.color"
-                  fill-opacity="0.2"
-              />
+                    :x="Math.min(...footprint.units.map(u => u.x))"
+                    :y="Math.min(...footprint.units.map(u => u.y))"
+                    :width="((footprint.rotation || 0) % 180 === 0) ? (footprint.width || 1200) / 600 * 20 : (footprint.height || 1200) / 600 * 20"
+                    :height="((footprint.rotation || 0) % 180 === 0) ? (footprint.height || 1200) / 600 * 20 : (footprint.width || 1200) / 600 * 20"
+                    :fill="footprint.color"
+                    fill-opacity="0.2"
+                />
               <text
                   v-if="footprint.name"
                   :x="getFootprintCenter(footprint).x"
@@ -335,20 +351,18 @@ defineExpose({svgRef});
           <g v-for="footprint in layers[2].footprints" :key="footprint.id"
              class="footprint-group"
              :class="{ 'selected': footprint.id === selectedFootprintId }"
+             @mousedown.stop="$emit('start-drag-footprint', $event, footprint.id)"
           >
             <template v-if="(footprint.units?.length ?? 0) > 0">
               <rect
-                  v-for="(unit, uIdx) in footprint.units || []"
-                  :key="uIdx"
-                  :x="unit.x"
-                  :y="unit.y"
-                  :width="20"
-                  :height="20"
+                  :x="Math.min(...footprint.units.map(u => u.x))"
+                  :y="Math.min(...footprint.units.map(u => u.y))"
+                  :width="((footprint.rotation || 0) % 180 === 0) ? (footprint.width || 1200) / 600 * 20 : (footprint.height || 1200) / 600 * 20"
+                  :height="((footprint.rotation || 0) % 180 === 0) ? (footprint.height || 1200) / 600 * 20 : (footprint.width || 1200) / 600 * 20"
                   :fill="footprint.color"
                   :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
                   stroke="white"
                   :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
-                  @mousedown.stop="$emit('start-drag-footprint', $event, footprint.id)"
               />
               <text
                   v-if="footprint.name"

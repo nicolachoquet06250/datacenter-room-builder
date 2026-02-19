@@ -387,15 +387,37 @@ const onDropRack = (event: DragEvent) => {
     const widthPx = (footprint.width || 1200) / 600 * 20;
     const heightPx = (footprint.height || 1200) / 600 * 20;
 
-    const rawX = worldX - widthPx / 2;
-    const rawY = worldY - heightPx / 2;
+    // Détermine le nombre d'unités de grille nécessaires pour couvrir cette dimension (en tenant compte de la rotation)
+    const normRotation = ((footprint.rotation || 0) % 360 + 360) % 360;
+    const isRotated = normRotation === 90 || normRotation === 270;
+
+    const widthUnits = Math.ceil((isRotated ? (footprint.height || 1200) : (footprint.width || 1200)) / 600);
+    const heightUnits = Math.ceil((isRotated ? (footprint.width || 1200) : (footprint.height || 1200)) / 600);
+    const coveredWidthPx = widthUnits * 20;
+    const coveredHeightPx = heightUnits * 20;
+
+    const effectiveWidthPx = isRotated ? heightPx : widthPx;
+    const effectiveHeightPx = isRotated ? widthPx : heightPx;
+
+    const rawX = worldX - effectiveWidthPx / 2;
+    const rawY = worldY - effectiveHeightPx / 2;
 
     const snapX = Math.round(rawX / SNAP_SIZE) * SNAP_SIZE;
     const snapY = Math.round(rawY / SNAP_SIZE) * SNAP_SIZE;
 
+    // Vérifier si le footprint est à l'intérieur des murs
+    const { isElementInWalls } = useRoomBuilderGeometry();
+    if (walls.value.length > 2 && !isElementInWalls(snapX, snapY, footprint.rotation ?? 0, walls.value, widthPx, heightPx)) {
+      notifyError({
+        title: 'Erreur',
+        text: 'Le footprint doit être positionné à l\'intérieur des murs.'
+      });
+      return;
+    }
+
     const newUnits: Point[] = [];
-    for (let curX = 0; curX < widthPx; curX += 20) {
-      for (let curY = 0; curY < heightPx; curY += 20) {
+    for (let curX = 0; curX < coveredWidthPx; curX += 20) {
+      for (let curY = 0; curY < coveredHeightPx; curY += 20) {
         newUnits.push({ x: snapX + curX, y: snapY + curY });
       }
     }

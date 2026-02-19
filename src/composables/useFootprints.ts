@@ -1,7 +1,7 @@
 import {ref, type Ref} from 'vue';
 import {nanoid} from 'nanoid';
 import {useRoomBuilderGeometry} from './useRoomBuilderGeometry';
-import {SNAP_SIZE, GRID_SIZE} from "../constants";
+import {GRID_SIZE, SNAP_SIZE} from "../constants";
 
 export const colors = ref([
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
@@ -23,7 +23,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   const startMouseSVGPos = { x: 0, y: 0 };
   const startRotationAngle = ref(0);
   const initialFootprintRotation = ref(0);
-  const { isPointInPolygon } = useRoomBuilderGeometry();
+  const { isPointInPolygon, isElementInWalls } = useRoomBuilderGeometry();
 
   const getRandomColor = () => colors.value[Math.floor(Math.random() * colors.value.length)]!;
 
@@ -365,18 +365,25 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
       return;
     }
 
-    const newUnits = footprintUnitsBeforeDrag.value.map(u => ({
+    const minXBefore = Math.min(...footprintUnitsBeforeDrag.value.map(u => u.x));
+    const minYBefore = Math.min(...footprintUnitsBeforeDrag.value.map(u => u.y));
+    const newX = minXBefore + snapDeltaX;
+    const newY = minYBefore + snapDeltaY;
+
+    // Vérifier si le footprint (avec sa taille réelle) est dans les murs
+    const widthPx = (footprint.width || 1200) / 600 * 20;
+    const heightPx = (footprint.height || 1200) / 600 * 20;
+
+    if (walls.value.length > 2) {
+      if (!isElementInWalls(newX, newY, footprint.rotation ?? 0, walls.value, widthPx, heightPx)) {
+        return;
+      }
+    }
+
+    footprint.units = footprintUnitsBeforeDrag.value.map(u => ({
       x: u.x + snapDeltaX,
       y: u.y + snapDeltaY
     }));
-
-    // Optionnel : vérifier si toutes les nouvelles unités sont dans les murs
-    if (walls.value.length > 2) {
-      const allInside = newUnits.every(u => isPointInPolygon(u.x + 10, u.y + 10, walls.value));
-      if (!allInside) return;
-    }
-
-    footprint.units = newUnits;
   };
 
   const resetFootprintState = () => {
@@ -460,6 +467,16 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
 
     if (deltaX === 0) return;
 
+    const minY = Math.min(...footprint.units.map(u => u.y));
+    const widthPx = (footprint.width || 1200) / 600 * 20;
+    const heightPx = (footprint.height || 1200) / 600 * 20;
+
+    if (walls.value.length > 2) {
+      if (!isElementInWalls(newX, minY, footprint.rotation ?? 0, walls.value, widthPx, heightPx)) {
+        return;
+      }
+    }
+
     const newUnits = footprint.units.map(u => ({
       ...u,
       x: u.x + deltaX
@@ -482,6 +499,16 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     const deltaY = newY - minY;
 
     if (deltaY === 0) return;
+
+    const minX = Math.min(...footprint.units.map(u => u.x));
+    const widthPx = (footprint.width || 1200) / 600 * 20;
+    const heightPx = (footprint.height || 1200) / 600 * 20;
+
+    if (walls.value.length > 2) {
+      if (!isElementInWalls(minX, newY, footprint.rotation ?? 0, walls.value, widthPx, heightPx)) {
+        return;
+      }
+    }
 
     const newUnits = footprint.units.map(u => ({
       ...u,
@@ -512,16 +539,6 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
       const delta = (newRotation - prev) % 360;
 
       if (delta === 0) return;
-
-      const norm = (v: number) => ((v % 360) + 360) % 360;
-      const prevParity = Math.floor(norm(prev) / 90) % 2;
-      const newParity = Math.floor(norm(newRotation) / 90) % 2;
-
-      if (prevParity !== newParity) {
-        const w = footprint.width;
-        footprint.width = footprint.height;
-        footprint.height = w;
-      }
 
       // Si le footprint a des unités (placé sur la grille), on fait pivoter les unités
       if (footprint.units && footprint.units.length > 0) {
@@ -562,14 +579,20 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         });
 
         // Vérification des murs
+        const minXAfter = Math.min(...newUnits.map(u => u.x));
+        const minYAfter = Math.min(...newUnits.map(u => u.y));
+        const widthPx = (footprint.width || 1200) / 600 * 20;
+        const heightPx = (footprint.height || 1200) / 600 * 20;
+
         if (walls.value.length > 2) {
-          const allInside = newUnits.every(u => isPointInPolygon(u.x + SNAP_SIZE / 2, u.y + SNAP_SIZE / 2, walls.value));
-          if (!allInside) return;
+          if (!isElementInWalls(minXAfter, minYAfter, newRotation, walls.value, widthPx, heightPx)) {
+            return;
+          }
         }
 
         footprint.units = newUnits;
       }
-
+      
       footprint.rotation = newRotation;
     }
   };

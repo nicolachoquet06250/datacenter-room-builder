@@ -177,28 +177,34 @@ export const useRoomBuilderGeometry = () => {
     };
   };
 
-  const isElementInWalls = (x: number, y: number, rotation: number | null, polygon: Point[], _width?: number, _height?: number) => {
+  const isElementInWalls = (x: number, y: number, rotation: number | null, polygon: Point[], width?: number, height?: number) => {
     if (polygon.length < 3) return true;
+
+    let w = width || rackWidth;
+    let h = height || rackHeight;
+
+    // Si on a une rotation de 90 ou 270 deg (modulo 180 non nul), on inverse largeur et hauteur effectives
+    const normRotation = ((rotation || 0) % 360 + 360) % 360;
+    if (normRotation === 90 || normRotation === 270) {
+      const tmp = w;
+      w = h;
+      h = tmp;
+    }
 
     const corners = [
       { x, y },
-      { x: x + rackWidth, y },
-      { x, y: y + rackHeight },
-      { x: x + rackWidth, y: y + rackHeight }
+      { x: x + w, y },
+      { x, y: y + h },
+      { x: x + w, y: y + h }
     ];
 
-    const angle = ((rotation || 0) * Math.PI) / 180;
-    const cx = x + rackWidth / 2;
-    const cy = y + rackHeight / 2;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
 
     return corners.every(corner => {
-      let finalX = corner.x;
-      let finalY = corner.y;
-
-      if (rotation) {
-        finalX = cx + (corner.x - cx) * Math.cos(angle) - (corner.y - cy) * Math.sin(angle);
-        finalY = cy + (corner.x - cx) * Math.sin(angle) + (corner.y - cy) * Math.cos(angle);
-      }
+      // Plus besoin de rotation géométrique (sin/cos) ici car on a inversé w et h
+      const finalX = corner.x;
+      const finalY = corner.y;
 
       // On réduit légèrement la taille de l'élément pour la vérification des collisions
       // afin d'éviter les problèmes de précision aux bords des murs (unité de grille.)
