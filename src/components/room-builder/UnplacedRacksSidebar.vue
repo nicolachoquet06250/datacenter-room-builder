@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { rackHeight, rackWidth } from '../../composables/useRoomBuilderGeometry';
+import { getRackDimensions } from '../../composables/useRoomBuilderGeometry';
 import {computed, type ComputedRef, inject} from "vue";
 
 defineProps<{
@@ -21,12 +21,14 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
     event.dataTransfer.setData('rackId', rack.id.toString());
     event.dataTransfer.dropEffect = 'move';
 
+    const { w, h } = getRackDimensions(rack);
+
     // Créer une image fantôme SVG qui ressemble au rack dans le canvas
     const svgNS = "http://www.w3.org/2000/svg";
     const dragIcon = document.createElementNS(svgNS, "svg");
-    dragIcon.setAttribute("width", rackWidth.toString());
-    dragIcon.setAttribute("height", rackHeight.toString());
-    dragIcon.setAttribute("viewBox", `0 0 ${rackWidth} ${rackHeight}`);
+    dragIcon.setAttribute("width", w.toString());
+    dragIcon.setAttribute("height", h.toString());
+    dragIcon.setAttribute("viewBox", `0 0 ${w} ${h}`);
     dragIcon.style.position = 'absolute';
     dragIcon.style.top = '-1000px';
     dragIcon.style.left = '-1000px';
@@ -34,8 +36,8 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
     const rect = document.createElementNS(svgNS, "rect");
     rect.setAttribute("x", "0");
     rect.setAttribute("y", "0");
-    rect.setAttribute("width", rackWidth.toString());
-    rect.setAttribute("height", rackHeight.toString());
+    rect.setAttribute("width", w.toString());
+    rect.setAttribute("height", h.toString());
     rect.setAttribute("fill", "#ffffff");
     rect.setAttribute("stroke", "#007bff");
     rect.setAttribute("stroke-width", "1");
@@ -50,8 +52,8 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
     dragIcon.appendChild(icon);
 
     const text = document.createElementNS(svgNS, "text");
-    text.setAttribute("x", (rackWidth / 2).toString());
-    text.setAttribute("y", (rackHeight / 2).toString());
+    text.setAttribute("x", (w / 2).toString());
+    text.setAttribute("y", (h / 2).toString());
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("dominant-baseline", "middle");
     text.setAttribute("fill", "#333");
@@ -63,7 +65,7 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
 
     document.body.appendChild(dragIcon);
     
-    event.dataTransfer.setDragImage(dragIcon, rackWidth / 2, rackHeight / 2);
+    event.dataTransfer.setDragImage(dragIcon, w / 2, h / 2);
     
     // Nettoyer l'élément après un court délai
     setTimeout(() => {

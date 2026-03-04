@@ -40,7 +40,7 @@ import {
   BuilderLayerPreviews, UnplacedRacksSidebar,
   UnplacedCircuitsSidebar, UnplacedFootprintsSidebar
 } from './room-builder'
-import {rackHeight, rackWidth, useRoomBuilderGeometry} from '../composables/useRoomBuilderGeometry';
+import {getRackDimensions, rackHeight, rackWidth, useRoomBuilderGeometry} from '../composables/useRoomBuilderGeometry';
 import {useRoomBuilderHistory} from '../composables/useRoomBuilderHistory';
 import {useNotify} from '../composables/useNotify';
 import {useDrawRoomWalls} from "../composables/useDrawRoomWalls.ts";
@@ -284,8 +284,7 @@ const onDropRack = (event: DragEvent) => {
     const worldX = x / zoomLevel.value - panOffset.value.x;
     const worldY = y / zoomLevel.value - panOffset.value.y;
 
-    const w = (rack.width && rack.width > 0) ? Math.round(rack.width / 600 * 20) : rackWidth;
-    const h = (rack.height && rack.height > 0) ? Math.round(rack.height / 600 * 20) : rackHeight;
+    const { w, h } = getRackDimensions(rack);
 
     const rawX = worldX - w / 2;
     const rawY = worldY - h / 2;

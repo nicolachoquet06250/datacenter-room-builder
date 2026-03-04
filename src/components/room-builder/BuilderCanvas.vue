@@ -162,6 +162,21 @@ const getFootprintBBox = (footprint: Footprint) => {
   return { minX, minY, maxX: minX + widthPx, maxY: minY + heightPx, width: widthPx, height: heightPx };
 };
 
+const getRackDimensions = (rack: Rack) => {
+  let widthPx = (rack.width && rack.width > 0) ? Math.round(rack.width / 600 * 20) : props.rackWidth;
+  let heightPx = (rack.height && rack.height > 0) ? Math.round(rack.height / 600 * 20) : props.rackHeight;
+
+  return { width: widthPx, height: heightPx };
+};
+
+const getRackCenter = (rack: Rack) => {
+  const { width, height } = getRackDimensions(rack);
+  return {
+    x: (rack.x || 0) + width / 2,
+    y: (rack.y || 0) + height / 2
+  };
+};
+
 defineExpose({svgRef});
 </script>
 
@@ -201,8 +216,8 @@ defineExpose({svgRef});
               <rect
                     :x="Math.min(...footprint.units.map(u => u.x))"
                     :y="Math.min(...footprint.units.map(u => u.y))"
-                    :width="((footprint.rotation || 0) % 180 === 0) ? (footprint.width || 1200) / 600 * 20 : (footprint.height || 1200) / 600 * 20"
-                    :height="((footprint.rotation || 0) % 180 === 0) ? (footprint.height || 1200) / 600 * 20 : (footprint.width || 1200) / 600 * 20"
+                    :width="(footprint.width || 1200) / 600 * 20"
+                    :height="(footprint.height || 1200) / 600 * 20"
                     :fill="footprint.color"
                     fill-opacity="0.2"
                 />
@@ -277,12 +292,12 @@ defineExpose({svgRef});
         />
 
         <g v-for="(rack, tIdx) in layer?.racks || []" :key="`rack-${tIdx}`">
-          <g v-if="rack && rack.x !== undefined && rack.x !== null && rack.y !== undefined && rack.y !== null" :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`">
+          <g v-if="rack && rack.x !== undefined && rack.x !== null && rack.y !== undefined && rack.y !== null" :transform="`rotate(${rack?.rotation || 0}, ${getRackCenter(rack).x}, ${getRackCenter(rack).y})`">
             <rect
                 :x="rack.x"
                 :y="rack.y"
-                :width="rackWidth"
-                :height="rackHeight"
+                :width="getRackDimensions(rack).width"
+                :height="getRackDimensions(rack).height"
                 class="rack-rect"
                 :class="{ grouped: rack.podId }"
             />
@@ -294,12 +309,12 @@ defineExpose({svgRef});
                 :href="`${itop_url}/images/icons/icons8-rack.svg`"
             />
             <text
-                :x="rack.x + rackWidth / 2"
-                :y="rack.y + rackHeight / 2"
+                :x="getRackCenter(rack).x"
+                :y="getRackCenter(rack).y"
                 text-anchor="middle"
                 dominant-baseline="middle"
                 class="rack-label"
-                :transform="`rotate(${- (rack?.rotation || 0)}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
+                :transform="`rotate(${- (rack?.rotation || 0)}, ${getRackCenter(rack).x}, ${getRackCenter(rack).y})`"
             >
               {{ rack.name }}
             </text>
@@ -357,8 +372,8 @@ defineExpose({svgRef});
               <rect
                   :x="Math.min(...footprint.units.map(u => u.x))"
                   :y="Math.min(...footprint.units.map(u => u.y))"
-                  :width="((footprint.rotation || 0) % 180 === 0) ? (footprint.width || 1200) / 600 * 20 : (footprint.height || 1200) / 600 * 20"
-                  :height="((footprint.rotation || 0) % 180 === 0) ? (footprint.height || 1200) / 600 * 20 : (footprint.width || 1200) / 600 * 20"
+                  :width="(footprint.width || 1200) / 600 * 20"
+                  :height="(footprint.height || 1200) / 600 * 20"
                   :fill="footprint.color"
                   :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
                   stroke="white"
@@ -610,12 +625,12 @@ defineExpose({svgRef});
 
         <g v-for="(rack, tIdx) in racks" :key="tIdx">
           <template v-if="typeof rack !== 'string' && rack.x !== undefined && rack.x !== null && rack.y !== undefined && rack.y !== null">
-            <g :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`">
+            <g :transform="`rotate(${rack?.rotation || 0}, ${getRackCenter(rack).x}, ${getRackCenter(rack).y})`">
               <rect
                   :x="rack.x"
                   :y="rack.y"
-                  :width="rackWidth"
-                  :height="rackHeight"
+                  :width="getRackDimensions(rack).width"
+                  :height="getRackDimensions(rack).height"
                   class="rack-rect"
                   :class="{
                     selected: selectedRackIndices.includes(tIdx),
@@ -635,19 +650,19 @@ defineExpose({svgRef});
 
               <line
                   :x1="rack.x + 1"
-                  :y1="rack.y + (rackHeight / 10) * 9"
-                  :x2="rack.x + (rackWidth - 1)"
-                  :y2="rack.y + (rackHeight / 10) * 9"
+                  :y1="rack.y + (getRackDimensions(rack).height / 10) * 9"
+                  :x2="rack.x + (getRackDimensions(rack).width - 1)"
+                  :y2="rack.y + (getRackDimensions(rack).height / 10) * 9"
                   class="rack-front-line"
               />
 
               <text
-                  :x="rack.x + rackWidth / 2"
-                  :y="rack.y + rackHeight / 2"
+                  :x="getRackCenter(rack).x"
+                  :y="getRackCenter(rack).y"
                   text-anchor="middle"
                   dominant-baseline="middle"
                   class="rack-label"
-                  :transform="`rotate(${- (rack?.rotation || 0)}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
+                  :transform="`rotate(${- (rack?.rotation || 0)}, ${getRackCenter(rack).x}, ${getRackCenter(rack).y})`"
               >
                 {{ rack.name }}
               </text>
@@ -656,9 +671,9 @@ defineExpose({svgRef});
                 <circle
                     v-for="(pos, pIdx) in [
                     {x: rack.x, y: rack.y},
-                    {x: rack.x + rackWidth, y: rack.y},
-                    {x: rack.x, y: rack.y + rackHeight},
-                    {x: rack.x + rackWidth, y: rack.y + rackHeight}
+                    {x: rack.x + getRackDimensions(rack).width, y: rack.y},
+                    {x: rack.x, y: rack.y + getRackDimensions(rack).height},
+                    {x: rack.x + getRackDimensions(rack).width, y: rack.y + getRackDimensions(rack).height}
                   ]"
                     :key="pIdx"
                     :cx="pos.x"

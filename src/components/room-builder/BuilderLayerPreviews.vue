@@ -15,7 +15,7 @@ import {computed, type ComputedRef, inject} from "vue";
 import {type ExposedFunctions, exposedFunctions} from "../RoomBuilder.vue";
 import {getContrastColor} from "../../utils/colors";
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const currentLayerIndex = defineModel<number>('currentLayerIndex');
 
@@ -35,6 +35,28 @@ const getFootprintCenter = (footprint: Footprint) => {
   return {
     x: (minX + maxX + 20) / 2,
     y: (minY + maxY + 20) / 2
+  };
+};
+
+const getRackDimensions = (rack: Rack) => {
+  let widthPx = (rack.width && rack.width > 0) ? Math.round(rack.width / 600 * 20) : props.rackWidth;
+  let heightPx = (rack.height && rack.height > 0) ? Math.round(rack.height / 600 * 20) : props.rackHeight;
+
+  const normRotation = ((rack.rotation || 0) % 360 + 360) % 360;
+  if (normRotation === 90 || normRotation === 270) {
+    const tmp = widthPx;
+    widthPx = heightPx;
+    heightPx = tmp;
+  }
+
+  return { width: widthPx, height: heightPx };
+};
+
+const getRackCenter = (rack: Rack) => {
+  const { width, height } = getRackDimensions(rack);
+  return {
+    x: (rack.x || 0) + width / 2,
+    y: (rack.y || 0) + height / 2
   };
 };
 </script>
@@ -139,13 +161,13 @@ const getFootprintCenter = (footprint: Footprint) => {
                 v-if="rack.x !== null && rack.x !== undefined && rack.y !== null && rack.y !== undefined"
                 :x="rack.x"
                 :y="rack.y"
-                :width="rackWidth"
-                :height="rackHeight"
+                :width="getRackDimensions(rack).width"
+                :height="getRackDimensions(rack).height"
                 fill="#004a99"
                 fill-opacity="0.6"
                 stroke="rgba(255, 255, 255, 0.4)"
                 stroke-width="1"
-                :transform="`rotate(${rack?.rotation || 0}, ${rack.x + rackWidth / 2}, ${rack.y + rackHeight / 2})`"
+                :transform="`rotate(${rack?.rotation || 0}, ${getRackCenter(rack).x}, ${getRackCenter(rack).y})`"
               />
             </template>
 

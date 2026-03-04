@@ -12,11 +12,12 @@ export const getRackDimensions = (rack: Rack) => {
 const getRackCorners = (rack: Rack) => {
   const x = rack.x || 0;
   const y = rack.y || 0;
+  const { w, h } = getRackDimensions(rack);
   return [
     { x, y },
-    { x: x + rackWidth, y },
-    { x, y: y + rackHeight },
-    { x: x + rackWidth, y: y + rackHeight }
+    { x: x + w, y },
+    { x, y: y + h },
+    { x: x + w, y: y + h }
   ];
 };
 
@@ -38,9 +39,10 @@ export const useRoomBuilderGeometry = () => {
         if (rotation) {
           const x = rack.x || 0;
           const y = rack.y || 0;
+          const { w, h } = getRackDimensions(rack);
           const angle = (rotation * Math.PI) / 180;
-          const cx = x + rackWidth / 2;
-          const cy = y + rackHeight / 2;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
 
           corners.forEach(corner => {
             const x = cx + (corner.x - cx) * Math.cos(angle) - (corner.y - cy) * Math.sin(angle);

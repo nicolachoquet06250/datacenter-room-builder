@@ -2,7 +2,7 @@ import {computed, ref} from "vue";
 import {useLayers} from "./useLayers.ts";
 import {useRoomBuilderHistory} from "./useRoomBuilderHistory.ts";
 import {useDrawRoomWalls} from "./useDrawRoomWalls.ts";
-import {rackHeight, rackWidth, useRoomBuilderGeometry} from "./useRoomBuilderGeometry.ts";
+import {getRackDimensions, rackHeight, rackWidth, useRoomBuilderGeometry} from "./useRoomBuilderGeometry.ts";
 import {useZoom} from "./useZoom.ts";
 import {SNAP_SIZE} from "../constants";
 
@@ -192,8 +192,9 @@ export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) 
         selectedRackIndices.value = [index];
 
         const rack = racks.value[index];
-        const centerX = (rack?.x ?? 0) + rackWidth / 2 + panOffset.value.x;
-        const centerY = (rack?.y ?? 0) + rackHeight / 2 + panOffset.value.y;
+        const { w, h } = getRackDimensions(rack!);
+        const centerX = (rack?.x ?? 0) + w / 2 + panOffset.value.x;
+        const centerY = (rack?.y ?? 0) + h / 2 + panOffset.value.y;
 
         startRotationAngle.value = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
         initialRackRotation.value = rack?.rotation || 0;
@@ -254,14 +255,16 @@ export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) 
 
     const rotateRack = (event: MouseEvent) => {
         const rack = racks.value[rotatingRack.value!];
-        const centerX = (rack?.x ?? 0) + (rackWidth ?? 0) / 2 + panOffset.value.x;
-        const centerY = (rack?.y ?? 0) + (rackHeight ?? 0) / 2 + panOffset.value.y;
+        if (!rack) return;
+        const { w, h } = getRackDimensions(rack);
+        const centerX = (rack.x ?? 0) + w / 2 + panOffset.value.x;
+        const centerY = (rack.y ?? 0) + h / 2 + panOffset.value.y;
 
         const currentAngle = Math.atan2(event.clientY / zoomLevel.value - centerY, event.clientX / zoomLevel.value - centerX);
         const deltaAngle = (currentAngle - startRotationAngle.value) * (180 / Math.PI);
 
         const rawRotation = (initialRackRotation.value + deltaAngle) % 360;
-        rack!.rotation = Math.round(rawRotation / 90) * 90;
+        rack.rotation = Math.round(rawRotation / 90) * 90;
     }
 
     const resetRackState = () => {

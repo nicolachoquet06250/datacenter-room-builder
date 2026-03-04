@@ -242,7 +242,9 @@
         "x": null,
         "y": null,
         "rotation": null,
-        "podId": "pod-1769443744398"
+        "podId": null,
+        "width": null,
+        "height": null
       },
       {
         "id": 2,
@@ -251,7 +253,9 @@
         "x": 600,
         "y": 360,
         "rotation": -90,
-        "podId": "pod-1769443744398"
+        "podId": null,
+        "width": 1200,
+        "height": 600
       }
     ],
     "pods": [

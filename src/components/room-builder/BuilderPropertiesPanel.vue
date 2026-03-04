@@ -49,7 +49,7 @@ import FootprintPanel from "../properties-panel/FootprintPanel.vue";
 import CircuitPanel from "../properties-panel/CircuitPanel.vue";
 import RoomPropertiesPanel from "../properties-panel/RoomPropertiesPanel.vue";
 import {useLayers} from "../../composables/useLayers.ts";
-import {useRoomBuilderGeometry, rackWidth, rackHeight} from "../../composables/useRoomBuilderGeometry.ts";
+import {useRoomBuilderGeometry, getRackDimensions} from "../../composables/useRoomBuilderGeometry.ts";
 import { SNAP_SIZE, GRID_SIZE } from "../../constants";
 
 const props = defineProps<Props>();
@@ -91,11 +91,12 @@ const coordLabel = computed(() => {
 
   // Front = bord du bas dans la référence non-rotée → coin avant gauche = bottom left
   const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
-  const cx = rack.x + rackWidth / 2;
-  const cy = rack.y + rackHeight / 2;
+  const { w, h } = getRackDimensions(rack);
+  const cx = rack.x + w / 2;
+  const cy = rack.y + h / 2;
 
-  const vblx = -rackWidth / 2;
-  const vbly = rackHeight / 2;
+  const vblx = -w / 2;
+  const vbly = h / 2;
   const rotVx = vblx * Math.cos(theta) - vbly * Math.sin(theta);
   const rotVy = vblx * Math.sin(theta) + vbly * Math.cos(theta);
 
@@ -207,10 +208,11 @@ const onCoordChange = (event: Event) => {
   const py = bbox.maxY - (rowIndex + 1) * GRID_SIZE;
 
   const theta = ((rack.rotation || 0) % 360) * Math.PI / 180;
+  const { w, h } = getRackDimensions(rack);
 
   // vecteur bottom-left en repère centré
-  const vblx = -rackWidth / 2;
-  const vbly = rackHeight / 2;
+  const vblx = -w / 2;
+  const vbly = h / 2;
   const rotVx = vblx * Math.cos(theta) - vbly * Math.sin(theta);
   const rotVy = vblx * Math.sin(theta) + vbly * Math.cos(theta);
 
@@ -219,8 +221,8 @@ const onCoordChange = (event: Event) => {
   const cy = py - rotVy;
 
   // Recalcul du top left à partir du centre
-  let x = cx - rackWidth / 2;
-  let y = cy - rackHeight / 2;
+  let x = cx - w / 2;
+  let y = cy - h / 2;
 
   // Snap sur la grille de 20 px
   x = Math.round(x / SNAP_SIZE) * SNAP_SIZE;
