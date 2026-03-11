@@ -54,6 +54,10 @@ type Emits = {
   (e: 'dragover-rack', event: DragEvent): void;
   (e: 'hover-rack', event: MouseEvent, rack: Rack): void;
   (e: 'leave-rack'): void;
+  (e: 'hover-footprint', event: MouseEvent, footprint: Footprint): void;
+  (e: 'leave-footprint'): void;
+  (e: 'hover-circuit', event: MouseEvent, footprint: Circuit): void;
+  (e: 'leave-circuit'): void;
 }
 </script>
 
@@ -222,6 +226,8 @@ defineExpose({svgRef});
                     :height="(footprint.height || 1200) / 600 * 20"
                     :fill="footprint.color"
                     fill-opacity="0.2"
+                    @mouseenter="$emit('hover-footprint', $event, footprint)"
+                    @mouseleave="$emit('leave-footprint')"
                 />
               <text
                   v-if="footprint.name"
@@ -270,6 +276,8 @@ defineExpose({svgRef});
                   fill="none"
                   stroke="#63b3ed"
                   stroke-width="2"
+                  @mouseenter="$emit('hover-circuit', $event, circuit)"
+                  @mouseleave="$emit('leave-circuit')"
               />
               <image
                   :x="circuit.x"
@@ -380,6 +388,8 @@ defineExpose({svgRef});
                   :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
                   stroke="white"
                   :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
+                  @mouseenter="$emit('hover-footprint', $event, footprint)"
+                  @mouseleave="$emit('leave-footprint')"
               />
               <text
                   v-if="footprint.name"
@@ -555,6 +565,8 @@ defineExpose({svgRef});
                   :class="{
                     selected: selectedCircuitIndices.includes(circuitIdx)
                   }"
+                  @mouseenter="$emit('hover-circuit', $event, circuit)"
+                  @mouseleave="$emit('leave-circuit')"
               />
               <image
                   :x="circuit.x"

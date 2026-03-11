@@ -622,6 +622,70 @@ const {
     setTimeout(adjustRackTooltipPosition, 0);
   }
 })
+const {
+  tooltip: footprintTooltip,
+  container: footprintTooltipContainer,
+  adjustTooltipPosition: adjustFootprintTooltipPosition,
+  showTooltip: showFootprintTooltip,
+  hideTooltip: hideFootprintTooltip,
+  hideTooltipImmediately: hideFootprintTooltipImmediately,
+  loadTooltip: loadFootprintTooltip,
+} = useSpecificTooltip('footprint', async (footprintId) => {
+  const url = `${props.itopTooltipUrl}&obj_class=FootPrint&obj_key=${footprintId}`;
+  const r = await fetch(url);
+  if (r.ok) {
+    footprintTooltip.value.content = await r.text();
+    // Attendre que le DOM soit mis à jour pour injecter les scripts et ajuster la position
+    setTimeout(() => {
+      adjustFootprintTooltipPosition();
+      if (footprintTooltipContainer.value) {
+        const scripts = footprintTooltipContainer.value.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          const newScript = document.createElement('script');
+          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+          newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+          oldScript.parentNode?.replaceChild(newScript, oldScript);
+        });
+      }
+    }, 100);
+  }
+  else {
+    footprintTooltip.value.content = 'Erreur lors du chargement du tooltip';
+    setTimeout(adjustFootprintTooltipPosition, 0);
+  }
+})
+const {
+  tooltip: circuitTooltip,
+  container: circuitTooltipContainer,
+  adjustTooltipPosition: adjustCircuitTooltipPosition,
+  showTooltip: showCircuitTooltip,
+  hideTooltip: hideCircuitTooltip,
+  hideTooltipImmediately: hideCircuitTooltipImmediately,
+  loadTooltip: loadCircuitTooltip,
+} = useSpecificTooltip('circuit', async (circuitId) => {
+  const url = `${props.itopTooltipUrl}&obj_class=CircuitElec&obj_key=${circuitId}`;
+  const r = await fetch(url);
+  if (r.ok) {
+    circuitTooltip.value.content = await r.text();
+    // Attendre que le DOM soit mis à jour pour injecter les scripts et ajuster la position
+    setTimeout(() => {
+      adjustCircuitTooltipPosition();
+      if (circuitTooltipContainer.value) {
+        const scripts = circuitTooltipContainer.value.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          const newScript = document.createElement('script');
+          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+          newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+          oldScript.parentNode?.replaceChild(newScript, oldScript);
+        });
+      }
+    }, 100);
+  }
+  else {
+    circuitTooltip.value.content = 'Erreur lors du chargement du tooltip';
+    setTimeout(adjustCircuitTooltipPosition, 0);
+  }
+})
 
 const roomName = ref(props.roomName);
 const isDrawingCircuit = ref(false);
@@ -640,6 +704,32 @@ const onHoverRack = async (event: MouseEvent, rack: Rack) => {
   await loadRackTooltip(rack.id);
 
   showRackTooltip(
+      event.clientX + 10,
+      event.clientY + 10
+  );
+};
+
+const onHoverFootprint = async (event: MouseEvent, footprint: Footprint) => {
+  if (!props.useItopForm) return;
+
+  clearTooltipTimer();
+
+  await loadFootprintTooltip(footprint.id);
+
+  showFootprintTooltip(
+      event.clientX + 10,
+      event.clientY + 10
+  );
+};
+
+const onHoverCircuit = async (event: MouseEvent, circuit: Circuit) => {
+  if (!props.useItopForm) return;
+
+  clearTooltipTimer();
+
+  await loadCircuitTooltip(circuit.id);
+
+  showCircuitTooltip(
       event.clientX + 10,
       event.clientY + 10
   );
@@ -773,7 +863,11 @@ const isInteracting = computed(() =>
 );
 
 watch(isPanning, (v) => {
-  if (v) hideRackTooltipImmediately();
+  if (v) {
+    hideRackTooltipImmediately();
+    hideFootprintTooltipImmediately();
+    hideCircuitTooltipImmediately();
+  }
 });
 
 const onRemoveRack = (index: number) => {
@@ -1380,6 +1474,8 @@ const ensureElementsInsideWalls = () => {
 
 const deselect = (event: MouseEvent) => {
   hideRackTooltipImmediately();
+  hideFootprintTooltipImmediately();
+  hideCircuitTooltipImmediately();
   if (isDrawingPillar.value) {
     if (event.button !== 0) return;
     const svg = canvasComponent.value?.svgRef;
@@ -1838,6 +1934,10 @@ provide<ExposedFunctions>(exposedFunctions, {
           @drop-rack="onDropRack"
           @hover-rack="onHoverRack"
           @leave-rack="hideRackTooltip"
+          @hover-footprint="onHoverFootprint"
+          @leave-footprint="hideFootprintTooltip"
+          @hover-circuit="onHoverCircuit"
+          @leave-circuit="hideCircuitTooltip"
       >
         <template #loader>
           <slot name="loader" />
@@ -1891,6 +1991,28 @@ provide<ExposedFunctions>(exposedFunctions, {
 
             @enter-tooltip="clearTooltipTimer"
             @leave-tooltip="hideRackTooltip"
+        />
+
+        <Tooltip
+            v-if="footprintTooltip.show"
+            name="footprint"
+            v-bind="tooltip"
+            :content="footprintTooltip.content"
+            :loading="footprintTooltip.loading"
+
+            @enter-tooltip="clearTooltipTimer"
+            @leave-tooltip="hideFootprintTooltip"
+        />
+
+        <Tooltip
+            v-if="circuitTooltip.show"
+            name="circuit"
+            v-bind="tooltip"
+            :content="circuitTooltip.content"
+            :loading="circuitTooltip.loading"
+
+            @enter-tooltip="clearTooltipTimer"
+            @leave-tooltip="hideCircuitTooltip"
         />
       </teleport>
 
