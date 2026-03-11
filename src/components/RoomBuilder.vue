@@ -19,7 +19,8 @@ type Props = {
   isDataLoading?: boolean,
   language?: string,
   langKeys?: string,
-  footprintColors?: string
+  footprintColors?: string,
+  withLayerPreview?: boolean
 }
 
 type Emits = {
@@ -148,7 +149,8 @@ const props = withDefaults(
         'FloorPlanBuilder:Panels:RackToSetPosition:MissingPositionAndRotation': 'Position/Rotation manquante',
       }
     }),
-    footprintColors: '[]'
+    footprintColors: '[]',
+    withLayerPreview: false
   }
 );
 
@@ -2055,17 +2057,35 @@ provide<ExposedFunctions>(exposedFunctions, {
           @clear-walls="triggerClearWalls"
       />
 
-      <BuilderLayerPreviews
-          v-if="shouldShowLayers && !isDataLoading"
-          v-model:current-layer-index="currentLayerIndex"
-          :layers="layers"
-          :viewport-rect="viewportRect"
-          :rack-width="rackWidth"
-          :rack-height="rackHeight"
-          :is-drawing-walls="isDrawingWalls"
-          :wall-preview-point="wallPreviewPoint"
-          :is-drawing-circuit="isDrawingCircuit"
-      />
+      <template v-if="shouldShowLayers && !isDataLoading">
+        <div
+            v-if="!withLayerPreview"
+            class="layer-dropdown-container"
+        >
+          <select v-model="currentLayerIndex" class="layer-dropdown">
+            <option
+                v-for="(layer, index) in (layers as Layer[])"
+                :key="`layer-option-${layer.id}`"
+                :value="index"
+            >
+              {{ langKeys[layer.name] }}
+            </option>
+          </select>
+        </div>
+
+        <BuilderLayerPreviews
+            v-else
+            v-model:current-layer-index="currentLayerIndex"
+            :layers="layers"
+            :viewport-rect="viewportRect"
+            :rack-width="rackWidth"
+            :rack-height="rackHeight"
+            :is-drawing-walls="isDrawingWalls"
+            :wall-preview-point="wallPreviewPoint"
+            :is-drawing-circuit="isDrawingCircuit"
+        />
+      </template>
+
 
       <UnplacedRacksSidebar
           v-if="incompleteRacks.length > 0 && shouldShowLayers && currentLayerIndex === 3"
@@ -2112,5 +2132,27 @@ provide<ExposedFunctions>(exposedFunctions, {
   background: #004a99; /* Bleu iTop Designer */
   border-bottom-right-radius: v-bind(radius);
   border-bottom-left-radius: v-bind(radius);
+}
+
+.layer-dropdown-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1;
+}
+
+.layer-dropdown {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: white;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+  outline: none;
+}
+
+.layer-dropdown:focus {
+  border-color: #004a99;
 }
 </style>
