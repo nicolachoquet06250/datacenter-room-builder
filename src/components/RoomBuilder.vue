@@ -596,6 +596,7 @@ const {
   adjustTooltipPosition: adjustRackTooltipPosition,
   showTooltip: showRackTooltip,
   hideTooltip: hideRackTooltip,
+  hideTooltipImmediately: hideRackTooltipImmediately,
   loadTooltip: loadRackTooltip,
 } = useSpecificTooltip<number>('rack', async (rackId) => {
   const url = `${props.itopTooltipUrl}&obj_class=Rack&obj_key=${rackId}`;
@@ -770,6 +771,10 @@ const isInteracting = computed(() =>
     isSelecting.value ||
     contextMenu.value.show
 );
+
+watch(isPanning, (v) => {
+  if (v) hideRackTooltipImmediately();
+});
 
 const onRemoveRack = (index: number) => {
   triggerConfirm({
@@ -1374,6 +1379,7 @@ const ensureElementsInsideWalls = () => {
 };
 
 const deselect = (event: MouseEvent) => {
+  hideRackTooltipImmediately();
   if (isDrawingPillar.value) {
     if (event.button !== 0) return;
     const svg = canvasComponent.value?.svgRef;

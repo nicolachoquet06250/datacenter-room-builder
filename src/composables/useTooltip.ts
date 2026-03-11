@@ -102,8 +102,14 @@ export const useSpecificTooltip = <T extends string|number>(
                 tooltip.value.show = false;
                 specificTooltips[name]!.value.show = false;
                 specificTooltips[name]!.value.content = '';
-                tooltip.value.timer = null;
+                clearTooltipTimer();
             }, 300) as unknown as number;
+        },
+        hideTooltipImmediately: () => {
+            clearTooltipTimer();
+            tooltip.value.show = false;
+            specificTooltips[name]!.value.show = false;
+            specificTooltips[name]!.value.content = '';
         }
     };
-}
+};

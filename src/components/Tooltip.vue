@@ -42,6 +42,7 @@ watch([tooltipContainer, tooltipRef], () => {
       :style="{top, left, backgroundColor, padding}"
       @mouseenter="$emit('enter-tooltip', $event)"
       @mouseleave="$emit('leave-tooltip', $event)"
+      @mousedown.stop
   >
     <div v-if="loading" class="tooltip-loader">Chargement...</div>
     <div v-else ref="tooltipContainer" v-html="content"></div>
