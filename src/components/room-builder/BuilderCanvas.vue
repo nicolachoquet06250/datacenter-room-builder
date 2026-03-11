@@ -672,17 +672,39 @@ defineExpose({svgRef});
               </text>
 
               <template v-if="selectedRackIndices.length === 1 && selectedRackIndices[0] === tIdx">
-                <circle
-                    v-for="(pos, pIdx) in [
-                    {x: rack.x, y: rack.y},
-                    {x: rack.x + getRackDimensions(rack).width, y: rack.y},
-                    {x: rack.x, y: rack.y + getRackDimensions(rack).height},
-                    {x: rack.x + getRackDimensions(rack).width, y: rack.y + getRackDimensions(rack).height}
-                  ]"
-                    :key="pIdx"
-                    :cx="pos.x"
-                    :cy="pos.y"
-                    r="6"
+                <!-- Coin Haut-Gauche -->
+                <path
+                    :d="`M ${rack.x + 10} ${rack.y} L ${rack.x} ${rack.y} L ${rack.x} ${rack.y + 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="3"
+                    class="rotation-handle rack"
+                    @mousedown="$emit('start-rotate', $event, tIdx)"
+                />
+                <!-- Coin Haut-Droite -->
+                <path
+                    :d="`M ${rack.x + getRackDimensions(rack).width - 10} ${rack.y} L ${rack.x + getRackDimensions(rack).width} ${rack.y} L ${rack.x + getRackDimensions(rack).width} ${rack.y + 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="3"
+                    class="rotation-handle rack"
+                    @mousedown="$emit('start-rotate', $event, tIdx)"
+                />
+                <!-- Coin Bas-Gauche -->
+                <path
+                    :d="`M ${rack.x} ${rack.y + getRackDimensions(rack).height - 10} L ${rack.x} ${rack.y + getRackDimensions(rack).height} L ${rack.x + 10} ${rack.y + getRackDimensions(rack).height}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="3"
+                    class="rotation-handle rack"
+                    @mousedown="$emit('start-rotate', $event, tIdx)"
+                />
+                <!-- Coin Bas-Droite -->
+                <path
+                    :d="`M ${rack.x + getRackDimensions(rack).width - 10} ${rack.y + getRackDimensions(rack).height} L ${rack.x + getRackDimensions(rack).width} ${rack.y + getRackDimensions(rack).height} L ${rack.x + getRackDimensions(rack).width} ${rack.y + getRackDimensions(rack).height - 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="3"
                     class="rotation-handle rack"
                     @mousedown="$emit('start-rotate', $event, tIdx)"
                 />
@@ -832,7 +854,13 @@ defineExpose({svgRef});
   stroke: #ff4500;
   stroke-width: 1.5;
 
-  &.rack, &.footprint {
+  &.rack {
+    cursor: alias;
+    stroke-width: 3;
+    pointer-events: visibleStroke;
+  }
+
+  &.footprint {
     cursor: alias;
   }
 }
