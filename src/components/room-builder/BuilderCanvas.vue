@@ -52,6 +52,8 @@ type Emits = {
   (e: 'start-rotate-footprint', event: MouseEvent, id: string): void;
   (e: 'drop-rack', event: DragEvent): void;
   (e: 'dragover-rack', event: DragEvent): void;
+  (e: 'hover-rack', event: MouseEvent, rack: Rack): void;
+  (e: 'leave-rack'): void;
 }
 </script>
 
@@ -638,6 +640,8 @@ defineExpose({svgRef});
                   }"
                   @mousedown="$emit('start-drag', $event, tIdx)"
                   @contextmenu="$emit('open-context-menu', $event, tIdx)"
+                  @mouseenter="$emit('hover-rack', $event, rack)"
+                  @mouseleave="$emit('leave-rack')"
               />
 
               <image

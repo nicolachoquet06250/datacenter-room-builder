@@ -15,6 +15,7 @@ type Props = {
   disableAddRacks?: boolean
   useItopForm?: boolean
   itopCreateRackUrl?: string,
+  itopTooltipUrl?: string,
   isDataLoading?: boolean,
   language?: string,
   langKeys?: string,
@@ -34,6 +35,7 @@ type Emits = {
 import 'simple-notify/dist/simple-notify.css';
 import {computed, onMounted, onUnmounted, provide, ref, useTemplateRef, watch, watchEffect} from 'vue';
 import Modal from './Modal.vue';
+import Tooltip from './Tooltip.vue';
 import {
   BuilderToolbar, BuilderCanvas,
   BuilderContextMenu, BuilderPropertiesPanel,
@@ -55,6 +57,7 @@ import {useModal} from "../composables/useModal.ts";
 import {colors, useFootprints} from "../composables/useFootprints.ts";
 import {useWallResizer} from "../composables/useWallResizer.ts";
 import {usePillars} from "../composables/usePillars.ts";
+import {clearTooltipTimer, useSpecificTooltip, useTooltip} from "../composables/useTooltip.ts";
 import {SNAP_SIZE, GRID_SIZE} from "../constants";
 
 const props = withDefaults(
@@ -65,6 +68,7 @@ const props = withDefaults(
     disableAddRacks: false,
     useItopForm: false,
     itopCreateRackUrl: '/pages/UI.php?route=linkset.create_linked_object',
+    itopTooltipUrl: '/pages/UI.php?route=object.summary',
     isDataLoading: false,
     language: 'FR FR',
     langKeys: JSON.stringify({
@@ -574,12 +578,49 @@ const {
     selectedUnits
 );
 
-const {pods, createPod, selectPod, leavePod, deletePod} = usePodsCrud(props.roomId);
+const {
+  pods,
+  createPod, selectPod,
+  leavePod, deletePod
+} = usePodsCrud(props.roomId);
 
 const {
   showModal, modalConfig,
   triggerConfirm, cancelModal
 } = useModal();
+
+const tooltip = useTooltip();
+const {
+  tooltip: rackTooltip,
+  container: rackTooltipContainer,
+  adjustTooltipPosition: adjustRackTooltipPosition,
+  showTooltip: showRackTooltip,
+  hideTooltip: hideRackTooltip,
+  loadTooltip: loadRackTooltip,
+} = useSpecificTooltip('rack', async (rackId) => {
+  const url = `${props.itopTooltipUrl}&obj_class=Rack&obj_key=${rackId}`;
+  const r = await fetch(url);
+  if (r.ok) {
+    rackTooltip.value.content = await r.text();
+    // Attendre que le DOM soit mis à jour pour injecter les scripts et ajuster la position
+    setTimeout(() => {
+      adjustRackTooltipPosition();
+      if (rackTooltipContainer.value) {
+        const scripts = rackTooltipContainer.value.querySelectorAll('script');
+        scripts.forEach(oldScript => {
+          const newScript = document.createElement('script');
+          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+          newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+          oldScript.parentNode?.replaceChild(newScript, oldScript);
+        });
+      }
+    }, 100);
+  }
+  else {
+    rackTooltip.value.content = 'Erreur lors du chargement du tooltip';
+    setTimeout(adjustRackTooltipPosition, 0);
+  }
+})
 
 const roomName = ref(props.roomName);
 const isDrawingCircuit = ref(false);
@@ -589,6 +630,19 @@ const draggingCircuitStart = ref<Point>({x: 0, y: 0});
 const rotatingCircuitIndex = ref<number | null>(null);
 const startRotationAngle = ref(0);
 const initialCircuitRotation = ref(0);
+
+const onHoverRack = async (event: MouseEvent, rack: Rack) => {
+  if (!props.useItopForm) return;
+
+  clearTooltipTimer();
+
+  await loadRackTooltip(rack.id);
+
+  showRackTooltip(
+      event.clientX + 10,
+      event.clientY + 10
+  );
+};
 
 const radius = computed(() => `${props.radius}px`);
 
@@ -1776,6 +1830,8 @@ provide<ExposedFunctions>(exposedFunctions, {
           @start-rotate-footprint="onStartRotateFootprint"
           @dragover-rack="onDragOverRack"
           @drop-rack="onDropRack"
+          @hover-rack="onHoverRack"
+          @leave-rack="hideRackTooltip"
       >
         <template #loader>
           <slot name="loader" />
@@ -1818,6 +1874,17 @@ provide<ExposedFunctions>(exposedFunctions, {
 
             @cancel="cancelItopFormModal"
             @confirm="confirmItopFormModal"
+        />
+
+        <Tooltip
+            v-if="tooltip.show"
+            name="rack"
+            v-bind="tooltip"
+            :content="rackTooltip.content"
+            :loading="rackTooltip.loading"
+
+            @enter-tooltip="clearTooltipTimer"
+            @leave-tooltip="hideRackTooltip"
         />
       </teleport>
 
