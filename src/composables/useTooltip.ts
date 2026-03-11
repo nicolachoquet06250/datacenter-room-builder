@@ -41,9 +41,9 @@ const adjustTooltipPosition = (name: string) => {
     }
 };
 
-export const useSpecificTooltip = (
+export const useSpecificTooltip = <T extends string|number>(
     name : string,
-    loaderFn?: (itemId: number) => Promise<void|never>
+    loaderFn?: (itemId: T) => Promise<void|never>
 ) => {
     if (!specificTooltips[name]) {
         specificTooltips[name] = ref<{
@@ -64,7 +64,7 @@ export const useSpecificTooltip = (
         ref: specificTooltipsRefs[name]!,
         container: specificTooltipsContainers[name]!,
         adjustTooltipPosition: () => adjustTooltipPosition(name),
-        loadTooltip: async (itemId: number) => {
+        loadTooltip: async (itemId: T) => {
             // Ajustement initial de la position (sera affiné après chargement/rendu)
             setTimeout(() => adjustTooltipPosition(name), 0);
 

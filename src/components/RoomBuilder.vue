@@ -597,7 +597,7 @@ const {
   showTooltip: showRackTooltip,
   hideTooltip: hideRackTooltip,
   loadTooltip: loadRackTooltip,
-} = useSpecificTooltip('rack', async (rackId) => {
+} = useSpecificTooltip<number>('rack', async (rackId) => {
   const url = `${props.itopTooltipUrl}&obj_class=Rack&obj_key=${rackId}`;
   const r = await fetch(url);
   if (r.ok) {
@@ -1877,7 +1877,7 @@ provide<ExposedFunctions>(exposedFunctions, {
         />
 
         <Tooltip
-            v-if="tooltip.show"
+            v-if="rackTooltip.show"
             name="rack"
             v-bind="tooltip"
             :content="rackTooltip.content"
