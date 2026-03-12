@@ -11,7 +11,7 @@ const emit = defineEmits<{
   (e: 'drag-start', event: DragEvent, circuit: Circuit): void;
 }>();
 
-const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
+const itop_url = import.meta.env.VITE_ITOP_BASE_URL ?? window.location.protocol+'//'+window.location.hostname+(window.location.port ? ':' + window.location.port : '');
 const circuitWidth = 40;
 const circuitHeight = 40;
 

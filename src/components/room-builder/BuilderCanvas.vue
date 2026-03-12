@@ -1,7 +1,7 @@
 <script lang="ts">
 const circuitWidth = 40;
 const circuitHeight = 40;
-const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
+const itop_url = import.meta.env.VITE_ITOP_BASE_URL ?? window.location.protocol+'//'+window.location.hostname+(window.location.port ? ':' + window.location.port : '');
 
 type Props = {
   layers: Layer[];
@@ -31,6 +31,7 @@ type Props = {
   selectedFootprintId: string | null;
   selectedCircuitIndices: number[];
   isDataLoading: boolean;
+  useItopForm: boolean;
 }
 
 type Emits = {
@@ -309,7 +310,7 @@ defineExpose({svgRef});
                 :width="getRackDimensions(rack).width"
                 :height="getRackDimensions(rack).height"
                 class="rack-rect"
-                :class="{ grouped: rack.podId }"
+                :class="{ grouped: rack.podId, [`status-${rack.status}`]: useItopForm }"
             />
             <image
                 :x="rack.x + 2"
@@ -354,7 +355,6 @@ defineExpose({svgRef});
             style="pointer-events: none;"
         />
 
-
         <polygon
             v-if="!isDrawingWalls && walls.length > 2"
             :points="walls.map(p => `${p.x},${p.y}`).join(' ')"
@@ -369,8 +369,6 @@ defineExpose({svgRef});
             stroke-linejoin="round"
             :style="{ pointerEvents: isDrawingPillar ? 'none' : 'auto' }"
         />
-<!--        Pour la création de footprints à la volée depuis l'interface -->
-<!--        @mousedown.stop="(!isDrawingPillar && !isDrawingWalls) && $emit('select-wall', $event)"-->
 
         <g v-if="currentLayerIndex === 2 && layers[2]?.footprints" class="footprints-layer">
           <g v-for="footprint in layers[2].footprints" :key="footprint.id"
@@ -562,9 +560,7 @@ defineExpose({svgRef});
                   :width="circuitWidth"
                   :height="circuitHeight"
                   class="circuit-rect"
-                  :class="{
-                    selected: selectedCircuitIndices.includes(circuitIdx)
-                  }"
+                  :class="{selected: selectedCircuitIndices.includes(circuitIdx)}"
                   @mouseenter="$emit('hover-circuit', $event, circuit)"
                   @mouseleave="$emit('leave-circuit')"
               />
@@ -597,7 +593,6 @@ defineExpose({svgRef});
             </g>
           </template>
         </g>
-
 
         <rect
             v-for="pod in podBoundaries"
@@ -648,7 +643,8 @@ defineExpose({svgRef});
                   class="rack-rect"
                   :class="{
                     selected: selectedRackIndices.includes(tIdx),
-                    grouped: rack.podId
+                    grouped: rack.podId,
+                    [`status-${rack.status}`]: useItopForm
                   }"
                   @mousedown="$emit('start-drag', $event, tIdx)"
                   @contextmenu="$emit('open-context-menu', $event, tIdx)"
@@ -774,19 +770,19 @@ defineExpose({svgRef});
   cursor: grab;
   user-select: none;
   display: block;
-}
 
-.canvas-svg:active {
-  cursor: grabbing;
-}
+  &:active {
+    cursor: grabbing;
+  }
 
-.canvas-svg.interacting {
-  cursor: grabbing;
-}
+  &.interacting {
+    cursor: grabbing;
+  }
 
-.canvas-svg.drawing-walls,
-.canvas-svg.drawing-pillar {
-  cursor: crosshair !important;
+  &.drawing-walls,
+  &.drawing-pillar {
+    cursor: crosshair !important;
+  }
 }
 
 .rack-rect {
@@ -794,12 +790,43 @@ defineExpose({svgRef});
   stroke: #007bff;
   stroke-width: 1;
   cursor: move;
-}
 
-.rack-rect.selected {
-  stroke: #ff4500;
-  stroke-width: 2;
-  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  &.selected {
+    stroke: #ff4500;
+    stroke-width: 2;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  }
+
+  &.grouped {
+    fill: #e8f4fd;
+    stroke: #3498db;
+
+    &.selected {
+      stroke: #ff4500;
+    }
+  }
+
+  &.status-reserved_without_customer {
+    fill: #FF8C00;
+  }
+
+  &.status-in_production_with_customer {
+    fill: #006400;
+    ~ text {
+      fill: #ffffff;
+    }
+  }
+
+  &.status-in_production_without_customer {
+    fill: #ffffff;
+  }
+
+  &.status-other {
+    fill: #4b5563;
+    ~ text {
+      fill: #ffffff;
+    }
+  }
 }
 
 .room-surface {
@@ -807,25 +834,16 @@ defineExpose({svgRef});
   stroke: rgba(255, 255, 255, 0.5);
   stroke-width: 1;
   cursor: pointer;
-}
 
-.room-surface.layer-footprints {
-  pointer-events: all;
-}
+  &.layer-footprints {
+    pointer-events: all;
+  }
 
-.room-surface.selected {
-  fill: rgba(255, 69, 0, 0.15);
-  stroke: #ff4500;
-  stroke-width: 2;
-}
-
-.rack-rect.grouped {
-  fill: #e8f4fd;
-  stroke: #3498db;
-}
-
-.rack-rect.grouped.selected {
-  stroke: #ff4500;
+  &.selected {
+    fill: rgba(255, 69, 0, 0.15);
+    stroke: #ff4500;
+    stroke-width: 2;
+  }
 }
 
 .pod-rect {
@@ -836,16 +854,16 @@ defineExpose({svgRef});
   cursor: pointer;
   pointer-events: all;
   transition: fill 0.2s;
-}
 
-.pod-rect:hover {
-  fill: rgba(255, 0, 0, 0.1);
-}
+  &:hover {
+    fill: rgba(255, 0, 0, 0.1);
+  }
 
-.pod-rect.selected {
-  stroke: #ff4500;
-  fill: rgba(255, 69, 0, 0.1);
-  stroke-dasharray: none;
+  &.selected {
+    stroke: #ff4500;
+    fill: rgba(255, 69, 0, 0.1);
+    stroke-dasharray: none;
+  }
 }
 
 .coord-text {
@@ -898,19 +916,6 @@ defineExpose({svgRef});
   pointer-events: none;
 }
 
-.circuit-line {
-  pointer-events: none;
-  stroke: #63b3ed;
-}
-
-.circuit-segment {
-  pointer-events: stroke;
-  stroke: #63b3ed;
-  stroke-width: 3;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
 .circuit-rect.selected {
   stroke: #ff4500;
   stroke-width: 2;
@@ -918,21 +923,22 @@ defineExpose({svgRef});
 
 .footprint-group {
   cursor: move;
-}
 
-.footprint-group.selected rect {
-  stroke: #2563eb;
-  stroke-width: 1.5;
-}
-.footprint-group.draggable {
-  cursor: move;
+  &.selected rect {
+    stroke: #2563eb;
+    stroke-width: 1.5;
+  }
+
+  &.draggable {
+    cursor: move;
+  }
 }
 
 .pillar-rect {
   cursor: crosshair;
-}
 
-.pillar-rect.inactive {
-  cursor: default;
+  &.inactive {
+    cursor: default;
+  }
 }
 </style>

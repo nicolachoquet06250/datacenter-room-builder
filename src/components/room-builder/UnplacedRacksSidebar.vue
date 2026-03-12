@@ -12,7 +12,7 @@ const emit = defineEmits<{
   (e: 'drag-start', event: DragEvent, rack: Rack): void;
 }>();
 
-const itop_url = import.meta.env.VITE_ITOP_BASE_URL;
+const itop_url = import.meta.env.VITE_ITOP_BASE_URL ?? window.location.protocol+'//'+window.location.hostname+(window.location.port ? ':' + window.location.port : '');
 
 const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() => ({})))
 

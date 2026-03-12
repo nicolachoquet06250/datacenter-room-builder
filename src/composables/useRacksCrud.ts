@@ -83,7 +83,8 @@ export const useRacksCrud = (roomId: number, externalTakeSnapshot?: () => void) 
             name: `Rack ${racks.value.length + 1}`,
             x: startX,
             y: startY,
-            rotation: 0
+            rotation: 0,
+            status: RackStatus.OTHER
         });
         selectedRackIndices.value = [racks.value.length - 1];
     };

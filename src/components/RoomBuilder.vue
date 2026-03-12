@@ -60,6 +60,7 @@ import {useWallResizer} from "../composables/useWallResizer.ts";
 import {usePillars} from "../composables/usePillars.ts";
 import {clearTooltipTimer, useSpecificTooltip, useTooltip} from "../composables/useTooltip.ts";
 import {SNAP_SIZE, GRID_SIZE} from "../constants";
+import BuilderLayerDropdown from "./room-builder/BuilderLayerDropdown.vue";
 
 const props = withDefaults(
   defineProps<Props>(),
@@ -1839,6 +1840,39 @@ provide<ExposedFunctions>(exposedFunctions, {
   getPodBoundaries,
   getGridLabel
 })
+
+const tooltips = computed(() => [
+  {
+    props: {
+      name: 'rack',
+      ...tooltip.value,
+      ...rackTooltip.value
+    },
+    events: {
+      hideTooltip: hideRackTooltip
+    }
+  },
+  {
+    props: {
+      name: 'footprint',
+      ...tooltip.value,
+      ...footprintTooltip.value
+    },
+    events: {
+      hideTooltip: hideFootprintTooltip
+    }
+  },
+  {
+    props: {
+      name: 'circuit',
+      ...tooltip.value,
+      ...circuitTooltip.value
+    },
+    events: {
+      hideTooltip: hideCircuitTooltip
+    }
+  },
+]);
 </script>
 
 <template>
@@ -1915,6 +1949,7 @@ provide<ExposedFunctions>(exposedFunctions, {
           :selected-circuit-indices="selectedCircuitIndices"
           :pillar-preview-point="pillarPreviewPoint"
           :is-data-loading="isDataLoading"
+          :use-itop-form="useItopForm"
 
           @deselect="deselect"
           @mousemove-svg="onMouseMoveSVG"
@@ -1971,7 +2006,6 @@ provide<ExposedFunctions>(exposedFunctions, {
           @cancel="cancelModal"
       />
 
-      <!-- Modale alternative pour iTop -->
       <teleport to="body">
         <Modal
             title="Créer un Rack"
@@ -1984,38 +2018,15 @@ provide<ExposedFunctions>(exposedFunctions, {
             @confirm="confirmItopFormModal"
         />
 
-        <Tooltip
-            v-if="rackTooltip.show"
-            name="rack"
-            v-bind="tooltip"
-            :content="rackTooltip.content"
-            :loading="rackTooltip.loading"
+        <template v-for="t in tooltips" :key="t.props.name">
+          <Tooltip
+              v-if="t.props.show"
+              v-bind="t.props"
 
-            @enter-tooltip="clearTooltipTimer"
-            @leave-tooltip="hideRackTooltip"
-        />
-
-        <Tooltip
-            v-if="footprintTooltip.show"
-            name="footprint"
-            v-bind="tooltip"
-            :content="footprintTooltip.content"
-            :loading="footprintTooltip.loading"
-
-            @enter-tooltip="clearTooltipTimer"
-            @leave-tooltip="hideFootprintTooltip"
-        />
-
-        <Tooltip
-            v-if="circuitTooltip.show"
-            name="circuit"
-            v-bind="tooltip"
-            :content="circuitTooltip.content"
-            :loading="circuitTooltip.loading"
-
-            @enter-tooltip="clearTooltipTimer"
-            @leave-tooltip="hideCircuitTooltip"
-        />
+              @enter-tooltip="clearTooltipTimer"
+              @leave-tooltip="t.events.hideTooltip"
+          />
+        </template>
       </teleport>
 
       <BuilderPropertiesPanel
@@ -2058,23 +2069,8 @@ provide<ExposedFunctions>(exposedFunctions, {
       />
 
       <template v-if="shouldShowLayers && !isDataLoading">
-        <div
-            v-if="!withLayerPreview"
-            class="layer-dropdown-container"
-        >
-          <select v-model="currentLayerIndex" class="layer-dropdown">
-            <option
-                v-for="(layer, index) in (layers as Layer[])"
-                :key="`layer-option-${layer.id}`"
-                :value="index"
-            >
-              {{ langKeys[layer.name] }}
-            </option>
-          </select>
-        </div>
-
         <BuilderLayerPreviews
-            v-else
+            v-if="withLayerPreview"
             v-model:current-layer-index="currentLayerIndex"
             :layers="layers"
             :viewport-rect="viewportRect"
@@ -2084,8 +2080,15 @@ provide<ExposedFunctions>(exposedFunctions, {
             :wall-preview-point="wallPreviewPoint"
             :is-drawing-circuit="isDrawingCircuit"
         />
-      </template>
 
+        <BuilderLayerDropdown
+            v-else
+            v-if="!withLayerPreview"
+            :layers="layers"
+            :lang-keys="langKeys"
+            v-model:current-layer-index="currentLayerIndex"
+        />
+      </template>
 
       <UnplacedRacksSidebar
           v-if="incompleteRacks.length > 0 && shouldShowLayers && currentLayerIndex === 3"
@@ -2132,27 +2135,5 @@ provide<ExposedFunctions>(exposedFunctions, {
   background: #004a99; /* Bleu iTop Designer */
   border-bottom-right-radius: v-bind(radius);
   border-bottom-left-radius: v-bind(radius);
-}
-
-.layer-dropdown-container {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 1;
-}
-
-.layer-dropdown {
-  padding: 8px 12px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  background: white;
-  font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  cursor: pointer;
-  outline: none;
-}
-
-.layer-dropdown:focus {
-  border-color: #004a99;
 }
 </style>

@@ -1,4 +1,11 @@
 declare global {
+  export enum RackStatus {
+    RESERVED_WITH_CUSTOMER = 'reserved_with_customer',
+    IN_PRODUCTION_WITH_CUSTOMER = 'in_production_with_customer',
+    IN_PRODUCTION_WITHOUT_CUSTOMER = 'in_production_without_customer',
+    OTHER = 'other',
+  }
+
   export interface Rack {
     id: number;
     roomId: number;
@@ -9,6 +16,7 @@ declare global {
     podId?: string | null;
     width?: number | null;
     height?: number | null;
+    status: RackStatus;
   }
 
   export interface Pod {

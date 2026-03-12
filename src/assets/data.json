@@ -244,7 +244,8 @@
         "rotation": null,
         "podId": null,
         "width": null,
-        "height": null
+        "height": null,
+        "status": "reserved_with_customer"
       },
       {
         "id": 2,
@@ -255,7 +256,8 @@
         "rotation": -90,
         "podId": null,
         "width": 1200,
-        "height": 600
+        "height": 600,
+        "status": "in_production_with_customer"
       }
     ],
     "pods": [
