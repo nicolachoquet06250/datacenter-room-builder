@@ -37,13 +37,13 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 <template>
   <div>
     <div class="panel-header">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>
       <h3>{{ langs['FloorPlanBuilder:Panels:Footprints:Title'] }}</h3>
     </div>
 
     <div class="property-info">
       <span class="info-label">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3H3v18h18V3zM8 6h8v2H8V6zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3H3v18h18V3zM8 6h8v2H8V6zm0 4h8v2H8v-2zm0 4h5v2H8v-2z"/></svg>
         ID
       </span>
       <span class="info-value">{{ footprint.id }}</span>
@@ -62,7 +62,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
     <div class="property-info">
       <span class="info-label">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12l-1.41-1.41L13 17.17V3h-2v14.17l-6.59-6.58L3 12l9 9 9-9z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12l-1.41-1.41L13 17.17V3h-2v14.17l-6.59-6.58L3 12l9 9 9-9z"/></svg>
         {{ langs['FloorPlanBuilder:Panels:Footprints:Units'] }}
       </span>
       <span class="info-value">{{ footprint.units?.length }}</span>
@@ -93,7 +93,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
     <div class="property-group">
       <label for="footprint-rotation">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
         {{ langs['FloorPlanBuilder:Panels:Footprints:Rotation'] }} (° )
       </label>
       <div class="input-with-suffix">
@@ -110,21 +110,21 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
     <div class="property-group">
       <label>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
         {{ langs['FloorPlanBuilder:Panels:Footprints:Color'] }}
       </label>
       <div class="color-preview-container" @click="$emit('change-color', footprint.id)">
         <div class="color-preview" :style="{ backgroundColor: footprint.color }"></div>
         <span class="color-value">{{ footprint.color }}</span>
         <button class="btn-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
         </button>
       </div>
     </div>
 
     <div class="actions" v-if="!useItopForm || (footprint.units ?? []).length > 0">
       <button @click="$emit('delete-footprint', footprint.id)" class="btn btn-danger">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         {{ langs['FloorPlanBuilder:Panels:Footprints:Remove'] }}
       </button>
     </div>

@@ -94,8 +94,10 @@ export const useSpecificTooltip = <T extends string|number>(
         showTooltip: (x: number, y: number) => {
             tooltip.value.show = true;
             specificTooltips[name]!.value.show = true;
-            tooltip.value.x = x;
-            tooltip.value.y = y;
+            requestAnimationFrame(() => {
+                tooltip.value.x = x;
+                tooltip.value.y = y;
+            })
         },
         hideTooltip: () => {
             tooltip.value.timer = setTimeout(() => {

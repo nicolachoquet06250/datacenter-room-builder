@@ -8,8 +8,10 @@ customElements.define('room-builder', RoomBuilderElement)
 
 window.addEventListener('DOMContentLoaded', () => {
     const roomBuilder = document.createElement('room-builder');
-    roomBuilder.setAttribute('room-id', '1')
-    roomBuilder.setAttribute('room-name', 'Salle principale')
+    roomBuilder.setAttribute('room-id', '1');
+    roomBuilder.setAttribute('room-name', 'Salle principale');
+    roomBuilder.setAttribute('with-layer-preview', 'true');
+    roomBuilder.setAttribute('show-location-name', 'true');
 
     const spinner = document.createElement('span');
     spinner.setAttribute('slot', 'loader');

@@ -246,7 +246,7 @@ const getRackCenter = (rack: Rack) => {
 .layer-previews {
   position: absolute;
   bottom: 1.5rem;
-  right: 1.5rem;
+  right: calc(1.5rem + 300px);
   display: flex;
   flex-direction: row;
   gap: 16px;

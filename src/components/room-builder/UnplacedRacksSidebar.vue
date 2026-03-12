@@ -5,6 +5,7 @@ import {computed, type ComputedRef, inject} from "vue";
 defineProps<{
   racks: Rack[];
   selectedRackId: number | null;
+  radius: string;
 }>();
 
 const emit = defineEmits<{
@@ -79,7 +80,12 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
 <template>
   <div class="unplaced-racks-sidebar">
     <div class="sidebar-header">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="7" height="7" x="3" y="3" rx="1"/>
+        <rect width="7" height="7" x="14" y="3" rx="1"/>
+        <rect width="7" height="7" x="14" y="14" rx="1"/>
+        <rect width="7" height="7" x="3" y="14" rx="1"/>
+      </svg>
       <h3>{{ langs['FloorPlanBuilder:Panels:RacksToSetPosition:Title'] }}</h3>
     </div>
     <div class="racks-list">
@@ -93,7 +99,12 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
         @click="$emit('select-rack', rack.id)"
       >
         <div class="rack-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="8" x="2" y="2" rx="2"/>
+            <rect width="20" height="8" x="2" y="14" rx="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
         </div>
         <div class="rack-info">
           <div class="rack-name">{{ rack.name }}</div>
@@ -106,19 +117,14 @@ const onDragStart = (event: DragEvent, rack: Rack) => {
 
 <style scoped>
 .unplaced-racks-sidebar {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  width: 240px;
+  width: calc(100% - 2px);
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  max-height: calc(100% - 2rem);
-  z-index: 9;
   overflow: hidden;
+  border-radius: v-bind(radius);
 }
 
 .sidebar-header {

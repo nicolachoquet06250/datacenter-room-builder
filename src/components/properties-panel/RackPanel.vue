@@ -35,13 +35,21 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 <template>
   <div>
     <div class="panel-header">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon">
+        <rect width="20" height="8" x="2" y="2" rx="2"/>
+        <rect width="20" height="8" x="2" y="14" rx="2"/>
+        <line x1="6" y1="6" x2="6.01" y2="6"/>
+        <line x1="6" y1="18" x2="6.01" y2="18"/>
+      </svg>
       <h3>{{ langs['FloorPlanBuilder:Panels:Racks:Title'] }}</h3>
     </div>
 
     <div class="property-group">
       <label for="rack-name">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+          <path d="m15 5 4 4"/>
+        </svg>
         {{ langs['FloorPlanBuilder:Panels:Racks:Name'] }}
       </label>
       <input
@@ -68,7 +76,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
     <div class="property-group">
       <label for="rack-rotation">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
         {{ langs['FloorPlanBuilder:Panels:Racks:Rotation'] }} (° )
       </label>
       <div class="input-with-suffix">
@@ -85,7 +93,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
     <div v-if="podId" class="property-info">
         <span class="info-label">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-4-9 4 9 4 9-4z"/><path d="M21 12l-9 4-9-4"/><path d="M21 16l-9 4-9-4"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-4-9 4 9 4 9-4z"/><path d="M21 12l-9 4-9-4"/><path d="M21 16l-9 4-9-4"/></svg>
           Pod ID
         </span>
       <span class="info-value">{{ podId }}</span>
@@ -93,7 +101,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
     <div class="actions" v-if="!useItopForm || (x !== null && y !== null)">
       <button @click="$emit('remove-rack')" class="btn btn-danger">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         {{ langs['FloorPlanBuilder:Panels:Racks:Remove'] }}
       </button>
     </div>

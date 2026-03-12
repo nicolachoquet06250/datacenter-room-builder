@@ -4,6 +4,7 @@ import {computed, type ComputedRef, inject} from "vue";
 defineProps<{
   footprints: Footprint[];
   selectedFootprintId: string | null;
+  radius: string;
 }>();
 
 const emit = defineEmits<{
@@ -45,7 +46,7 @@ const onDragStart = (event: DragEvent, footprint: Footprint) => {
 <template>
   <div class="unplaced-footprints-sidebar">
     <div class="sidebar-header">
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 3h18v18H3z"/>
         <path d="M3 9h18"/>
         <path d="M3 15h18"/>
@@ -80,18 +81,13 @@ const onDragStart = (event: DragEvent, footprint: Footprint) => {
 
 <style scoped>
 .unplaced-footprints-sidebar {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  width: 240px;
+  width: calc(100% - 2px);
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: v-bind(radius);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  max-height: calc(100% - 2rem);
-  z-index: 9;
   overflow: hidden;
 }
 

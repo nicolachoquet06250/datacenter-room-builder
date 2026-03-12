@@ -20,7 +20,8 @@ type Props = {
   language?: string,
   langKeys?: string,
   footprintColors?: string,
-  withLayerPreview?: boolean
+  withLayerPreview?: boolean,
+  showLocationName?: boolean
 }
 
 type Emits = {
@@ -151,7 +152,8 @@ const props = withDefaults(
       }
     }),
     footprintColors: '[]',
-    withLayerPreview: false
+    withLayerPreview: false,
+    showLocationName: false
   }
 );
 
@@ -190,13 +192,15 @@ const {
   cancelDrawingWalls, toggleIsDrawingWalls, createWall
 } = useDrawRoomWalls();
 
+const isRefreshMode = ref(false);
+
 const {
   layers,
   currentLayerIndex,
   clearLayers,
   initialize: initializeLayers,
   currentLayer
-} = useLayers(walls, propsLayers);
+} = useLayers(walls, isRefreshMode, propsLayers);
 
 const shouldShowLayers = computed(() => {
   if (layers.value.length === 0) return false;
@@ -1093,7 +1097,7 @@ const triggerClearWalls = () => {
 const showItopModal = ref(false);
 const itopFormContent = ref('');
 const itopFormLoading = ref(false);
-const itopModalContainer = useTemplateRef<HTMLElement>('itopModalContainer');
+// const itopModalContainer = useTemplateRef<HTMLElement>('itopModalContainer');
 
 function loadScriptOnce(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -1175,45 +1179,6 @@ const openItopRackForm = async () => {
     });
     itopFormContent.value = await response.text();
     itopFormLoading.value = false;
-
-    // Attendre que le DOM soit mis à jour pour injecter le jQuery
-    setTimeout(() => {
-      if (itopModalContainer.value) {
-        const scripts = itopModalContainer.value.querySelectorAll('script');
-        scripts.forEach(oldScript => {
-          const newScript = document.createElement('script');
-          Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
-          newScript.appendChild(document.createTextNode(oldScript.innerHTML));
-          oldScript.parentNode?.replaceChild(newScript, oldScript);
-        });
-
-        // Détecter le submit du formulaire
-        const form = itopModalContainer.value.querySelector('form');
-        if (form) {
-          form.addEventListener('submit', () => {
-            console.log('Formulaire iTop soumis');
-            // iTop ferme généralement la modale et rafraîchit la page ou une partie de la page
-            // On attend un peu pour laisser le temps à la requête de partir
-            setTimeout(() => {
-              closeItopModal();
-              reloadData();
-            }, 1000);
-          });
-        }
-
-        // Alternative : iTop utilise parfois des événements personnalisés ou ferme la fenêtre si c'est un popup
-        // On peut écouter les messages postés à la fenêtre
-        const messageHandler = (event: MessageEvent) => {
-          // On peut filtrer par origine si besoin : if (event.origin !== "https://itop.localhost:8009") return;
-          if (event.data && (event.data === 'itop.form.submitted' || event.data.type === 'itop.form.submitted')) {
-            closeItopModal();
-            reloadData();
-            window.removeEventListener('message', messageHandler);
-          }
-        };
-        window.addEventListener('message', messageHandler);
-      }
-    }, 100);
   } catch (err) {
     console.error('Erreur lors de la récupération du formulaire iTop:', err);
     notifyError({
@@ -1229,11 +1194,11 @@ const closeItopModal = () => {
 
 // Fonction pour recharger les données (émet un événement pour que le parent sache qu'il doit refresh)
 const reloadData = () => {
-  emit('saved', {
-    roomName: roomName.value,
-    layers: layers.value
-  });
-};
+  isRefreshMode.value = true;
+  setTimeout(() => {
+    emit('refresh');
+  }, 1000);
+}
 
 // On expose une méthode pour fermer la modale et refresh depuis l'extérieur si nécessaire
 defineExpose({
@@ -1800,7 +1765,7 @@ const cancelItopFormModal = () => {
 }
 
 const confirmItopFormModal = () => {
-  emit('refresh');
+  reloadData();
   cancelItopFormModal();
 }
 
@@ -1873,10 +1838,15 @@ const tooltips = computed(() => [
     }
   },
 ]);
+const marginBottom = computed(() => '10px');
 </script>
 
 <template>
-  <div class="builder-container" @mousemove="onMouseMove" @mouseup="stopDrag" @wheel="onWheel" @contextmenu.prevent>
+  <div class="builder-container"
+       @mousemove="onMouseMove"
+       @mouseup="stopDrag"
+       @wheel="onWheel"
+       @contextmenu.prevent>
     <div v-if="isDataLoading" />
 
     <BuilderToolbar
@@ -1897,6 +1867,7 @@ const tooltips = computed(() => [
         :selected-layer-index="currentLayerIndex"
         :radius="props.radius"
         :disable-add-racks="disableAddRacks"
+        :show-location-name="showLocationName"
 
         @undo="undo"
         @redo="redo"
@@ -2016,6 +1987,8 @@ const tooltips = computed(() => [
 
             @cancel="cancelItopFormModal"
             @confirm="confirmItopFormModal"
+            @close="closeItopModal"
+            @reload="reloadData"
         />
 
         <template v-for="t in tooltips" :key="t.props.name">
@@ -2029,111 +2002,273 @@ const tooltips = computed(() => [
         </template>
       </teleport>
 
-      <BuilderPropertiesPanel
-          v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndices.length > 0 || selectedFootprint !== null || selectedCircuitIndices.length > 0"
-          :selected-rack-indices="selectedRackIndices"
-          :racks="racks as Rack[]"
-          :is-wall-selected="isWallSelected"
-          :walls="walls"
-          :unit-count="roomUnitCount"
-          :selected-pillar-indices="selectedPillarIndices"
-          :pillars="layers[currentLayerIndex]?.pillars ?? []"
-          :selected-footprint="selectedFootprint"
-          :selected-circuit-indices="selectedCircuitIndices"
-          :circuits="layers[currentLayerIndex]?.circuits ?? []"
-          :context-menu-options="contextMenuOptions"
-          :use-itop-form="useItopForm"
-
-          @remove-rack="onRemoveRack"
-          @create-pod="createPod"
-          @leave-pod="leavePod"
-          @delete-pod="onConfirmDeletePod"
-          @clear-selection="selectedRackIndices = []"
-          @update-rack-name="updateRackName"
-          @update-rack-rotation="updateRackRotation"
-          @update-rack-x="updateRackX"
-          @update-rack-y="updateRackY"
-          @update-circuit-name="onUpdateCircuitName"
-          @update-circuit-rotation="onUpdateCircuitRotation"
-          @update-circuit-x="onUpdateCircuitX"
-          @update-circuit-y="onUpdateCircuitY"
-          @delete-pillar="onConfirmDeletePillar"
-          @delete-footprint="onConfirmDeleteFootprint"
-          @change-footprint-color="changeFootprintColor"
-          @update-footprint-x="onUpdateFootprintX"
-          @update-footprint-y="onUpdateFootprintY"
-          @update-footprint-name="onUpdateFootprintName"
-          @update-footprint-rotation="onUpdateFootprintRotation"
-          @delete-circuit-selection="onConfirmDeleteCircuitSelection"
-          @clear-walls="triggerClearWalls"
-      />
-
-      <template v-if="shouldShowLayers && !isDataLoading">
-        <BuilderLayerPreviews
-            v-if="withLayerPreview"
-            v-model:current-layer-index="currentLayerIndex"
-            :layers="layers"
-            :viewport-rect="viewportRect"
-            :rack-width="rackWidth"
-            :rack-height="rackHeight"
-            :is-drawing-walls="isDrawingWalls"
-            :wall-preview-point="wallPreviewPoint"
-            :is-drawing-circuit="isDrawingCircuit"
-        />
-
-        <BuilderLayerDropdown
-            v-else
-            v-if="!withLayerPreview"
-            :layers="layers"
-            :lang-keys="langKeys"
-            v-model:current-layer-index="currentLayerIndex"
-        />
-      </template>
-
-      <UnplacedRacksSidebar
-          v-if="incompleteRacks.length > 0 && shouldShowLayers && currentLayerIndex === 3"
-          :racks="incompleteRacks"
-          :selected-rack-id="selectedRackIndices.length === 1 && selectedRackIndices[0] !== undefined ? (racks[selectedRackIndices[0]]?.id ?? null) : null"
-
-          @select-rack="onSelectUnplacedRack"
-          @drag-start="takeSnapshot"
-      />
-
-      <UnplacedCircuitsSidebar
-          v-if="incompleteCircuits.length > 0 && shouldShowLayers && currentLayerIndex === 1"
-          :circuits="incompleteCircuits"
-          :selected-circuit-id="selectedCircuitIndices.length === 1 && selectedCircuitIndices[0] !== undefined ? String(circuitPaths[selectedCircuitIndices[0]]?.id!) : null"
-
-          @select-circuit="onSelectUnplacedCircuit"
-          @drag-start="takeSnapshot"
-      />
-
-      <UnplacedFootprintsSidebar
-          v-if="incompleteFootprints.length > 0 && shouldShowLayers && currentLayerIndex === 2"
-          :footprints="incompleteFootprints"
-          :selected-footprint-id="selectedFootprintId"
-
-          @select-footprint="onSelectUnplacedFootprint"
-          @drag-start="onStartDragUnplacedFootprint"
+      <BuilderLayerPreviews
+          v-if="shouldShowLayers && !isDataLoading && withLayerPreview"
+          v-model:current-layer-index="currentLayerIndex"
+          :layers="layers"
+          :viewport-rect="viewportRect"
+          :rack-width="rackWidth"
+          :rack-height="rackHeight"
+          :is-drawing-walls="isDrawingWalls"
+          :wall-preview-point="wallPreviewPoint"
+          :is-drawing-circuit="isDrawingCircuit"
       />
     </div>
+
+    <aside class="sidebar-right" v-if="!isDataLoading">
+      <header>
+        <span>
+          <span /> = 600 mm
+        </span>
+
+        <button @click="save" class="toolbar-btn btn-primary">
+          <span class="icon">💾</span>
+          <span class="label">{{ langKeys['FloorPlanBuilder:Toolbar:Save'] }}</span>
+        </button>
+      </header>
+
+      <main>
+        <BuilderLayerDropdown
+            v-if="shouldShowLayers && !isDataLoading && !withLayerPreview"
+            :layers="layers"
+            :lang-keys="langKeys"
+            :radius="radius"
+            v-model:current-layer-index="currentLayerIndex"
+
+            class="items"
+        />
+
+        <UnplacedRacksSidebar
+            v-if="incompleteRacks.length > 0 && shouldShowLayers && currentLayerIndex === 3"
+            :racks="incompleteRacks"
+            :selected-rack-id="selectedRackIndices.length === 1 && selectedRackIndices[0] !== undefined ? (racks[selectedRackIndices[0]]?.id ?? null) : null"
+            :radius="radius"
+
+            class="items"
+
+            @select-rack="onSelectUnplacedRack"
+            @drag-start="takeSnapshot"
+        />
+
+        <UnplacedCircuitsSidebar
+            v-if="incompleteCircuits.length > 0 && shouldShowLayers && currentLayerIndex === 1"
+            :circuits="incompleteCircuits"
+            :selected-circuit-id="selectedCircuitIndices.length === 1 && selectedCircuitIndices[0] !== undefined ? String(circuitPaths[selectedCircuitIndices[0]]?.id!) : null"
+            :radius="radius"
+
+            class="items"
+
+            @select-circuit="onSelectUnplacedCircuit"
+            @drag-start="takeSnapshot"
+        />
+
+        <UnplacedFootprintsSidebar
+            v-if="incompleteFootprints.length > 0 && shouldShowLayers && currentLayerIndex === 2"
+            :footprints="incompleteFootprints"
+            :selected-footprint-id="selectedFootprintId"
+            :radius="radius"
+
+            class="items"
+
+            @select-footprint="onSelectUnplacedFootprint"
+            @drag-start="onStartDragUnplacedFootprint"
+        />
+
+        <BuilderPropertiesPanel
+            v-if="selectedRackIndices.length > 0 || isWallSelected || selectedPillarIndices.length > 0 || selectedFootprint !== null || selectedCircuitIndices.length > 0"
+            :selected-rack-indices="selectedRackIndices"
+            :racks="racks as Rack[]"
+            :is-wall-selected="isWallSelected"
+            :walls="walls"
+            :unit-count="roomUnitCount"
+            :selected-pillar-indices="selectedPillarIndices"
+            :pillars="layers[currentLayerIndex]?.pillars ?? []"
+            :selected-footprint="selectedFootprint"
+            :selected-circuit-indices="selectedCircuitIndices"
+            :circuits="layers[currentLayerIndex]?.circuits ?? []"
+            :context-menu-options="contextMenuOptions"
+            :use-itop-form="useItopForm"
+            :radius="radius"
+
+            :margin-bottom="marginBottom"
+
+            @remove-rack="onRemoveRack"
+            @create-pod="createPod"
+            @leave-pod="leavePod"
+            @delete-pod="onConfirmDeletePod"
+            @clear-selection="selectedRackIndices = []"
+            @update-rack-name="updateRackName"
+            @update-rack-rotation="updateRackRotation"
+            @update-rack-x="updateRackX"
+            @update-rack-y="updateRackY"
+            @update-circuit-name="onUpdateCircuitName"
+            @update-circuit-rotation="onUpdateCircuitRotation"
+            @update-circuit-x="onUpdateCircuitX"
+            @update-circuit-y="onUpdateCircuitY"
+            @delete-pillar="onConfirmDeletePillar"
+            @delete-footprint="onConfirmDeleteFootprint"
+            @change-footprint-color="changeFootprintColor"
+            @update-footprint-x="onUpdateFootprintX"
+            @update-footprint-y="onUpdateFootprintY"
+            @update-footprint-name="onUpdateFootprintName"
+            @update-footprint-rotation="onUpdateFootprintRotation"
+            @delete-circuit-selection="onConfirmDeleteCircuitSelection"
+            @clear-walls="triggerClearWalls"
+        />
+      </main>
+    </aside>
   </div>
 </template>
 
 <style scoped>
 .builder-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: #2c3e50;
+
+  > .canvas-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #004a99; /* Bleu iTop Designer */
+    border-bottom-right-radius: v-bind(radius);
+    border-bottom-left-radius: v-bind(radius);
+  }
 }
-.canvas-area {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  background: #004a99; /* Bleu iTop Designer */
+
+.sidebar-right {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: white;
+  background: #2c3e50;
+  border-top-right-radius: v-bind(radius);
   border-bottom-right-radius: v-bind(radius);
-  border-bottom-left-radius: v-bind(radius);
+  border-left: 1px solid #333;
+
+  > header {
+    height: 40px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+
+    > span {
+      display: inline-flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+
+      > span {
+        display: inline-block;
+        height: 20px;
+        width: 20px;
+        border: 1px solid #1a252f;
+        background-color: #004a99;
+      }
+    }
+
+    .icon {
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .label {
+      display: inline-block;
+    }
+
+    @media (max-width: 800px) {
+      .label {
+        display: none;
+      }
+    }
+
+    .toolbar-btn {
+      height: 28px;
+      padding: 0 8px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: #ecf0f1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .toolbar-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .toolbar-btn:active:not(:disabled) {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .toolbar-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .toolbar-btn.active {
+      background: #3498db;
+      color: white;
+    }
+
+    .toolbar-btn.btn-primary {
+      background: #27ae60;
+      color: white;
+      font-weight: 600;
+    }
+
+    .toolbar-btn.btn-primary:hover:not(:disabled) {
+      background: #219150;
+    }
+
+    .toolbar-btn.btn-primary:active:not(:disabled) {
+      background: #1e7e46;
+    }
+
+    .toolbar-btn.btn-danger {
+      color: #e74c3c;
+    }
+
+    .toolbar-btn.btn-danger:hover:not(:disabled) {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .toolbar-btn.btn-danger:active:not(:disabled) {
+      background: #c0392b;
+    }
+  }
+
+  > main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    > .items {
+      margin-bottom: v-bind(marginBottom);
+    }
+  }
 }
 </style>

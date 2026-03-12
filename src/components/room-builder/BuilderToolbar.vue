@@ -14,7 +14,8 @@ type Props = {
   canZoomIn: boolean;
   selectedLayerIndex: number | null;
   radius: number;
-  disableAddRacks: boolean
+  disableAddRacks: boolean;
+  showLocationName: boolean;
 }
 
 type Emits = {
@@ -28,7 +29,6 @@ type Emits = {
   (e: 'zoom-out'): void;
   (e: 'zoom-in'): void;
   (e: 'reset-pan'): void;
-  (e: 'save'): void;
 }
 </script>
 
@@ -48,15 +48,17 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
 <template>
   <div class="toolbar">
-    <div class="toolbar-section room-info">
-      <input 
-        v-model="roomName"
-        placeholder="Nom de la salle"
-        :title="langs['FloorPlanBuilder:Toolbar:Room:Name']"
-      />
-    </div>
+    <template v-if="showLocationName">
+      <div class="toolbar-section room-info">
+        <input
+            v-model="roomName"
+            placeholder="Nom de la salle"
+            :title="langs['FloorPlanBuilder:Toolbar:Room:Name']"
+        />
+      </div>
 
-    <div class="toolbar-divider"/>
+      <div class="toolbar-divider"/>
+    </template>
 
     <div class="toolbar-section history-controls">
       <button
@@ -144,7 +146,8 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
       </div>
     </template>
 
-    <div class="toolbar-section action-controls" v-if="selectedLayerIndex === 0">
+    <div class="toolbar-section action-controls"
+         v-if="selectedLayerIndex === 0">
       <div class="toolbar-divider"/>
 
       <button
@@ -177,21 +180,6 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
         <span class="icon">🗑️</span>
       </button>
     </div>
-
-    <div class="toolbar-spacer"/>
-
-    <div class="toolbar-section finish-controls">
-      <span>
-        <span /> = 600 mm
-      </span>
-
-      <div class="toolbar-divider"/>
-
-      <button @click="$emit('save')" class="toolbar-btn btn-primary">
-        <span class="icon">💾</span>
-        <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Save'] }}</span>
-      </button>
-    </div>
   </div>
 </template>
 
@@ -215,21 +203,6 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.toolbar-section.finish-controls > span {
-  display: inline-flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-}
-
-.toolbar-section.finish-controls > span > span {
-  display: inline-block;
-  height: 20px;
-  width: 20px;
-  border: 1px solid #1a252f;
 }
 
 .toolbar-divider {
@@ -294,20 +267,6 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 .toolbar-btn.active {
   background: #3498db;
   color: white;
-}
-
-.toolbar-btn.btn-primary {
-  background: #27ae60;
-  color: white;
-  font-weight: 600;
-}
-
-.toolbar-btn.btn-primary:hover:not(:disabled) {
-  background: #219150;
-}
-
-.toolbar-btn.btn-primary:active:not(:disabled) {
-  background: #1e7e46;
 }
 
 .toolbar-btn.btn-danger {

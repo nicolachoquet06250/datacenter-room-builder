@@ -12,6 +12,8 @@ type Props = {
   circuits: Circuit[];
   contextMenuOptions: { type: string; podId?: string };
   useItopForm: boolean;
+  radius: string;
+  marginBottom: number|string
 }
 
 type Emits = {
@@ -55,6 +57,8 @@ import { SNAP_SIZE, GRID_SIZE } from "../../constants";
 const props = defineProps<Props>();
 
 const emit = defineEmits<Emits>();
+
+const marginBottom = computed(() => typeof props.marginBottom === 'string' ? props.marginBottom : `${props.marginBottom}px`)
 
 const {currentLayerIndex} = useLayers(computed(() => props.walls));
 const {getWallBoundingBox} = useRoomBuilderGeometry();
@@ -308,18 +312,14 @@ const onCoordChange = (event: Event) => {
 
 <style scoped>
 .properties-panel {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 280px;
+  max-width: 100%;
   background: white;
   border: 1px solid #e2e8f0;
   padding: 1.25rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border-radius: 8px;
-  max-height: calc(100% - 18rem);
+  border-radius: v-bind(radius);
   overflow-y: auto;
-  z-index: 9;
+  margin-bottom: v-bind(marginBottom);
 }
 
 .properties-panel h3 {

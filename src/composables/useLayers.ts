@@ -10,7 +10,7 @@ export const layerNames = [
     'FloorPlanBuilder:Layers:Racks:Title'
 ] as const;
 
-export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer[]>) => {
+export const useLayers = (walls: Ref<Point[]>, isRefreshMod?: Ref<boolean>, defaultLayers?: ComputedRef<Layer[]>) => {
     if (!defaultLayers) {
         defaultLayers = computed<Layer[]>(() => []);
     }
@@ -85,7 +85,9 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
                 walls.value = JSON.parse(JSON.stringify(initialLayers[0]!.walls));
             }
 
-            currentLayerIndex.value = 0;
+            if (!isRefreshMod || !isRefreshMod?.value) {
+                currentLayerIndex.value = 0;
+            }
         }
     })
 
@@ -129,7 +131,9 @@ export const useLayers = (walls: Ref<Point[]>, defaultLayers?: ComputedRef<Layer
                 walls.value = JSON.parse(JSON.stringify(initialLayers[0]!.walls));
             }
 
-            currentLayerIndex.value = 0;
+            if (!isRefreshMod || !isRefreshMod.value) {
+                currentLayerIndex.value = 0;
+            }
         }
     }, { immediate: true })
 

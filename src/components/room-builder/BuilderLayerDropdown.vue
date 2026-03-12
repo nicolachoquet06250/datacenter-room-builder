@@ -2,6 +2,7 @@
 defineProps<{
   layers: Layer[];
   langKeys: Record<string, string>;
+  radius: string
 }>()
 
 const currentLayerIndex = defineModel<number>('currentLayerIndex');
@@ -9,27 +10,33 @@ const currentLayerIndex = defineModel<number>('currentLayerIndex');
 
 <template>
   <div class="layer-dropdown-container">
-    <select v-model="currentLayerIndex" class="layer-dropdown">
-      <option
-          v-for="(layer, index) in (layers as Layer[])"
-          :key="`layer-option-${layer.id}`"
-          :value="index"
-      >
-        {{ langKeys[layer.name] }}
-      </option>
-    </select>
+    <label>
+      <span class="layer-dropdown-label">Layer courent:</span>
+      <select v-model="currentLayerIndex" class="layer-dropdown">
+        <option
+            v-for="(layer, index) in (layers as Layer[])"
+            :key="`layer-option-${layer.id}`"
+            :value="index"
+        >
+          {{ langKeys[layer.name] }}
+        </option>
+      </select>
+    </label>
   </div>
 </template>
 
 <style scoped>
 .layer-dropdown-container {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 1;
+  width: 100%;
+  border-radius: v-bind(radius);
+}
+
+.layer-dropdown-label {
+  color: #ffffff;
 }
 
 .layer-dropdown {
+  width: 100%;
   padding: 8px 12px;
   border-radius: 4px;
   border: 1px solid #ccc;

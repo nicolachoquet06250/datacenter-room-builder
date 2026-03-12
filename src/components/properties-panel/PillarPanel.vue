@@ -21,7 +21,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
 <template>
   <div class="panel-header">
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
     <h3>{{ langs['FloorPlanBuilder:Panels:Pillars:Title'] }}</h3>
   </div>
 
@@ -37,7 +37,7 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
 
     <div class="actions">
       <button class="btn btn-danger" @click="$emit('delete-pillar')">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
         {{ langs[`FloorPlanBuilder:Panels:Pillar${selectedPillarIndices && selectedPillarIndices?.length > 1 ? 's' : ''}:Remove`] }}
       </button>
     </div>

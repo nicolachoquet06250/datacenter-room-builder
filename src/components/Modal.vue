@@ -13,7 +13,9 @@ type Props = {
 
 type Emits = {
   (e: 'confirm'): void,
-  (e: 'cancel'): void
+  (e: 'cancel'): void,
+  (e: 'close'): void,
+  (e: 'reload'): void
 }
 </script>
 
@@ -53,7 +55,7 @@ const message = computed(() => props.isHtml ? `<style>
 }
 
 .modal-container {
-    background: white;
+    background: #3b4252;
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -120,13 +122,8 @@ const message = computed(() => props.isHtml ? `<style>
   opacity: 0;
 }</style>${props.message}` : props.message);
 
-const confirm = () => {
-  emit('confirm');
-};
-
-const cancel = () => {
-  emit('cancel');
-};
+const confirm = () => emit('confirm');
+const cancel = () => emit('cancel');
 
 const handleHtmlContentClick = (e: MouseEvent) => {
   if ((e.target as HTMLElement)?.parentElement?.tagName === 'BUTTON') {
@@ -144,11 +141,93 @@ watch(htmlContent, (htmlContent, oldHtmlContent) => {
     oldHtmlContent?.removeEventListener('click', handleHtmlContentClick);
   }
 });
+
+/*watch(itopModalContainer, itopModalContainer => {
+  console.log('itopModalContainer changed:', itopModalContainer);
+  setTimeout(() => {
+    if (itopModalContainer) {
+      const scripts = itopModalContainer.querySelectorAll('script');
+      scripts.forEach(oldScript => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+        oldScript.parentNode?.replaceChild(newScript, oldScript);
+      });
+
+      // Détecter le submit du formulaire
+      const form = itopModalContainer.querySelector('form');
+      console.log('Form detected:', form);
+      if (form) {
+        console.log('Form detected:', form);
+        form.addEventListener('submit', () => {
+          console.log('Formulaire iTop soumis');
+          // iTop ferme généralement la modale et rafraîchit la page ou une partie de la page
+          // On attend un peu pour laisser le temps à la requête de partir
+          setTimeout(() => {
+            emit('close');
+            emit('reload');
+          }, 1000);
+        });
+      }
+
+      // Alternative : iTop utilise parfois des événements personnalisés ou ferme la fenêtre si c'est un popup
+      // On peut écouter les messages postés à la fenêtre
+      const messageHandler = (event: MessageEvent) => {
+        // On peut filtrer par origine si besoin : if (event.origin !== "https://itop.localhost:8009") return;
+        if (event.data && (event.data === 'itop.form.submitted' || event.data.type === 'itop.form.submitted')) {
+          emit('close');
+          emit('reload');
+          window.removeEventListener('message', messageHandler);
+        }
+      };
+      window.addEventListener('message', messageHandler);
+    }
+  }, 100)
+})*/
+
+watch(htmlContent, htmlContent => {
+  if (htmlContent) {
+    const scripts = htmlContent.querySelectorAll('script');
+    scripts.forEach(oldScript => {
+      const newScript = document.createElement('script');
+      Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+      newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+      oldScript.parentNode?.replaceChild(newScript, oldScript);
+    });
+
+    // Détecter le submit du formulaire
+    const form = htmlContent.querySelector('form');
+    if (form) {
+      console.log('Form detected:', form);
+      form.addEventListener('submit', () => {
+        console.log('Formulaire iTop soumis');
+        // iTop ferme généralement la modale et rafraîchit la page ou une partie de la page
+        // On attend un peu pour laisser le temps à la requête de partir
+        setTimeout(() => {
+          emit('close');
+          emit('reload');
+        }, 1000);
+      });
+    }
+
+    // Alternative : iTop utilise parfois des événements personnalisés ou ferme la fenêtre si c'est un popup
+    // On peut écouter les messages postés à la fenêtre
+    const messageHandler = (event: MessageEvent) => {
+      // On peut filtrer par origine si besoin : if (event.origin !== "https://itop.localhost:8009") return;
+      if (event.data && (event.data === 'itop.form.submitted' || event.data.type === 'itop.form.submitted')) {
+        emit('close');
+        emit('reload');
+        window.removeEventListener('message', messageHandler);
+      }
+    };
+    window.addEventListener('message', messageHandler);
+  }
+})
 </script>
 
 <template>
   <Transition name="modal">
-    <div v-if="show" :class="['modal-overlay', {centered: center}]" @click.self="cancel">
+    <div v-if="show" :class="['modal-overlay', {centered: center}]" @click.self="cancel" ref="itopModalContainer">
       <div class="modal-container">
         <div class="modal-header">
           <h3>{{ title }}</h3>
@@ -198,7 +277,7 @@ watch(htmlContent, (htmlContent, oldHtmlContent) => {
 }
 
 .modal-container {
-  background: white;
+  background: #3b4252;
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
