@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, useTemplateRef, watch} from "vue";
+import {computed, onBeforeUnmount, onMounted, useTemplateRef, watch} from "vue";
 import {useSpecificTooltip} from "../composables/useTooltip.ts";
 
 const props = defineProps<{
@@ -32,6 +32,19 @@ watch([tooltipContainer, tooltipRef], () => {
   if (tooltipContainer.value && tooltipRef.value)
     _c.value = tooltipContainer.value;
     _r.value = tooltipRef.value;
+})
+
+onMounted(() => {
+  const container = window.document.querySelector<HTMLElement>('#ibo-main-content');
+  if (container) {
+    container.style.overflowY = 'hidden';
+  }
+})
+onBeforeUnmount(() => {
+  const container = window.document.querySelector<HTMLElement>('#ibo-main-content');
+  if (container) {
+    container.style.overflowY = 'auto';
+  }
 })
 </script>
 
