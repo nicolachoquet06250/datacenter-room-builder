@@ -11,7 +11,7 @@ window.addEventListener('DOMContentLoaded', () => {
     roomBuilder.setAttribute('room-id', '1');
     roomBuilder.setAttribute('room-name', 'Salle principale');
     roomBuilder.setAttribute('with-layer-preview', 'true');
-    roomBuilder.setAttribute('show-location-name', 'true');
+    roomBuilder.setAttribute('show-location-name', '');
 
     const spinner = document.createElement('span');
     spinner.setAttribute('slot', 'loader');

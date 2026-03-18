@@ -133,40 +133,27 @@ const handleSelectCircuit = (e: MouseEvent, cIdx: number) => {
 const getFootprintCenter = (footprint: Footprint) => {
   if (!footprint.units || (footprint.units?.length ?? 0) === 0) return { x: 0, y: 0 };
   const minX = Math.min(...footprint.units.map(u => u.x));
+  const maxX = Math.max(...footprint.units.map(u => u.x));
   const minY = Math.min(...footprint.units.map(u => u.y));
-  
-  let widthPx = (footprint.width || 1200) / 600 * 20;
-  let heightPx = (footprint.height || 1200) / 600 * 20;
-
-  const normRotation = ((footprint.rotation || 0) % 360 + 360) % 360;
-  if (normRotation === 90 || normRotation === 270) {
-    const tmp = widthPx;
-    widthPx = heightPx;
-    heightPx = tmp;
-  }
+  const maxY = Math.max(...footprint.units.map(u => u.y));
 
   return {
-    x: minX + widthPx / 2,
-    y: minY + heightPx / 2
+    x: (minX + maxX + 20) / 2,
+    y: (minY + maxY + 20) / 2
   };
 };
 
 const getFootprintBBox = (footprint: Footprint) => {
   if (!footprint.units || footprint.units.length === 0) return null;
   const minX = Math.min(...footprint.units.map(u => u.x));
+  const maxX = Math.max(...footprint.units.map(u => u.x));
   const minY = Math.min(...footprint.units.map(u => u.y));
-  
-  let widthPx = (footprint.width || 1200) / 600 * 20;
-  let heightPx = (footprint.height || 1200) / 600 * 20;
+  const maxY = Math.max(...footprint.units.map(u => u.y));
 
-  const normRotation = ((footprint.rotation || 0) % 360 + 360) % 360;
-  if (normRotation === 90 || normRotation === 270) {
-    const tmp = widthPx;
-    widthPx = heightPx;
-    heightPx = tmp;
-  }
+  const width = maxX - minX + 20;
+  const height = maxY - minY + 20;
 
-  return { minX, minY, maxX: minX + widthPx, maxY: minY + heightPx, width: widthPx, height: heightPx };
+  return { minX, minY, maxX: minX + width, maxY: minY + height, width, height };
 };
 
 const getRackDimensions = (rack: Rack) => {
@@ -221,15 +208,17 @@ defineExpose({svgRef});
           <g v-for="footprint in layer.footprints" :key="footprint.id">
             <template v-if="(footprint.units?.length ?? 0) > 0">
               <rect
-                    :x="Math.min(...footprint.units.map(u => u.x))"
-                    :y="Math.min(...footprint.units.map(u => u.y))"
-                    :width="(footprint.width || 1200) / 600 * 20"
-                    :height="(footprint.height || 1200) / 600 * 20"
-                    :fill="footprint.color"
-                    fill-opacity="0.2"
-                    @mouseenter="$emit('hover-footprint', $event, footprint)"
-                    @mouseleave="$emit('leave-footprint')"
-                />
+                  v-for="(unit, uIdx) in footprint.units"
+                  :key="`footprint-unit-inactive-${footprint.id}-${uIdx}`"
+                  :x="unit.x"
+                  :y="unit.y"
+                  :width="20"
+                  :height="20"
+                  :fill="footprint.color"
+                  fill-opacity="0.2"
+                  @mouseenter="$emit('hover-footprint', $event, footprint)"
+                  @mouseleave="$emit('leave-footprint')"
+              />
               <text
                   v-if="footprint.name"
                   :x="getFootprintCenter(footprint).x"
@@ -378,14 +367,16 @@ defineExpose({svgRef});
           >
             <template v-if="(footprint.units?.length ?? 0) > 0">
               <rect
-                  :x="Math.min(...footprint.units.map(u => u.x))"
-                  :y="Math.min(...footprint.units.map(u => u.y))"
-                  :width="(footprint.width || 1200) / 600 * 20"
-                  :height="(footprint.height || 1200) / 600 * 20"
+                  v-for="(unit, uIdx) in footprint.units"
+                  :key="`footprint-unit-${footprint.id}-${uIdx}`"
+                  :x="unit.x"
+                  :y="unit.y"
+                  :width="20"
+                  :height="20"
                   :fill="footprint.color"
                   :fill-opacity="footprint.id === selectedFootprintId ? 0.6 : 0.4"
                   stroke="white"
-                  :stroke-width="footprint.id === selectedFootprintId ? 1 : 0.5"
+                  :stroke-width="footprint.id === selectedFootprintId ? 0.5 : 0.2"
                   @mouseenter="$emit('hover-footprint', $event, footprint)"
                   @mouseleave="$emit('leave-footprint')"
               />

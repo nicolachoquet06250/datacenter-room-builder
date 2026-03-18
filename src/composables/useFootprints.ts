@@ -20,6 +20,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
   const draggingFootprintId = ref<string | null>(null);
   const rotatingFootprintId = ref<string | null>(null);
   const footprintUnitsBeforeDrag = ref<Point[]>([]);
+  const footprintRotationBeforeDrag = ref<number | null>(null);
   const startMouseSVGPos = { x: 0, y: 0 };
   const startRotationAngle = ref(0);
   const initialFootprintRotation = ref(0);
@@ -390,6 +391,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     draggingFootprintId.value = null;
     rotatingFootprintId.value = null;
     footprintUnitsBeforeDrag.value = [];
+    footprintRotationBeforeDrag.value = null;
   };
 
   const startRotateFootprint = (event: MouseEvent, footprintId: string, zoomLevel: number, panOffset: { x: number, y: number }) => {
@@ -401,6 +403,7 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
     selectedFootprintId.value = footprintId;
     rotatingFootprintId.value = footprintId;
     footprintUnitsBeforeDrag.value = footprint.units.map(u => ({ ...u }));
+    footprintRotationBeforeDrag.value = footprint.rotation ?? 0;
 
     const minX = Math.min(...footprint.units.map(u => u.x));
     const maxX = Math.max(...footprint.units.map(u => u.x));
@@ -538,10 +541,10 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
       const prev = footprint.rotation ?? 0;
       const delta = (newRotation - prev) % 360;
 
-      if (delta === 0) return;
-
       // Si le footprint a des unités (placé sur la grille), on fait pivoter les unités
       if (footprint.units && footprint.units.length > 0) {
+        if (delta === 0) return;
+
         // En mode interaction, on part des unités initiales pour éviter les dérives cumulatives
         const sourceUnits = (fromInteraction && footprintUnitsBeforeDrag.value.length > 0)
           ? footprintUnitsBeforeDrag.value
@@ -556,20 +559,32 @@ export const useFootprints = (currentLayer: Ref<Layer>, walls: Ref<Point[]>) => 
         const centerX = (minX + maxX + SNAP_SIZE) / 2;
         const centerY = (minY + maxY + SNAP_SIZE) / 2;
 
-        const rad = (delta * Math.PI) / 180;
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
-
         const newUnits = sourceUnits.map(u => {
-          // Centrer sur (0,0) par rapport au centre du rectangle englobant, mais en considérant le centre de l'unité
+          // Si on est en interaction, on tourne par rapport à la position INITIALE (from 0 to newRotation)
+          // Mais attention, sourceUnits sont déjà les unités initiales si fromInteraction est vrai.
+          // Le problème est que rotation est cumulative si delta est utilisé.
+          
+          // Utilisons le delta par rapport aux sourceUnits
+          // Si fromInteraction est vrai, sourceUnits sont à rotation 0 relative (car on les a capturées au début)
+          // Donc on applique newRotation (si on veut que la rotation soit absolue par rapport au début de l'interaction)
+          // Mais attendez, footprint.rotation est stocké.
+          
+          // Le code original utilisait delta. Si delta est calculé par rapport à prev, et sourceUnits est footprint.units, 
+          // c'est une rotation incrémentale.
+          // Si fromInteraction est vrai, sourceUnits est constant. On doit donc appliquer la rotation TOTALE depuis le début.
+          const rotationToApply = fromInteraction ? (newRotation - (footprintRotationBeforeDrag.value ?? 0)) : delta;
+          const radToApply = (rotationToApply * Math.PI) / 180;
+          const cosA = Math.cos(radToApply);
+          const sinA = Math.sin(radToApply);
+
           const ux = u.x + SNAP_SIZE / 2;
           const uy = u.y + SNAP_SIZE / 2;
 
           const dx = ux - centerX;
           const dy = uy - centerY;
 
-          const rx = dx * cos - dy * sin;
-          const ry = dx * sin + dy * cos;
+          const rx = dx * cosA - dy * sinA;
+          const ry = dx * sinA + dy * cosA;
 
           // Revenir aux coordonnées globales et snap sur la grille de 20px (coin haut-gauche)
           return {
