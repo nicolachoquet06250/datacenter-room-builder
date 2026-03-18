@@ -6,6 +6,7 @@ type Props = {
   showAddRack: boolean;
   canAddCircuit: boolean;
   showAddCircuit: boolean;
+  showAddFootprint: boolean;
   canClearWalls: boolean;
   isDrawingWalls: boolean;
   isDrawingPillar: boolean;
@@ -23,6 +24,7 @@ type Emits = {
   (e: 'redo'): void;
   (e: 'add-rack'): void;
   (e: 'add-circuit'): void;
+  (e: 'add-footprint'): void;
   (e: 'toggle-walls'): void;
   (e: 'toggle-pillar'): void;
   (e: 'clear-walls'): void;
@@ -142,6 +144,23 @@ const langs = inject<ComputedRef<Record<string, string>>>('langs', computed(() =
           <span class="icon">+</span>
 
           <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Layers:Circuits'] }}</span>
+        </button>
+      </div>
+    </template>
+
+    <template v-if="showAddFootprint">
+      <div class="toolbar-divider"/>
+
+      <div class="toolbar-section footprint-controls">
+        <button
+            class="toolbar-btn"
+            @click="$emit('add-footprint')"
+            :disabled="!canAddCircuit"
+            :title="langs['FloorPlanBuilder:Toolbar:Layers:Footprints:Title']"
+        >
+          <span class="icon">+</span>
+
+          <span class="label">{{ langs['FloorPlanBuilder:Toolbar:Layers:Footprints'] }}</span>
         </button>
       </div>
     </template>

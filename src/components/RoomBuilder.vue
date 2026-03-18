@@ -97,6 +97,9 @@ const props = withDefaults(
         'FloorPlanBuilder:Toolbar:Layers:Circuits': 'Circuit',
         'FloorPlanBuilder:Toolbar:Layers:Circuits:Title': 'Ajouter un circuit électrique',
 
+        'FloorPlanBuilder:Toolbar:Layers:Footprints': 'FootPrint',
+        'FloorPlanBuilder:Toolbar:Layers:Footprints:Title': 'Ajouter un FootPrint',
+
         'FloorPlanBuilder:Toolbar:Layers:Racks': 'Rack',
         'FloorPlanBuilder:Toolbar:Layers:Racks:Title': 'Ajouter un rack',
 
@@ -778,6 +781,15 @@ const circuitPaths = computed({
   }
 });
 
+const footprints = computed({
+  get: () => layers.value[currentLayerIndex.value]?.footprints ?? [],
+  set: (val) => {
+    if (layers.value[currentLayerIndex.value]) {
+      layers.value[currentLayerIndex.value]!.footprints = val;
+    }
+  }
+})
+
 const podBoundaries = computed(() => getPodBoundaries(racks.value as Rack[], pods.value));
 
 const wallBoundingBox = computed(() => {
@@ -1095,6 +1107,7 @@ const triggerClearWalls = () => {
 };
 
 const showItopModal = ref(false);
+const itopFormTitle = ref('');
 const itopFormContent = ref('');
 const itopFormLoading = ref(false);
 // const itopModalContainer = useTemplateRef<HTMLElement>('itopModalContainer');
@@ -1159,6 +1172,7 @@ watchEffect(() => {
 })
 
 const openItopRackForm = async () => {
+  itopFormTitle.value = 'Ajouter un rack';
   showItopModal.value = true;
   itopFormLoading.value = true;
   try {
@@ -1207,25 +1221,110 @@ defineExpose({
 });
 
 const addRack = () => {
-  if (currentLayerIndex.value === 0) return;
+  if (currentLayerIndex.value !== 3) return;
   if (props.useItopForm) {
     openItopRackForm();
-  } else {
+  }
+  else {
     addRackRaw();
+  }
+};
+
+const openItopCircuitForm = async () => {
+  itopFormTitle.value = 'Ajouter un circuit';
+  showItopModal.value = true;
+  itopFormLoading.value = true;
+  try {
+    const response = await fetch(props.itopCreateRackUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-Combodo-Ajax': 'true',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new URLSearchParams({
+        att_code: 'physicaldevice_list',
+        host_class: 'Location',
+        host_id: String(props.roomId),
+        class: 'CircuitElec'
+      })
+    });
+    itopFormContent.value = await response.text();
+    itopFormLoading.value = false;
+  } catch (err) {
+    console.error('Erreur lors de la récupération du formulaire iTop:', err);
+    notifyError({
+      text: 'Erreur lors de la récupération du formulaire iTop'
+    });
   }
 };
 
 const addCircuit = () => {
   if (currentLayerIndex.value !== 1) return;
-  takeSnapshot();
-  const newCircuit = {
-    id: `circuit-${Date.now()}`,
-    x: null,
-    y: null,
-    rotation: null,
-    name: `Circuit ${circuitPaths.value.length + 1}`
-  };
-  circuitPaths.value = [...circuitPaths.value, newCircuit];
+  if (props.useItopForm) {
+    openItopCircuitForm();
+  }
+  else {
+    takeSnapshot();
+    const newCircuit = {
+      id: `circuit-${Date.now()}`,
+      x: null,
+      y: null,
+      rotation: null,
+      name: `Circuit ${circuitPaths.value.length + 1}`
+    };
+    circuitPaths.value = [...circuitPaths.value, newCircuit];
+  }
+};
+
+const openItopFootprintForm = async () => {
+  itopFormTitle.value = 'Ajouter un FootPrint';
+  showItopModal.value = true;
+  itopFormLoading.value = true;
+  try {
+    const response = await fetch(props.itopCreateRackUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-Combodo-Ajax': 'true',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new URLSearchParams({
+        att_code: 'physicaldevice_list',
+        host_class: 'Location',
+        host_id: String(props.roomId),
+        class: 'FootPrint'
+      })
+    });
+    itopFormContent.value = await response.text();
+    itopFormLoading.value = false;
+  } catch (err) {
+    console.error('Erreur lors de la récupération du formulaire iTop:', err);
+    notifyError({
+      text: 'Erreur lors de la récupération du formulaire iTop'
+    });
+  }
+}
+
+const addFootprint = () => {
+  if (props.useItopForm) {
+    openItopFootprintForm();
+  }
+  else {
+    takeSnapshot();
+    const newFootprint: Footprint = {
+      id: `footprint-${Date.now()}`,
+      units: [],
+      color: '#ffffff',
+      width: undefined,
+      height: undefined,
+      rotation: 0,
+      name: `Circuit ${footprints.value.length + 1}`
+    };
+    footprints.value = [...footprints.value, newFootprint];
+  }
 };
 
 const selectWall = (event: MouseEvent) => {
@@ -1856,6 +1955,7 @@ const marginBottom = computed(() => '10px');
         :redo-disabled="redoStack.length === 0"
         :can-add-rack="walls.length > 2"
         :show-add-rack="currentLayerIndex === 3"
+        :show-add-footprint="currentLayerIndex === 2"
         :can-add-circuit="walls.length > 2"
         :show-add-circuit="currentLayerIndex === 1"
         :can-clear-walls="walls.length > 0"
@@ -1873,6 +1973,7 @@ const marginBottom = computed(() => '10px');
         @redo="redo"
         @add-rack="addRack"
         @add-circuit="addCircuit"
+        @add-footprint="addFootprint"
         @toggle-walls="toggleIsDrawingWalls"
         @toggle-pillar="toggleIsDrawingPillar"
         @clear-walls="triggerClearWalls"
@@ -1979,7 +2080,7 @@ const marginBottom = computed(() => '10px');
 
       <teleport to="body">
         <Modal
-            title="Créer un Rack"
+            :title="itopFormTitle"
             :show="showItopModal"
             :message="itopFormContent"
             :is-loading="itopFormLoading"
