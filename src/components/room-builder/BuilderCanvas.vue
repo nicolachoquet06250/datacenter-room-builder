@@ -403,17 +403,39 @@ defineExpose({svgRef});
               </text>
 
               <template v-if="footprint.id === selectedFootprintId && getFootprintBBox(footprint)">
-                <circle
-                    v-for="(pos, pIdx) in [
-                      {x: getFootprintBBox(footprint)!.minX, y: getFootprintBBox(footprint)!.minY},
-                      {x: getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width, y: getFootprintBBox(footprint)!.minY},
-                      {x: getFootprintBBox(footprint)!.minX, y: getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height},
-                      {x: getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width, y: getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height}
-                    ]"
-                    :key="pIdx"
-                    :cx="pos.x"
-                    :cy="pos.y"
-                    r="6"
+                <!-- Coin Haut-Gauche -->
+                <path
+                    :d="`M ${getFootprintBBox(footprint)!.minX + 10} ${getFootprintBBox(footprint)!.minY} L ${getFootprintBBox(footprint)!.minX} ${getFootprintBBox(footprint)!.minY} L ${getFootprintBBox(footprint)!.minX} ${getFootprintBBox(footprint)!.minY + 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
+                    class="rotation-handle footprint"
+                    @mousedown.stop="$emit('start-rotate-footprint', $event, footprint.id)"
+                />
+                <!-- Coin Haut-Droite -->
+                <path
+                    :d="`M ${getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width - 10} ${getFootprintBBox(footprint)!.minY} L ${getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width} ${getFootprintBBox(footprint)!.minY} L ${getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width} ${getFootprintBBox(footprint)!.minY + 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
+                    class="rotation-handle footprint"
+                    @mousedown.stop="$emit('start-rotate-footprint', $event, footprint.id)"
+                />
+                <!-- Coin Bas-Gauche -->
+                <path
+                    :d="`M ${getFootprintBBox(footprint)!.minX} ${getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height - 10} L ${getFootprintBBox(footprint)!.minX} ${getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height} L ${getFootprintBBox(footprint)!.minX + 10} ${getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
+                    class="rotation-handle footprint"
+                    @mousedown.stop="$emit('start-rotate-footprint', $event, footprint.id)"
+                />
+                <!-- Coin Bas-Droite -->
+                <path
+                    :d="`M ${getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width - 10} ${getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height} L ${getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width} ${getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height} L ${getFootprintBBox(footprint)!.minX + getFootprintBBox(footprint)!.width} ${getFootprintBBox(footprint)!.minY + getFootprintBBox(footprint)!.height - 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
                     class="rotation-handle footprint"
                     @mousedown.stop="$emit('start-rotate-footprint', $event, footprint.id)"
                 />
@@ -575,18 +597,40 @@ defineExpose({svgRef});
               />
 
               <template v-if="selectedCircuitIndices.length === 1 && selectedCircuitIndices[0] === circuitIdx">
-                <circle
-                    v-for="(pos, pIdx) in [
-                    {x: circuit.x, y: circuit.y},
-                    {x: circuit.x + circuitWidth, y: circuit.y},
-                    {x: circuit.x, y: circuit.y + circuitHeight},
-                    {x: circuit.x + circuitWidth, y: circuit.y + circuitHeight}
-                  ]"
-                    :key="pIdx"
-                    :cx="pos.x"
-                    :cy="pos.y"
-                    r="6"
-                    class="rotation-handle"
+                <!-- Coin Haut-Gauche -->
+                <path
+                    :d="`M ${circuit.x + 10} ${circuit.y} L ${circuit.x} ${circuit.y} L ${circuit.x} ${circuit.y + 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
+                    class="rotation-handle circuit"
+                    @mousedown="$emit('start-drag-circuit', $event, circuitIdx)"
+                />
+                <!-- Coin Haut-Droite -->
+                <path
+                    :d="`M ${circuit.x + circuitWidth - 10} ${circuit.y} L ${circuit.x + circuitWidth} ${circuit.y} L ${circuit.x + circuitWidth} ${circuit.y + 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
+                    class="rotation-handle circuit"
+                    @mousedown="$emit('start-drag-circuit', $event, circuitIdx)"
+                />
+                <!-- Coin Bas-Gauche -->
+                <path
+                    :d="`M ${circuit.x} ${circuit.y + circuitHeight - 10} L ${circuit.x} ${circuit.y + circuitHeight} L ${circuit.x + 10} ${circuit.y + circuitHeight}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
+                    class="rotation-handle circuit"
+                    @mousedown="$emit('start-drag-circuit', $event, circuitIdx)"
+                />
+                <!-- Coin Bas-Droite -->
+                <path
+                    :d="`M ${circuit.x + circuitWidth - 10} ${circuit.y + circuitHeight} L ${circuit.x + circuitWidth} ${circuit.y + circuitHeight} L ${circuit.x + circuitWidth} ${circuit.y + circuitHeight - 10}`"
+                    fill="none"
+                    stroke="#ff4500"
+                    stroke-width="2"
+                    class="rotation-handle circuit"
                     @mousedown="$emit('start-drag-circuit', $event, circuitIdx)"
                 />
               </template>
@@ -685,7 +729,7 @@ defineExpose({svgRef});
                     :d="`M ${rack.x + 10} ${rack.y} L ${rack.x} ${rack.y} L ${rack.x} ${rack.y + 10}`"
                     fill="none"
                     stroke="#ff4500"
-                    stroke-width="3"
+                    stroke-width="2"
                     class="rotation-handle rack"
                     @mousedown="$emit('start-rotate', $event, tIdx)"
                 />
@@ -694,7 +738,7 @@ defineExpose({svgRef});
                     :d="`M ${rack.x + getRackDimensions(rack).width - 10} ${rack.y} L ${rack.x + getRackDimensions(rack).width} ${rack.y} L ${rack.x + getRackDimensions(rack).width} ${rack.y + 10}`"
                     fill="none"
                     stroke="#ff4500"
-                    stroke-width="3"
+                    stroke-width="2"
                     class="rotation-handle rack"
                     @mousedown="$emit('start-rotate', $event, tIdx)"
                 />
@@ -703,7 +747,7 @@ defineExpose({svgRef});
                     :d="`M ${rack.x} ${rack.y + getRackDimensions(rack).height - 10} L ${rack.x} ${rack.y + getRackDimensions(rack).height} L ${rack.x + 10} ${rack.y + getRackDimensions(rack).height}`"
                     fill="none"
                     stroke="#ff4500"
-                    stroke-width="3"
+                    stroke-width="2"
                     class="rotation-handle rack"
                     @mousedown="$emit('start-rotate', $event, tIdx)"
                 />
@@ -712,7 +756,7 @@ defineExpose({svgRef});
                     :d="`M ${rack.x + getRackDimensions(rack).width - 10} ${rack.y + getRackDimensions(rack).height} L ${rack.x + getRackDimensions(rack).width} ${rack.y + getRackDimensions(rack).height} L ${rack.x + getRackDimensions(rack).width} ${rack.y + getRackDimensions(rack).height - 10}`"
                     fill="none"
                     stroke="#ff4500"
-                    stroke-width="3"
+                    stroke-width="2"
                     class="rotation-handle rack"
                     @mousedown="$emit('start-rotate', $event, tIdx)"
                 />
@@ -880,18 +924,19 @@ defineExpose({svgRef});
 }
 
 .rotation-handle {
-  fill: white;
+  fill: none;
   stroke: #ff4500;
-  stroke-width: 1.5;
+  stroke-width: 5;
+  cursor: alias;
 
-  &.rack {
-    cursor: alias;
+  &.footprint,
+  &.rack,
+  &.circuit {
     stroke-width: 3;
-    pointer-events: visibleStroke;
   }
 
-  &.footprint {
-    cursor: alias;
+  &.rack {
+    pointer-events: visibleStroke;
   }
 }
 
