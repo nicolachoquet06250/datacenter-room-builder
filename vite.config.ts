@@ -25,13 +25,15 @@ const keepBannerAfterMinify = (banner: string): Plugin => ({
       // JS chunks
       if (file.type === "chunk") {
         file.code = ensureBanner(file.code);
+        file.code = `${file.code}`.replaceAll(/background:var\(--lightningcss-light,#fff\)var\(--lightningcss-dark,#3b4253\)/g, 'background:light-dark(var(--lightningcss-light,#fff),var(--lightningcss-dark,#3b4253))');
         continue;
       }
 
       // CSS assets
       // file.type === "asset"
-      if (typeof file.fileName === "string" && file.fileName.endsWith(".css")) {
-        const src = `.modal-overlay {
+      if (typeof file.fileName === "string") {
+        if (file.fileName.endsWith(".css")) {
+          const src = `.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -43,10 +45,14 @@ const keepBannerAfterMinify = (banner: string): Plugin => ({
   align-items: flex-start;
   z-index: 20;
   overflow-y: auto;
+
+  &.centered {
+    align-items: center;
+  }
 }
 
 .modal-container {
-  background: #3b4252;
+  background: light-dark(#fff, #3B4253);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -144,12 +150,13 @@ const keepBannerAfterMinify = (banner: string): Plugin => ({
 
 ${file.source}`;
 
-        // Vite/Rollup peuvent donner string ou Uint8Array/Buffer-like
-        if (typeof src === "string") {
-          file.source = ensureBanner(src);
-        } else if (src && typeof (src as any).toString === "function") {
-          const asString = (src as any).toString("utf8");
-          file.source = ensureBanner(asString);
+          // Vite/Rollup peuvent donner string ou Uint8Array/Buffer-like
+          if (typeof src === "string") {
+            file.source = ensureBanner(src);
+          } else if (src && typeof (src as any).toString === "function") {
+            const asString = (src as any).toString("utf8");
+            file.source = ensureBanner(asString);
+          }
         }
       }
     }

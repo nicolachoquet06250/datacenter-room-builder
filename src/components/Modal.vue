@@ -55,7 +55,9 @@ const message = computed(() => props.isHtml ? `<style>
 }
 
 .modal-container {
-    background: light-dark(#ffffff, #3b4252);
+    --lightningcss-light: #ffffff;
+    --lightningcss-dark: #3b4252;
+    background: light-dark(var(--lightningcss-light, #fff), var(--lightningcss-dark, #3B4253));
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -183,35 +185,37 @@ watch(htmlContent, htmlContent => {
 </script>
 
 <template>
-  <Transition name="modal">
-    <div v-if="show" :class="['modal-overlay', {centered: center}]" @click.self="cancel" ref="itopModalContainer">
-      <div class="modal-container">
-        <div class="modal-header">
-          <h3>{{ title }}</h3>
-        </div>
-
-        <div class="modal-body" v-if="isHtml">
-          <div v-if="isLoading" class="loader-container modal-body">
-            <span class="loader" />
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="show" :class="['modal-overlay', {centered: center}]" @click.self="cancel" ref="itopModalContainer">
+        <div class="modal-container">
+          <div class="modal-header">
+            <h3>{{ title }}</h3>
           </div>
-          <div class="modal-body" ref="htmlContent" v-else-if="message" v-html="message" />
-        </div>
 
-        <div class="modal-body" v-else>
-          <p>{{ message }}</p>
-        </div>
+          <div class="modal-body" v-if="isHtml">
+            <div v-if="isLoading" class="loader-container modal-body">
+              <span class="loader" />
+            </div>
+            <div class="modal-body" ref="htmlContent" v-else-if="message" v-html="message" />
+          </div>
 
-        <div class="modal-footer" v-if="hasFooter">
-          <button class="btn btn-secondary" @click="cancel">
-            {{ cancelText || 'Annuler' }}
-          </button>
-          <button class="btn btn-danger" @click="confirm">
-            {{ confirmText || 'Confirmer' }}
-          </button>
+          <div class="modal-body" v-else>
+            <p>{{ message }}</p>
+          </div>
+
+          <div class="modal-footer" v-if="hasFooter">
+            <button class="btn btn-secondary" @click="cancel">
+              {{ cancelText || 'Annuler' }}
+            </button>
+            <button class="btn btn-danger" @click="confirm">
+              {{ confirmText || 'Confirmer' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </Transition>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -234,7 +238,7 @@ watch(htmlContent, htmlContent => {
 }
 
 .modal-container {
-  background: light-dark(#ffffff, #3b4252);
+  background: light-dark(#fff, #3B4253);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
