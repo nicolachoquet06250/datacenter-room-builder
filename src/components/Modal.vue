@@ -55,7 +55,7 @@ const message = computed(() => props.isHtml ? `<style>
 }
 
 .modal-container {
-    background: #3b4252;
+    background: light-dark(#ffffff, #3b4252);
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -141,49 +141,6 @@ watch(htmlContent, (htmlContent, oldHtmlContent) => {
     oldHtmlContent?.removeEventListener('click', handleHtmlContentClick);
   }
 });
-
-/*watch(itopModalContainer, itopModalContainer => {
-  console.log('itopModalContainer changed:', itopModalContainer);
-  setTimeout(() => {
-    if (itopModalContainer) {
-      const scripts = itopModalContainer.querySelectorAll('script');
-      scripts.forEach(oldScript => {
-        const newScript = document.createElement('script');
-        Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
-        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
-        oldScript.parentNode?.replaceChild(newScript, oldScript);
-      });
-
-      // Détecter le submit du formulaire
-      const form = itopModalContainer.querySelector('form');
-      console.log('Form detected:', form);
-      if (form) {
-        console.log('Form detected:', form);
-        form.addEventListener('submit', () => {
-          console.log('Formulaire iTop soumis');
-          // iTop ferme généralement la modale et rafraîchit la page ou une partie de la page
-          // On attend un peu pour laisser le temps à la requête de partir
-          setTimeout(() => {
-            emit('close');
-            emit('reload');
-          }, 1000);
-        });
-      }
-
-      // Alternative : iTop utilise parfois des événements personnalisés ou ferme la fenêtre si c'est un popup
-      // On peut écouter les messages postés à la fenêtre
-      const messageHandler = (event: MessageEvent) => {
-        // On peut filtrer par origine si besoin : if (event.origin !== "https://itop.localhost:8009") return;
-        if (event.data && (event.data === 'itop.form.submitted' || event.data.type === 'itop.form.submitted')) {
-          emit('close');
-          emit('reload');
-          window.removeEventListener('message', messageHandler);
-        }
-      };
-      window.addEventListener('message', messageHandler);
-    }
-  }, 100)
-})*/
 
 watch(htmlContent, htmlContent => {
   if (htmlContent) {
@@ -277,7 +234,7 @@ watch(htmlContent, htmlContent => {
 }
 
 .modal-container {
-  background: #3b4252;
+  background: light-dark(#ffffff, #3b4252);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);

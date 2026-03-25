@@ -1,6 +1,8 @@
 <script lang="ts">
-const circuitWidth = 40;
-const circuitHeight = 40;
+import {GRID_SIZE} from "../../constants.ts";
+
+const circuitWidth = GRID_SIZE;
+const circuitHeight = GRID_SIZE;
 const itop_url = import.meta.env.VITE_ITOP_BASE_URL ?? window.location.protocol+'//'+window.location.hostname+(window.location.port ? ':' + window.location.port : '');
 
 type Props = {
